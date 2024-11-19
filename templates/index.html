@@ -1,0 +1,15 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block title %}Home - {{ app_settings.app_title }}{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+    {% if app_settings.show_logo %}
+        <img src="{{ url_for('static', filename=app_settings.logo_path) }}" alt="Logo" height="100" class="mb-4">
+    {% endif %}
+    <h2>Welcome to {{ app_settings.app_title }}</h2>
+    <p>Click the button below to start chatting with the AI assistant.</p>
+    <a href="{{ url_for('chats') }}" class="btn btn-primary btn-lg">Start Chatting</a>
+</div>
+{% endblock %}

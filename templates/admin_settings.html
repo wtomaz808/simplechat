@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Admin Settings - {{ app_settings.app_title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Admin Settings</h1>
+    <form method="post" enctype="multipart/form-data">
+        <!-- Application Title -->
+        <div class="mb-3">
+            <label for="app_title" class="form-label">Application Title</label>
+            <input type="text" class="form-control" id="app_title" name="app_title" value="{{ settings.app_title }}">
+        </div>
+        <!-- Logo Upload Switch -->
+        <div class="form-group form-check form-switch mb-3">
+            <input type="checkbox" class="form-check-input" id="show_logo" name="show_logo" {% if settings.show_logo
+                %}checked{% endif %}>
+            <label class="form-check-label ms-2" for="show_logo">Show Logo</label>
+        </div>
+
+        <!-- Custom Logo Upload -->
+        <div class="form-group mb-3">
+            <label for="logo_file">Upload Custom Logo</label>
+            <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
+        </div>
+
+        <!-- Select LLM Model -->
+        <div class="mb-3">
+            <label for="llm_model" class="form-label">Language Model</label>
+            <select class="form-select" id="llm_model" name="llm_model">
+                <option value="gpt-4o" {% if settings.llm_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
+                <option value="gpt-4" {% if settings.llm_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
+                <option value="gpt-3.5-turbo" {% if settings.llm_model=='gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5
+                    Turbo</option>
+                <!-- Add other models as needed -->
+            </select>
+        </div>
+        <!-- Configure External APIs -->
+        <div class="form-group form-check form-switch mb-3">
+            <input type="checkbox" class="form-check-input" id="use_external_apis" name="use_external_apis" {% if
+                settings.use_external_apis %}checked{% endif %}>
+            <label class="form-check-label ms-2" for="use_external_apis">Use External APIs for Chunking and
+                Embedding</label>
+        </div>
+
+        <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;" {% endif %}>
+            <!-- External Chunking API Endpoint -->
+            <div class="mb-3">
+                <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
+                <input type="text" class="form-control" id="external_chunking_api" name="external_chunking_api"
+                    value="{{ settings.external_chunking_api }}">
+            </div>
+            <!-- External Embedding API Endpoint -->
+            <div class="mb-3">
+                <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
+                <input type="text" class="form-control" id="external_embedding_api" name="external_embedding_api"
+                    value="{{ settings.external_embedding_api }}">
+            </div>
+            <!-- Test Connection Button -->
+            <button type="button" class="btn btn-secondary mb-3" id="test_connection_button">Test Connection</button>
+            <div id="test_connection_result"></div>
+        </div>
+        <!-- Maximum File Size -->
+        <div class="mb-3">
+            <label for="max_file_size_mb" class="form-label">Maximum File Size (MB)</label>
+            <input type="number" class="form-control" id="max_file_size_mb" name="max_file_size_mb"
+                value="{{ settings.max_file_size_mb }}">
+        </div>
+        <!-- Conversation History Limit -->
+        <div class="mb-3">
+            <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
+            <input type="number" class="form-control" id="conversation_history_limit" name="conversation_history_limit"
+                value="{{ settings.conversation_history_limit }}">
+        </div>
+        <!-- Default System Prompt -->
+        <div class="mb-3">
+            <label for="default_system_prompt" class="form-label">Default System Prompt</label>
+            <textarea class="form-control" id="default_system_prompt" name="default_system_prompt"
+                rows="5">{{ settings.default_system_prompt }}</textarea>
+        </div>
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show/hide external API settings based on checkbox
+    document.getElementById('use_external_apis').addEventListener('change', function () {
+        var externalSettings = document.getElementById('external_apis_settings');
+        if (this.checked) {
+            externalSettings.style.display = 'block';
+        } else {
+            externalSettings.style.display = 'none';
+        }
+    });
+
+    document.getElementById('show_logo').addEventListener('change', function () {
+        console.log('Show Logo:', this.checked);
+    });
+
+    // Test Connection Button
+    document.getElementById('test_connection_button').addEventListener('click', function () {
+        var chunkingApiUrl = document.getElementById('external_chunking_api').value;
+        var embeddingApiUrl = document.getElementById('external_embedding_api').value;
+        var resultDiv = document.getElementById('test_connection_result');
+        resultDiv.innerHTML = 'Testing...';
+
+        fetch(chunkingApiUrl + '/api/version')
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.innerHTML = 'Chunking API Connected: ' + data.version;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = 'Chunking API Connection Failed.';
+            });
+
+        fetch(embeddingApiUrl + '/api/version')
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.innerHTML += '<br>Embedding API Connected: ' + data.version;
+            })
+            .catch(error => {
+                resultDiv.innerHTML += '<br>Embedding API Connection Failed.';
+            });
+    });
+</script>
+{% endblock %}
