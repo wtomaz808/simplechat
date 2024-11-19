@@ -28,7 +28,7 @@ app = Flask(__name__)
 # Flask Session Configuration
 app.config['SECRET_KEY'] = os.urandom(32) 
 app.config['SESSION_TYPE'] = 'filesystem'  # Use filesystem session storage
-app.config['VERSION'] = '0.82'
+app.config['VERSION'] = '0.83'
 Session(app)
 
 # Allowed extensions and max file size

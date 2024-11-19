@@ -116,6 +116,62 @@
         margin-right: 0.5rem;
     }
 
+    /* Styles for the search button */
+    .search-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        overflow: hidden;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Hide the text initially */
+    .search-btn .search-btn-text {
+        opacity: 0;
+        width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+    }
+
+    /* When the button is active */
+    .search-btn.active {
+        width: auto;
+        border-radius: 20px;
+        /* Less rounded when expanded */
+        padding: 0 15px;
+    }
+
+    /* Show the text when active */
+    .search-btn.active .search-btn-text {
+        opacity: 1;
+        width: auto;
+        margin-left: 8px;
+    }
+
+    /* Change button style when active */
+    .search-btn.active {
+        background-color: #0d6efd;
+        color: #fff;
+        border-color: #0d6efd;
+    }
+
+    /* Update the icon and text color when active */
+    .search-btn.active i,
+    .search-btn.active .search-btn-text {
+        color: #fff;
+    }
+
+    /* Set icon color when not active */
+    .search-btn i {
+        color: #0d6efd;
+        /* Bootstrap primary color */
+    }
+
     /* Additional custom styles can go here */
 </style>
 {% endblock %}
@@ -144,11 +200,11 @@
             <!-- User Input and Send Button -->
             <div class="p-3 border-top">
                 <!-- Hybrid Search Switch -->
-                <div class="form-group form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="hybrid-search-checkbox" name="hybrid_search">
-                    <label class="form-check-label ms-2" for="hybrid-search-checkbox">
-                        Enable hybrid search on my documents
-                    </label>
+                <div class="mb-3">
+                    <button id="search-documents-btn" class="btn btn-outline-secondary search-btn">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <span class="search-btn-text">Search Documents</span>
+                    </button>
                 </div>
 
 
@@ -206,6 +262,12 @@
                 console.error('Error loading conversations:', error);
             });
     }
+
+    // Toggle the active class on the button when clicked
+    document.getElementById('search-documents-btn').addEventListener('click', function () {
+        this.classList.toggle('active');
+    });
+
 
     // Function to select a conversation
     function selectConversation(conversationId) {
@@ -462,8 +524,8 @@
         // Show the loading indicator
         showLoadingIndicatorInChatbox();
 
-        // Get the state of the checkbox
-        const hybridSearchEnabled = document.getElementById('hybrid-search-checkbox').checked;
+        // Get the state of the search documents button
+        const hybridSearchEnabled = document.getElementById('search-documents-btn').classList.contains('active');
 
         fetch("/api/chat", {
             method: 'POST',
@@ -473,7 +535,7 @@
             body: JSON.stringify({
                 message: userInput,
                 conversation_id: currentConversationId,
-                hybrid_search: hybridSearchEnabled  // Include the checkbox state
+                hybrid_search: hybridSearchEnabled  // Include the button state
             }),
         })
             .then(response => response.json())
