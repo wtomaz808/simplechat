@@ -28,7 +28,7 @@ app = Flask(__name__)
 # Flask Session Configuration
 app.config['SECRET_KEY'] = os.urandom(32) 
 app.config['SESSION_TYPE'] = 'filesystem'  # Use filesystem session storage
-app.config['VERSION'] = '0.83'
+app.config['VERSION'] = '0.83b'
 Session(app)
 
 # Allowed extensions and max file size
@@ -81,7 +81,7 @@ container_name = os.getenv("AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME")
 database = cosmos_client.create_database_if_not_exists(database_name)
 container = database.create_container_if_not_exists(
     id=container_name,
-    partition_key=PartitionKey(path="/user_id"),
+    partition_key=PartitionKey(path="/id"),
     offer_throughput=400
 )
 documents_container_name = os.getenv("AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME", "documents")
@@ -209,7 +209,7 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
         # Retrieve the conversation document
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
 
         # Append the system message
@@ -799,7 +799,7 @@ def chat():
         try:
             conversation_item = container.read_item(
                 item=conversation_id,
-                partition_key=user_id
+                partition_key=conversation_id
             )
             messages = conversation_item['messages']
             print(f"Loaded conversation {conversation_id} successfully.")
@@ -834,7 +834,7 @@ def api_get_messages():
     try:
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         messages = conversation_item.get('messages', [])
         print(f"Retrieved messages for conversation {conversation_id}.")
@@ -881,10 +881,10 @@ def chat_api():
         try:
             conversation_item = container.read_item(
                 item=conversation_id,
-                partition_key=user_id
+                partition_key=conversation_id
             )
             print(f"Retrieved conversation {conversation_id}.")
-        except Exception:
+        except CosmosResourceNotFoundError:
             # Start a new conversation if not found
             conversation_id = str(uuid.uuid4())
             conversation_item = {
@@ -894,6 +894,9 @@ def chat_api():
                 'last_updated': datetime.utcnow().isoformat()
             }
             print(f"Conversation {conversation_id} not found. Started new conversation.")
+        except Exception as e:
+            print(f"Error retrieving conversation {conversation_id}: {str(e)}", exc_info=True)
+            return jsonify({'error': 'An error occurred'}), 500
 
     # Append the new user message
     conversation_item['messages'].append({'role': 'user', 'content': user_message})
@@ -1050,7 +1053,7 @@ def delete_conversation(conversation_id):
         # Attempt to read the conversation to ensure it exists and belongs to the user
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         # Delete the conversation
         container.delete_item(
@@ -1103,7 +1106,7 @@ def upload_file():
         try:
             conversation_item = container.read_item(
                 item=conversation_id,
-                partition_key=user_id
+                partition_key=conversation_id
             )
             print(f"Retrieved conversation {conversation_id}.")
         except Exception:
@@ -1207,7 +1210,7 @@ def get_file_content():
     try:
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         messages = conversation_item.get('messages', [])
         # Find the message with the given file_id
@@ -1251,7 +1254,7 @@ def view_conversation(conversation_id):
     try:
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         messages = conversation_item['messages']
         print(f"Viewing conversation {conversation_id}.")
@@ -1270,7 +1273,7 @@ def get_conversation_messages(conversation_id):
     try:
         conversation_item = container.read_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         messages = conversation_item.get('messages', [])
         # Remove 'file_content' from messages before sending
