@@ -29,6 +29,20 @@ https://github.com/user-attachments/assets/b79bea89-e24a-461b-bf75-31c79f1b18bf
 
 ![architecture](./images/architecture.png)
 
+## Demos
+
+### Upload document
+
+![Upload Document Demo](./images/UploadDocumentDemo.gif)
+
+### Chat with Searching your Documents
+
+![hat with Searching your Documents Demo](./images/ChatwithSearchingYourDocsDemo.gif)
+
+### Chat with temporary documents with a single conversation
+
+![Chat with Temp Docs](./images/ChatwithTempDocs.gif)
+
 ## Setup Instructions
 
 ### Prerequisites
