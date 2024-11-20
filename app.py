@@ -1058,7 +1058,7 @@ def delete_conversation(conversation_id):
         # Delete the conversation
         container.delete_item(
             item=conversation_id,
-            partition_key=user_id
+            partition_key=conversation_id
         )
         print(f"Conversation {conversation_id} deleted successfully.")
         return jsonify({'message': 'Conversation deleted successfully'}), 200
