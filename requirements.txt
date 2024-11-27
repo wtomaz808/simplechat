@@ -19,3 +19,5 @@ threadpoolctl==3.5.0
 azure-search-documents==11.5.1
 python-dotenv==0.19.1
 azure-ai-formrecognizer==3.3.3
+pyjwt==2.9.0
+pandas==2.2.3
