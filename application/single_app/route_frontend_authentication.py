@@ -10,7 +10,7 @@ def register_route_frontend_authentication(app):
             scopes=SCOPE,
             redirect_uri=url_for('authorized', _external=True, _scheme='https')
         )
-        print("Redirecting to Azure AD for authentication.")
+        #print("Redirecting to Azure AD for authentication.")
         return redirect(auth_url)
 
     @app.route('/getAToken')  # This path should match REDIRECT_PATH
@@ -20,7 +20,7 @@ def register_route_frontend_authentication(app):
         )
         code = request.args.get('code')
         if not code:
-            print("Authorization code not found.")
+            #print("Authorization code not found.")
             return "Authorization code not found", 400
         result = msal_app.acquire_token_by_authorization_code(
             code=code,
@@ -29,16 +29,16 @@ def register_route_frontend_authentication(app):
         )
         if "error" in result:
             error_description = result.get("error_description", result.get("error"))
-            print(f"Login failure: {error_description}")
+            #print(f"Login failure: {error_description}")
             return f"Login failure: {error_description}", 500
         session["user"] = result.get("id_token_claims")
         session["access_token"] = result.get("access_token")
-        print("User logged in successfully.")
+        #print("User logged in successfully.")
         return redirect(url_for('index'))
 
     @app.route('/logout')
     def logout():
         session.clear()
         logout_url = f"{AUTHORITY}/oauth2/v2.0/logout?post_logout_redirect_uri={url_for('index', _external=True)}"
-        print("User logged out. Redirecting to Azure AD logout endpoint.")
+        #print("User logged out. Redirecting to Azure AD logout endpoint.")
         return redirect(logout_url)

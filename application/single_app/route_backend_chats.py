@@ -10,7 +10,7 @@ def register_route_backend_chats(app):
         data = request.get_json()
         user_id = get_current_user_id()
         if not user_id:
-            print("User not authenticated.")
+            #print("User not authenticated.")
             return jsonify({'error': 'User not authenticated'}), 401
 
         user_message = data['message']
@@ -31,7 +31,7 @@ def register_route_backend_chats(app):
                 'messages': [],
                 'last_updated': datetime.utcnow().isoformat()
             }
-            print(f"Started new conversation {conversation_id}.")
+            #print(f"Started new conversation {conversation_id}.")
         else:
             # Retrieve existing conversation
             try:
@@ -39,7 +39,7 @@ def register_route_backend_chats(app):
                     item=conversation_id,
                     partition_key=conversation_id
                 )
-                print(f"Retrieved conversation {conversation_id}.")
+                #print(f"Retrieved conversation {conversation_id}.")
             except CosmosResourceNotFoundError:
                 # Start a new conversation if not found
                 conversation_id = str(uuid.uuid4())
@@ -49,9 +49,9 @@ def register_route_backend_chats(app):
                     'messages': [],
                     'last_updated': datetime.utcnow().isoformat()
                 }
-                print(f"Conversation {conversation_id} not found. Started new conversation.")
+                #print(f"Conversation {conversation_id} not found. Started new conversation.")
             except Exception as e:
-                print(f"Error retrieving conversation {conversation_id}: {str(e)}", exc_info=True)
+                #print(f"Error retrieving conversation {conversation_id}: {str(e)}", exc_info=True)
                 return jsonify({'error': 'An error occurred'}), 500
 
         # Append the new user message
@@ -101,7 +101,7 @@ def register_route_backend_chats(app):
                 )
                 # Add system prompt to conversation
                 conversation_item['messages'].append({'role': 'system', 'content': system_prompt})
-                print("System prompt with hybrid search results added to conversation.")
+                #print("System prompt with hybrid search results added to conversation.")
 
                 container.upsert_item(body=conversation_item)
 
@@ -146,7 +146,7 @@ def register_route_backend_chats(app):
 
         # Upsert the conversation item in Cosmos DB
         container.upsert_item(body=conversation_item)
-        print("AI response generated and conversation updated.")
+        #print("AI response generated and conversation updated.")
 
         return jsonify({
             'reply': ai_message,

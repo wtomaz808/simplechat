@@ -43,7 +43,7 @@ def register_route_frontend_admin_settings(app):
             update_settings(new_settings)
             settings.update(new_settings)
 
-            print("Admin settings updated successfully.")
+            #print("Admin settings updated successfully.")
 
             return redirect(url_for('admin_settings'))
 

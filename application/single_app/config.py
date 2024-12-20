@@ -5,6 +5,9 @@ import tempfile
 import json
 import openai
 import pandas as pd
+import time
+import threading
+import random
 
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from werkzeug.utils import secure_filename
@@ -12,6 +15,8 @@ from datetime import datetime, timezone
 from functools import wraps
 from msal import ConfidentialClientApplication
 from flask_session import Session
+from uuid import uuid4
+from threading import Thread
 
 from azure.cosmos import CosmosClient, PartitionKey
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -20,8 +25,8 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
-from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import AzureError
+from azure.core.polling import LROPoller
 
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'

@@ -22,10 +22,10 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
 
         container.upsert_item(conversation_item)
-        print(f"System message added to conversation {conversation_id} successfully.")
+        #print(f"System message added to conversation {conversation_id} successfully.")
 
     except Exception as e:
-        print(f"Error adding system message to conversation: {str(e)}")
+        #print(f"Error adding system message to conversation: {str(e)}")
         raise e
 
 def process_document_and_store_chunks(extracted_content , file_name, user_id):
@@ -40,12 +40,14 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
     else:
         chunks = chunk_text(extracted_content )
 
-    print("Function process_document_and_store_chunks called")
+    #print("Function process_document_and_store_chunks called")
     document_id = str(uuid.uuid4())
-    print(f"Generated document ID: {document_id}")
+    #print(f"Generated document ID: {document_id}")
     
     chunks = chunk_text(extracted_content )
-    print(f"Total chunks created: {len(chunks)}")
+    #print(f"Total chunks created: {len(chunks)}")
+
+    num_chunks = len(chunks)
 
     existing_document_query = """
         SELECT c.version 
@@ -53,17 +55,17 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
         WHERE c.file_name = @file_name AND c.user_id = @user_id
     """
     parameters = [{"name": "@file_name", "value": file_name}, {"name": "@user_id", "value": user_id}]
-    print(f"Querying existing document with parameters: {parameters}")
+    #print(f"Querying existing document with parameters: {parameters}")
     
     existing_document = list(documents_container.query_items(query=existing_document_query, parameters=parameters, enable_cross_partition_query=True))
-    print(f"Existing document found: {existing_document}")
+    #print(f"Existing document found: {existing_document}")
 
     if existing_document:
         version = existing_document[0]['version'] + 1
-        print(f"New version determined: {version} (existing document found)")
+        #print(f"New version determined: {version} (existing document found)")
     else:
         version = 1
-        print(f"New version determined: {version} (no existing document)")
+        #print(f"New version determined: {version} (no existing document)")
 
     current_time = datetime.now(timezone.utc)
 
@@ -71,28 +73,29 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
 
     document_metadata = {
         "id": document_id,
+        "num_chunks": num_chunks,
         "file_name": file_name,
         "user_id": user_id,
         "upload_date": formatted_time,
         "version": version,
         "type": "document_metadata"
     }
-    print(f"Document metadata to be upserted: {document_metadata}")
+    #print(f"Document metadata to be upserted: {document_metadata}")
     documents_container.upsert_item(document_metadata)
-    print("Document metadata upserted successfully.")
+    #print("Document metadata upserted successfully.")
 
     chunk_documents = []
     
     for idx, chunk_text_content in enumerate(chunks):
         chunk_id = f"{document_id}_{idx}"
-        print(f"Processing chunk {idx} with ID: {chunk_id}")
+        #print(f"Processing chunk {idx} with ID: {chunk_id}")
 
         if use_external_apis:
             response = requests.post(f"{external_embedding_api}/embed", json={'text': chunk_text_content})
             embedding = response.json().get('embedding')
         else:
             embedding = generate_embedding(chunk_text_content)
-        print(f"Generated embedding for chunk {idx}")
+        #print(f"Generated embedding for chunk {idx}")
 
         chunk_document = {
             "id": chunk_id,
@@ -106,24 +109,24 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
             "upload_date": formatted_time,
             "version": version
         }
-        print(f"Chunk document created for chunk {idx}: {chunk_document}")
+        #print(f"Chunk document created for chunk {idx}: {chunk_document}")
         chunk_documents.append(chunk_document)
 
-    print(f"Uploading {len(chunk_documents)} chunk documents to Azure Cognitive Search")
+    #print(f"Uploading {len(chunk_documents)} chunk documents to Azure Cognitive Search")
     search_client_user.upload_documents(documents=chunk_documents)
-    print("Chunks uploaded successfully")
+    #print("Chunks uploaded successfully")
 
 def get_user_documents(user_id):
     try:
         query = """
-            SELECT c.file_name, c.id, c.upload_date, c.user_id, c.version
+            SELECT c.file_name, c.id, c.upload_date, c.user_id, c.num_chunks ,c.version
             FROM c
             WHERE c.user_id = @user_id
         """
         parameters = [{"name": "@user_id", "value": user_id}]
         
         documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
-        print(f"Retrieved {len(documents)} documents for user {user_id}.")
+        #print(f"Retrieved {len(documents)} documents for user {user_id}.")
 
         latest_documents = {}
 
@@ -132,14 +135,14 @@ def get_user_documents(user_id):
             if file_name not in latest_documents or doc['version'] > latest_documents[file_name]['version']:
                 latest_documents[file_name] = doc
                 
-        print("Successfully processed user documents.")
+        #print("Successfully processed user documents.")
         return jsonify({"documents": list(latest_documents.values())}), 200
     except Exception as e:
-        print(f"Error retrieving documents: {str(e)}")
+        #print(f"Error retrieving documents: {str(e)}")
         return jsonify({'error': f'Error retrieving documents: {str(e)}'}), 500
 
 def get_user_document(user_id, document_id):
-    print(f"Function get_user_document called for user_id: {user_id}, document_id: {document_id}")
+    #print(f"Function get_user_document called for user_id: {user_id}, document_id: {document_id}")
 
     try:
         latest_version_query = """
@@ -152,7 +155,7 @@ def get_user_document(user_id, document_id):
             {"name": "@document_id", "value": document_id},
             {"name": "@user_id", "value": user_id}
         ]
-        print(f"Query parameters: {parameters}")
+        #print(f"Query parameters: {parameters}")
 
         document_results = list(documents_container.query_items(
             query=latest_version_query, 
@@ -160,21 +163,21 @@ def get_user_document(user_id, document_id):
             enable_cross_partition_query=True
         ))
 
-        print(f"Query executed, document_results: {document_results}")
+        #print(f"Query executed, document_results: {document_results}")
 
         if not document_results:
-            print("Document not found or access denied")
+            #print("Document not found or access denied")
             return jsonify({'error': 'Document not found or access denied'}), 404
 
-        print(f"Returning latest version of document: {document_results[0]}")
+        #print(f"Returning latest version of document: {document_results[0]}")
         return jsonify(document_results[0]), 200  # Return the latest version of the document
 
     except Exception as e:
-        print(f"Error retrieving document: {str(e)}")
+        #print(f"Error retrieving document: {str(e)}")
         return jsonify({'error': f'Error retrieving document: {str(e)}'}), 500
 
 def get_latest_version(document_id, user_id):
-    print(f"Function get_latest_version called for document_id: {document_id}, user_id: {user_id}")
+    #print(f"Function get_latest_version called for document_id: {document_id}, user_id: {user_id}")
 
     query = """
         SELECT c.version
@@ -185,22 +188,22 @@ def get_latest_version(document_id, user_id):
         {"name": "@document_id", "value": document_id},
         {"name": "@user_id", "value": user_id}
     ]
-    print(f"Query parameters: {parameters}")
+    #print(f"Query parameters: {parameters}")
 
     try:
         results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
-        print(f"Query results: {results}")
+        #print(f"Query results: {results}")
 
         if results:
             max_version = max(item['version'] for item in results)
-            print(f"Latest version found: {max_version}")
+            #print(f"Latest version found: {max_version}")
             return max_version
         else:
-            print("No version found for the document.")
+            #print("No version found for the document.")
             return None
 
     except Exception as e:
-        print(f"Error retrieving latest version: {str(e)}")
+        #print(f"Error retrieving latest version: {str(e)}")
         return None
 
 def get_user_document_version(user_id, document_id, version):
@@ -219,14 +222,14 @@ def get_user_document_version(user_id, document_id, version):
         document_results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
         if not document_results:
-            print("Document version not found.")
+            #print("Document version not found.")
             return jsonify({'error': 'Document version not found'}), 404
 
-        print(f"Returning document version: {version}")
+        #print(f"Returning document version: {version}")
         return jsonify(document_results[0]), 200  # Return the specific version of the document
 
     except Exception as e:
-        print(f"Error retrieving document version: {str(e)}")
+        #print(f"Error retrieving document version: {str(e)}")
         return jsonify({'error': f'Error retrieving document version: {str(e)}'}), 500
 
 def delete_user_document(user_id, document_id):
@@ -244,12 +247,12 @@ def delete_user_document(user_id, document_id):
             item=document_id,
             partition_key=document_id
         )
-        print(f"Document {document_id} deleted successfully.")
+        #print(f"Document {document_id} deleted successfully.")
     except CosmosResourceNotFoundError:
-        print("Document not found.")
+        #print("Document not found.")
         raise Exception("Document not found")
     except Exception as e:
-        print(f"Error deleting document: {str(e)}")
+        #print(f"Error deleting document: {str(e)}")
         raise
 
 def delete_user_document_chunks(document_id):
@@ -264,7 +267,7 @@ def delete_user_document_chunks(document_id):
         ids_to_delete = [doc['id'] for doc in results]
 
         if not ids_to_delete:
-            print(f"No chunks found for document_id: {document_id}")
+            #print(f"No chunks found for document_id: {document_id}")
             return
 
         documents_to_delete = [{"id": doc_id} for doc_id in ids_to_delete]
@@ -274,9 +277,9 @@ def delete_user_document_chunks(document_id):
         batch.add_delete_actions(documents_to_delete)
 
         result = search_client_user.index_documents(batch)
-        print(f"Document chunks for {document_id} deleted successfully.")
+        #print(f"Document chunks for {document_id} deleted successfully.")
     except Exception as e:
-        print(f"Error deleting document chunks: {str(e)}")
+        #print(f"Error deleting document chunks: {str(e)}")
         raise
 
 def delete_user_document_version(user_id, document_id, version):
@@ -294,7 +297,7 @@ def delete_user_document_version(user_id, document_id, version):
 
     for doc in documents:
         documents_container.delete_item(doc['id'], partition_key=doc['user_id'])
-        print(f"Deleted document version {version} for document_id {document_id}.")
+        #print(f"Deleted document version {version} for document_id {document_id}.")
 
 def delete_user_document_version_chunks(document_id, version):
     search_client_user.delete_documents(
@@ -307,7 +310,7 @@ def delete_user_document_version_chunks(document_id, version):
             )
         ]
     )
-    print(f"Deleted chunks for document_id {document_id}, version {version}.")
+    #print(f"Deleted chunks for document_id {document_id}, version {version}.")
 
 def get_document_versions(user_id, document_id):
     try:
@@ -325,11 +328,11 @@ def get_document_versions(user_id, document_id):
         versions_results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
         if not versions_results:
-            print("No versions found for the document.")
+            #print("No versions found for the document.")
             return []
-        print(f"Retrieved {len(versions_results)} versions for document {document_id}.")
+        #print(f"Retrieved {len(versions_results)} versions for document {document_id}.")
         return versions_results
 
     except Exception as e:
-        print(f'Error retrieving document versions: {str(e)}')
+        #print(f'Error retrieving document versions: {str(e)}')
         return []

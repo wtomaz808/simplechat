@@ -6,7 +6,7 @@ def hybrid_search(query, user_id, top_n=3):
         query_embedding = generate_embedding(query)
 
         if query_embedding is None:
-            print("Failed to generate query embedding.")
+            #print("Failed to generate query embedding.")
             return None
 
         vector_query = VectorizedQuery(vector=query_embedding, k_nearest_neighbors=top_n, fields="embedding")
@@ -25,9 +25,9 @@ def hybrid_search(query, user_id, top_n=3):
             limited_results.append(result)
 
         documents = [doc for doc in limited_results]
-        print(f"Hybrid search completed successfully with {len(documents)} results.")
+        #print(f"Hybrid search completed successfully with {len(documents)} results.")
         return documents
 
     except Exception as e:
-        print(f"Error during hybrid search: {str(e)}")
+        #print(f"Error during hybrid search: {str(e)}")
         return None

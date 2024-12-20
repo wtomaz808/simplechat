@@ -7,6 +7,6 @@ def register_route_frontend_documents(app):
     def documents():
         user_id = get_current_user_id()
         if not user_id:
-            print("User not authenticated.")
+            #print("User not authenticated.")
             return redirect(url_for('login'))
         return render_template('documents.html')
