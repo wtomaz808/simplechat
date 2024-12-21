@@ -24,6 +24,7 @@
       body {
         padding-top: 56px; /* Adjust for navbar height */
         overflow-x: hidden; /* Prevent horizontal scroll */
+        height: 100%
       }
       .main-content {
         margin-top: 10px;
@@ -84,6 +85,21 @@
 
       .form-group {
         margin-bottom: 10px; /* Adjust as needed */
+      }
+
+      .chat-container {
+          max-height: calc(100vh - 56px); /* Adjust height to fit below the navbar */
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+      }
+      #chatbox {
+          overflow-y: auto;
+          flex-grow: 1;
+      }
+
+      .p-3.border-top {
+          flex-shrink: 0;
       }
       /* Additional custom styles can go here */
     </style>

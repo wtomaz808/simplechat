@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.urandom(32) 
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.131'
+app.config['VERSION'] = '0.132'
 Session(app)
 
 # =================== Helper Functions ===================
