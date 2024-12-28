@@ -28,10 +28,23 @@ from azure.search.documents.models import VectorizedQuery
 from azure.core.exceptions import AzureError
 from azure.core.polling import LROPoller
 
+
+#from openai import AzureOpenAI
+
+
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
 }
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+
+#define the models that you want to be available in the app
+MODELS = [
+    {"value": "gpt-4o", "label": "GPT-4o", "max_tokens_k": 125},
+    {"value": "gpt-4", "label": "GPT-4", "max_tokens_k": 16},
+    #{"value": "gpt-3.5-turbo", "label": "GPT-3.5 Turbo"},
+    # Add more models as needed
+]
+
 
 # Azure AD Configuration
 CLIENT_ID = os.getenv("CLIENT_ID")
@@ -65,6 +78,13 @@ openai.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
 llm_model = os.getenv("AZURE_OPENAI_LLM_MODEL")
 embedding_model = os.getenv("AZURE_OPENAI_EMBEDDING_MODEL")
 
+
+# client = AzureOpenAI(endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), api_key=os.getenv("AZURE_OPENAI_KEY"),api_version="2024-07-01-preview")
+# deployments = client.list_deployments()
+# print('-----------------------------')
+# print(f"Deployed models: {deployments}")
+# print('-----------------------------')
+
 AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
 AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
 AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
@@ -76,17 +96,36 @@ cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 database_name = os.getenv("AZURE_COSMOS_DB_NAME")
 container_name = os.getenv("AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME")
 database = cosmos_client.create_database_if_not_exists(database_name)
-container = database.create_container_if_not_exists(
-    id=container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
 documents_container_name = os.getenv("AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME", "documents")
-documents_container = database.create_container_if_not_exists(
-    id=documents_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
+# Retrieve account properties
+database_account = cosmos_client.get_database_account()
+if hasattr(database_account, 'consistency_policy') and database_account.consistency_policy:
+    is_serverless= False
+else:
+    is_serverless = True
+
+if is_serverless:
+    print("The database is serverless.")
+    container = database.create_container_if_not_exists(
+        id=container_name,
+        partition_key=PartitionKey(path="/id")
+    )
+    documents_container = database.create_container_if_not_exists(
+        id=documents_container_name,
+        partition_key=PartitionKey(path="/id")
+    )    
+else:
+    print("The database is not serverless.")
+    container = database.create_container_if_not_exists(
+        id=container_name,
+        partition_key=PartitionKey(path="/id"),
+        offer_throughput=400
+    )
+    documents_container = database.create_container_if_not_exists(
+        id=documents_container_name,
+        partition_key=PartitionKey(path="/id"),
+        offer_throughput=400
+    )
 
 search_client_user = SearchClient(
     endpoint=AZURE_AI_SEARCH_ENDPOINT,
@@ -95,11 +134,17 @@ search_client_user = SearchClient(
 )
 
 settings_container_name = "settings"
-settings_container = database.create_container_if_not_exists(
-    id=settings_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
+if is_serverless:
+    settings_container = database.create_container_if_not_exists(
+        id=settings_container_name,
+        partition_key=PartitionKey(path="/id")
+    )
+else:
+    settings_container = database.create_container_if_not_exists(
+        id=settings_container_name,
+        partition_key=PartitionKey(path="/id"),
+        offer_throughput=400
+    )    
 
 def get_settings():
     try:
@@ -108,6 +153,9 @@ def get_settings():
             partition_key="app_settings"
         )
         print("Successfully retrieved settings.")
+        if 'models' not in settings_item:
+            settings_item['models'] = MODELS
+
         return settings_item
     except CosmosResourceNotFoundError:
         # If settings do not exist, return default settings
@@ -122,7 +170,8 @@ def get_settings():
             'external_chunking_api': '',
             'external_embedding_api': '',
             'logo_path': 'images/logo.svg',
-            'show_logo': False 
+            'show_logo': False,
+            'models': MODELS
         }
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")

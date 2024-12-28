@@ -27,11 +27,11 @@
         <div class="mb-3">
             <label for="llm_model" class="form-label">Language Model</label>
             <select class="form-select" id="llm_model" name="llm_model">
-                <option value="gpt-4o" {% if settings.llm_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
-                <option value="gpt-4" {% if settings.llm_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
-                <option value="gpt-3.5-turbo" {% if settings.llm_model=='gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5
-                    Turbo</option>
-                <!-- Add other models as needed -->
+                {% for model in settings.models %}
+                    <option value="{{ model.value }}" {% if settings.llm_model == model.value %}selected{% endif %}>
+                        {{ model.label }}
+                    </option>
+                {% endfor %}
             </select>
         </div>
         <!-- Configure External APIs -->

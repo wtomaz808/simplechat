@@ -7,6 +7,9 @@ def register_route_frontend_admin_settings(app):
     @login_required
     def admin_settings():
         settings = get_settings()
+        print('---------')
+        print(settings)
+        print('---------')        
         if request.method == 'POST':
             app_title = request.form.get('app_title', 'AI Chat Application')
             max_file_size_mb = int(request.form.get('max_file_size_mb', 16))
@@ -38,11 +41,11 @@ def register_route_frontend_admin_settings(app):
                 'external_chunking_api': external_chunking_api,
                 'external_embedding_api': external_embedding_api,
                 'logo_path': logo_path_relative,
-                'show_logo': show_logo  # Include the new setting
+                'show_logo': show_logo,  # Include the new setting
+                'models': MODELS
             }
             update_settings(new_settings)
             settings.update(new_settings)
-
             #print("Admin settings updated successfully.")
 
             return redirect(url_for('admin_settings'))
