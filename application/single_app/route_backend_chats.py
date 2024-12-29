@@ -1,6 +1,8 @@
 from config import *
 from functions_authentication import *
 from functions_search import *
+import base64
+#from openai import AzureOpenAI
 
 def register_route_backend_chats(app):
     @app.route('/api/chat', methods=['POST'])
@@ -16,10 +18,14 @@ def register_route_backend_chats(app):
         user_message = data['message']
         conversation_id = data.get('conversation_id')
         hybrid_search_enabled = data.get('hybrid_search', True)  # Default to True if not provided
+        create_images = data.get('create_images', False)  # Default to True if not provided
 
         # Convert hybrid_search_enabled to boolean if necessary
         if isinstance(hybrid_search_enabled, str):
             hybrid_search_enabled = hybrid_search_enabled.lower() == 'true'
+
+        if isinstance(create_images, str):
+            hybrid_search_enabled = create_images.lower() == 'true'
 
         # Retrieve or create the conversation
         if not conversation_id:
@@ -114,7 +120,8 @@ def register_route_backend_chats(app):
         conversation_history_for_api = []
         for msg in conversation_history:
             if msg['role'] in allowed_roles:
-                conversation_history_for_api.append(msg)
+                if 'data:image/png;base64' not in msg['content']:
+                    conversation_history_for_api.append(msg)
             elif msg['role'] == 'file':
                 # Modify 'file' messages to be 'system' messages
                 file_content = msg.get('file_content', '')
@@ -135,18 +142,59 @@ def register_route_backend_chats(app):
                 continue
 
         # Generate AI response
-        response = openai.ChatCompletion.create(
-            engine=settings.get('llm_model', 'gpt-4o'),
-            messages=conversation_history_for_api
-        )
+        if create_images==False:
+            print(f"Creating text response {create_images}")
+            response = openai.ChatCompletion.create(
+                engine=settings.get('llm_model', 'gpt-4o'),
+                messages=conversation_history_for_api
+            )
+            ai_message = response['choices'][0]['message']['content']
+            conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
+            conversation_item['last_updated'] = datetime.utcnow().isoformat()
+            # Upsert the conversation item in Cosmos DB
+            container.upsert_item(body=conversation_item)
+            #print("AI response generated and conversation updated.")                        
+        else:
+            print("Creating image response")
+            try:
+                openai.api_version = "2023-06-01-preview"  
+                response = openai.Image.create(
+                    #engine='dall-e-3', #settings.get('llm_model', 'gpt-4o'),
+                    prompt=user_message,
+                    #model="dall-e-3",
+                    n=1,
+                    size="256x256"
+                )
+                openai.api_version = os.getenv('OPENAI_API_VERSION', '2024-02-15-preview')
+                # Extract the URL of the generated image
+                image_url = response['data'][0]['url']
+                # Read the image from the URL
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()  # Raise an error for bad status codes
 
-        ai_message = response['choices'][0]['message']['content']
-        conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
-        conversation_item['last_updated'] = datetime.utcnow().isoformat()
+                # Encode the image in base64
+                image_base64 = base64.b64encode(image_response.content).decode('utf-8')
 
-        # Upsert the conversation item in Cosmos DB
-        container.upsert_item(body=conversation_item)
-        #print("AI response generated and conversation updated.")
+                # Create an HTML image tag with the base64-encoded image
+                ai_message = f"Here is the image you requested:<br><img src='data:image/png;base64,{image_base64}' alt='Generated Image'/>"
+                #ai_message = f"Here is the image you requested: {image_url}"
+                conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
+                conversation_item['last_updated'] = datetime.utcnow().isoformat()
+                # Upsert the conversation item in Cosmos DB
+                container.upsert_item(body=conversation_item)
+            except openai.error.InvalidRequestError as e:
+                ai_message = f"Invalid request: {str(e)}"
+                print(f"Invalid request: {str(e)}")
+            except openai.error.AuthenticationError as e:
+                ai_message = f"Authentication error: {str(e)}"
+                print(f"Authentication error: {str(e)}")
+            except openai.error.APIConnectionError as e:
+                ai_message = f"API connection error: {str(e)}"
+                print(f"API connection error: {str(e)}")
+            except openai.error.OpenAIError as e:
+                ai_message = f"An error occurred while generating the image: {str(e)}"
+                print(f"Error generating image: {str(e)}")
+
 
         return jsonify({
             'reply': ai_message,
