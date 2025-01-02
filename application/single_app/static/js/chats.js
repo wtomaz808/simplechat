@@ -50,6 +50,12 @@ document
     this.classList.toggle("active");
   });
 
+  document
+  .getElementById("search-web-btn")
+  .addEventListener("click", function () {
+    this.classList.toggle("active");
+  });
+
 // Function to select a conversation
 function selectConversation(conversationId) {
   currentConversationId = conversationId;
@@ -373,6 +379,10 @@ function sendMessage() {
     .getElementById("create-images-btn")
     .classList.contains("active");
 
+  const webSearchEnabled = document
+    .getElementById("search-web-btn")
+    .classList.contains("active");
+
   fetch("/api/chat", {
     method: "POST",
     headers: {
@@ -382,7 +392,8 @@ function sendMessage() {
       message: userInput,
       conversation_id: currentConversationId,
       hybrid_search: hybridSearchEnabled, // Include the button state
-      create_images: imageCreationEnabled
+      create_images: imageCreationEnabled,
+      web_search: webSearchEnabled
     }),
   })
     .then((response) => response.json())

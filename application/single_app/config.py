@@ -89,6 +89,9 @@ AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
 AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
 AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
 
+BING_SEARCH_ENDPOINT = os.getenv('BING_SEARCH_ENDPOINT')
+BING_SEARCH_KEY = os.getenv('BING_SEARCH_KEY')
+
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
 cosmos_key = os.getenv("AZURE_COSMOS_KEY")
@@ -190,3 +193,4 @@ def update_settings(new_settings):
     except Exception as e:
         print(f"Error updating settings: {str(e)}")
         return False
+    
