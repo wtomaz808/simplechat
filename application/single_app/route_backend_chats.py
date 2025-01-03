@@ -198,7 +198,8 @@ def register_route_backend_chats(app):
                 print(f"Error generating image: {str(e)}")
         elif web_search_enabled==True:
             print("Web search enabled")
-            ai_message=process_query_with_bing_and_llm(user_message)
+            tmodel = settings.get('llm_model', 'gpt-4o')
+            ai_message=process_query_with_bing_and_llm(user_message,tmodel)
             conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
             conversation_item['last_updated'] = datetime.utcnow().isoformat()
             # Upsert the conversation item in Cosmos DB
