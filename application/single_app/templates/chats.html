@@ -43,7 +43,26 @@
                         <i class="bi bi-file-earmark-text"></i>
                         <span class="search-btn-text">Search Documents</span>
                     </button>
-
+                    <!-- Create images button -->
+                    <button
+                        id="create-images-btn"
+                        class="btn btn-outline-secondary images-btn me-2"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Create Images with DALLE">
+                        <i class="bi bi-file-earmark-image"></i>
+                        <span class="images-btn-text">Create Images</span>
+                    </button>
+                    <!-- web search button -->
+                    <button
+                        id="search-web-btn"
+                        class="btn btn-outline-secondary images-btn me-2"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Search the web for information">
+                        <i class="bi bi-globe"></i>
+                        <span class="images-btn-text">Web Search</span>
+                    </button>                    
                     <!-- File Upload Elements -->
                     <input
                         type="file"
@@ -71,13 +90,13 @@
                 </div>
                 <!-- Second Row: Message Input and Send Button -->
                 <div class="input-group">
-                    <input
-                        type="text"
+                    <textarea
                         id="user-input"
                         class="form-control"
                         placeholder="Type your message here..."
+                        rows="3"
                         disabled
-                    />
+                    ></textarea>
                     <button class="btn btn-primary" id="send-btn" disabled>Send</button>
                 </div>
             </div>

@@ -172,6 +172,63 @@ a.citation-link:hover {
   /* Bootstrap primary color */
 }
 
+/* Styles for the images button */
+.images-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide the text initially */
+.images-btn .images-btn-text {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+/* When the button is active */
+.images-btn.active {
+  width: auto;
+  border-radius: 20px;
+  /* Less rounded when expanded */
+  padding: 0 15px;
+}
+
+/* Show the text when active */
+.images-btn.active .images-btn-text {
+  opacity: 1;
+  width: auto;
+  margin-left: 8px;
+}
+
+/* Change button style when active */
+.images-btn.active {
+  background-color: #0d6efd;
+  color: #fff;
+  border-color: #0d6efd;
+}
+
+/* Update the icon and text color when active */
+.images-btn.active i,
+.images-btn.active .images-btn-text {
+  color: #fff;
+}
+
+/* Set icon color when not active */
+.images-btn i {
+  color: #0d6efd;
+  /* Bootstrap primary color */
+}
+
+
 /* Styles for the file button */
 .file-btn {
   width: 40px;

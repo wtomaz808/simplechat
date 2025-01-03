@@ -22,3 +22,6 @@ priv-*
 
 # Visual Studio Code
 .vscode
+
+# temporary files
+flask_session
