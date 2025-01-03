@@ -1,6 +1,7 @@
 from config import *
 from functions_authentication import *
 from functions_search import *
+from functions_bing_search import *
 import base64
 #from openai import AzureOpenAI
 
@@ -19,6 +20,7 @@ def register_route_backend_chats(app):
         conversation_id = data.get('conversation_id')
         hybrid_search_enabled = data.get('hybrid_search', True)  # Default to True if not provided
         create_images = data.get('create_images', False)  # Default to True if not provided
+        web_search_enabled = data.get('web_search', True)  # Default to True if not provided
 
         # Convert hybrid_search_enabled to boolean if necessary
         if isinstance(hybrid_search_enabled, str):
@@ -142,7 +144,7 @@ def register_route_backend_chats(app):
                 continue
 
         # Generate AI response
-        if create_images==False:
+        if create_images==False and web_search_enabled==False:
             print(f"Creating text response {create_images}")
             response = openai.ChatCompletion.create(
                 engine=settings.get('llm_model', 'gpt-4o'),
@@ -154,7 +156,7 @@ def register_route_backend_chats(app):
             # Upsert the conversation item in Cosmos DB
             container.upsert_item(body=conversation_item)
             #print("AI response generated and conversation updated.")                        
-        else:
+        elif create_images==True:
             print("Creating image response")
             try:
                 openai.api_version = "2023-06-01-preview"  
@@ -194,7 +196,14 @@ def register_route_backend_chats(app):
             except openai.error.OpenAIError as e:
                 ai_message = f"An error occurred while generating the image: {str(e)}"
                 print(f"Error generating image: {str(e)}")
-
+        elif web_search_enabled==True:
+            print("Web search enabled")
+            tmodel = settings.get('llm_model', 'gpt-4o')
+            ai_message=process_query_with_bing_and_llm(user_message,tmodel)
+            conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
+            conversation_item['last_updated'] = datetime.utcnow().isoformat()
+            # Upsert the conversation item in Cosmos DB
+            container.upsert_item(body=conversation_item)
 
         return jsonify({
             'reply': ai_message,
