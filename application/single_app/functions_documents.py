@@ -1,5 +1,6 @@
 from config import *
 from functions_content import *
+from functions_settings import *
 
 def allowed_file(filename, allowed_extensions=None):
     if not allowed_extensions:
@@ -27,12 +28,12 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
     except Exception as e:
         #print(f"Error adding system message to conversation: {str(e)}")
         raise e
-
+    
 def process_document_and_store_chunks(extracted_content , file_name, user_id):
     settings = get_settings()
-    use_external_apis = settings.get('use_external_apis', False)
-    external_chunking_api = settings.get('external_chunking_api', '')
-    external_embedding_api = settings.get('external_embedding_api', '')
+    use_external_apis = settings.get('use_external_apis')
+    external_chunking_api = settings.get('external_chunking_api')
+    external_embedding_api = settings.get('external_embedding_api')
 
     if use_external_apis:
         response = requests.post(f"{external_chunking_api}/chunk", json={'text': extracted_content })
@@ -85,7 +86,7 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
     #print("Document metadata upserted successfully.")
 
     chunk_documents = []
-    
+
     for idx, chunk_text_content in enumerate(chunks):
         chunk_id = f"{document_id}_{idx}"
         #print(f"Processing chunk {idx} with ID: {chunk_id}")
@@ -205,7 +206,7 @@ def get_latest_version(document_id, user_id):
     except Exception as e:
         #print(f"Error retrieving latest version: {str(e)}")
         return None
-
+    
 def get_user_document_version(user_id, document_id, version):
     try:
         query = """

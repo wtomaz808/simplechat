@@ -4,6 +4,7 @@ from functions_authentication import *
 from functions_content import *
 from functions_documents import *
 from functions_search import *
+from functions_settings import *
 
 from route_frontend_authentication import *
 from route_frontend_profile import *
@@ -12,18 +13,9 @@ from route_frontend_documents import *
 from route_frontend_chats import *
 from route_frontend_conversations import *
 
-
 from route_backend_chats import *
 from route_backend_conversations import *
 from route_backend_documents import *
-
-
-app = Flask(__name__)
-
-app.config['SECRET_KEY'] = os.urandom(32) 
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.132'
-Session(app)
 
 # =================== Helper Functions ===================
 @app.context_processor
@@ -44,6 +36,14 @@ def format_datetime_filter(value):
 def index():
     return render_template('index.html')
 
+@app.route('/robots.txt')
+def robots():
+    return send_from_directory('static', 'robots.txt')
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.ico')
+
 # =================== Front End Routes ===================
 # ------------------- User Authentication Routes ---------
 register_route_frontend_authentication(app)
@@ -63,8 +63,6 @@ register_route_frontend_conversations(app)
 # ------------------- Documents Routes -------------------
 register_route_frontend_documents(app)
 
-
-
 # =================== Back End Routes ====================
 # ------------------- API Chat Routes --------------------
 register_route_backend_chats(app)
@@ -74,7 +72,6 @@ register_route_backend_conversations(app)
 
 # ------------------- API Documents Routes ---------------
 register_route_backend_documents(app)
-
 
 if __name__ == '__main__':
     app.run(debug=True)

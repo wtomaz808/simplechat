@@ -63,7 +63,7 @@ def register_route_backend_conversations(app):
         #print(f"Created new conversation {conversation_id} for user {user_id}.")
 
         return jsonify({'conversation_id': conversation_id}), 200
-
+    
     @app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
     @login_required
     def delete_conversation(conversation_id):

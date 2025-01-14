@@ -1,16 +1,18 @@
 from config import *
 from functions_authentication import *
 from functions_content import *
+from functions_settings import *
 
 def register_route_frontend_chats(app):
     @app.route('/chats', methods=['GET'])
     @login_required
     def chats():
         user_id = get_current_user_id()
+        settings = get_settings()
         if not user_id:
             #print("User not authenticated.")
             return redirect(url_for('login'))
-        return render_template('chats.html')
+        return render_template('chats.html', settings=settings)
     @app.route('/upload', methods=['POST'])
     @login_required
     def upload_file():
@@ -56,7 +58,7 @@ def register_route_frontend_chats(app):
                     'last_updated': datetime.utcnow().isoformat()
                 }
                 #print(f"Conversation {conversation_id} not found. Started new conversation.")
-
+        
         file.seek(0, os.SEEK_END)
         file_length = file.tell()
         max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024

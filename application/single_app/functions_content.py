@@ -1,7 +1,5 @@
 from config import *
-
-max_wait_time = 180  # seconds
-start_time = time.time()
+from functions_settings import *
 
 def extract_text_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -88,32 +86,41 @@ def chunk_text(text, chunk_size=2000, overlap=200):
 
 def generate_embedding(
     text,
-    embedding_model="text-embedding-ada-002",
     max_retries=5,
     initial_delay=1.0,  # initial delay in seconds for backoff
     delay_multiplier=2.0  # multiplier to increase delay after each retry
 ):
     #print("Function generate_embedding called")
     #print(f"Text input for embedding (truncated): {text[:100]}...")
+    settings = get_settings()
 
     retries = 0
     current_delay = initial_delay
+
+    embedding_client = AzureOpenAI(
+        api_version=settings.get('azure_openai_embedding_api_version'),
+        azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
+        api_key=settings.get('azure_openai_embedding_key')
+    )
+        
+    embedding_model = settings.get('embedding_model')
 
     while True:
         random_delay = random.uniform(0.5, 2.0)
         time.sleep(random_delay)
 
         try:
-            response = openai.Embedding.create(
-                input=text,
-                engine=embedding_model
+            response = embedding_client.embeddings.create(
+                model=embedding_model,
+                input=text
             )
+
             #print("OpenAI API call successful")
-            embedding = response['data'][0]['embedding']
+            embedding = response.data[0].embedding
             #print(f"Embedding generated successfully: Length {len(embedding)}")
             return embedding
 
-        except openai.error.RateLimitError as e:
+        except embedding_client.RateLimitError as e:
             retries += 1
             if retries > max_retries:
                 #print("Max retries reached due to RateLimitError. Returning None.")

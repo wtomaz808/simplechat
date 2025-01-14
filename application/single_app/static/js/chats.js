@@ -44,16 +44,38 @@ document
     this.classList.toggle("active");
   });
 
+// Toggle the active class on the button when clicked
 document
-  .getElementById("create-images-btn")
+  .getElementById("search-web-btn")
   .addEventListener("click", function () {
     this.classList.toggle("active");
   });
 
-  document
-  .getElementById("search-web-btn")
-  .addEventListener("click", function () {
+// Toggle the active class on the image generation button
+document
+  .getElementById("image-generate-btn")
+  ?.addEventListener("click", function () {
+    // Toggle on/off
     this.classList.toggle("active");
+    
+    // Check if Image Generation is active
+    const isImageGenEnabled = this.classList.contains("active");
+
+    // Grab the two existing search buttons
+    const docBtn = document.getElementById("search-documents-btn");
+    const webBtn = document.getElementById("search-web-btn");
+
+    // If image generation is enabled, disable the search buttons
+    if (isImageGenEnabled) {
+      docBtn.disabled = true;
+      webBtn.disabled = true;
+      docBtn.classList.remove("active");
+      webBtn.classList.remove("active");
+    } else {
+      // Otherwise, re-enable them
+      docBtn.disabled = false;
+      webBtn.disabled = false;
+    }
   });
 
 // Function to select a conversation
@@ -102,7 +124,25 @@ function appendMessage(sender, messageContent) {
     return;
   }
 
-  if (sender === "You") {
+  if (sender === "image") {
+    // Treat it as an AI-style message but replace the text with an <img> tag
+    messageClass = "ai-message";
+    senderLabel = "AI";
+    avatarImg = "/static/images/ai-avatar.png";
+  
+    // Create an image at 25% size; set a data attribute so we can capture clicks and open a modal
+    const imageHtml = `
+      <img 
+        src="${messageContent}" 
+        alt="Generated Image" 
+        class="generated-image" 
+        style="width: 25%; cursor: pointer;" 
+        data-image-src="${messageContent}" 
+      />
+    `;
+  
+    messageContentHtml = imageHtml;
+  } else if (sender === "You") {
     messageClass = "user-message";
     senderLabel = "You";
     avatarImg = "/static/images/user-avatar.png";
@@ -171,6 +211,8 @@ function loadMessages(conversationId) {
           appendMessage("AI", msg.content);
         } else if (msg.role === "file") {
           appendMessage("File", msg);
+        } else if (msg.role === "image") {
+          appendMessage("image", msg.content);
         }
       });
     })
@@ -373,15 +415,17 @@ function sendMessage() {
   // Get the state of the search documents button
   const hybridSearchEnabled = document
     .getElementById("search-documents-btn")
-    .classList.contains("active");
+    ?.classList.contains("active") || false;
 
-  const imageCreationEnabled = document
-    .getElementById("create-images-btn")
-    .classList.contains("active");
-
-  const webSearchEnabled = document
+  // Get the state of the search web button
+  const bingSearchEnabled = document
     .getElementById("search-web-btn")
-    .classList.contains("active");
+    ?.classList.contains("active") || false;
+
+  // Get the state of the image generation button
+  const imageGenEnabled = document
+    .getElementById("image-generate-btn")
+    ?.classList.contains("active") || false;
 
   fetch("/api/chat", {
     method: "POST",
@@ -391,9 +435,9 @@ function sendMessage() {
     body: JSON.stringify({
       message: userInput,
       conversation_id: currentConversationId,
-      hybrid_search: hybridSearchEnabled, // Include the button state
-      create_images: imageCreationEnabled,
-      web_search: webSearchEnabled
+      hybrid_search: hybridSearchEnabled,
+      bing_search: bingSearchEnabled,
+      image_generation: imageGenEnabled
     }),
   })
     .then((response) => response.json())
@@ -451,9 +495,8 @@ document.getElementById("send-btn").addEventListener("click", sendMessage);
 document
   .getElementById("user-input")
   .addEventListener("keypress", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       sendMessage();
-      e.preventDefault(); // Prevent default form submission behavior
     }
   });
 
@@ -633,6 +676,46 @@ document.getElementById("chatbox").addEventListener("click", (event) => {
     fetchFileContent(conversationId, fileId);
   }
 });
+
+// Listen for clicks on any images with the 'generated-image' class
+document.getElementById("chatbox").addEventListener("click", (event) => {
+  if (event.target.classList.contains("generated-image")) {
+    const imageSrc = event.target.getAttribute("data-image-src");
+    showImagePopup(imageSrc);
+  }
+});
+
+function showImagePopup(imageSrc) {
+  let modalContainer = document.getElementById("image-modal");
+  
+  // If the modal doesn't exist yet, create it
+  if (!modalContainer) {
+    modalContainer = document.createElement("div");
+    modalContainer.id = "image-modal";
+    modalContainer.classList.add("modal", "fade");
+    modalContainer.tabIndex = -1;
+    modalContainer.setAttribute("aria-hidden", "true");
+
+    modalContainer.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <img id="image-modal-img" src="" alt="Generated Image" class="img-fluid" />
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalContainer);
+  }
+
+  // Update the src for the image inside the modal
+  const modalImage = modalContainer.querySelector("#image-modal-img");
+  modalImage.src = imageSrc;
+
+  // Show the modal using Bootstrap
+  const modal = new bootstrap.Modal(modalContainer);
+  modal.show();
+}
 
 function fetchFileContent(conversationId, fileId) {
   // Show loading indicator

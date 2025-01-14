@@ -10,73 +10,185 @@
             <label for="app_title" class="form-label">Application Title</label>
             <input type="text" class="form-control" id="app_title" name="app_title" value="{{ settings.app_title }}">
         </div>
-        <!-- Logo Upload Switch -->
-        <div class="form-group form-check form-switch mb-3">
-            <input type="checkbox" class="form-check-input" id="show_logo" name="show_logo" {% if settings.show_logo
-                %}checked{% endif %}>
-            <label class="form-check-label ms-2" for="show_logo">Show Logo</label>
-        </div>
-
-        <!-- Custom Logo Upload -->
-        <div class="form-group mb-3">
-            <label for="logo_file">Upload Custom Logo</label>
-            <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
-        </div>
-
-        <!-- Select LLM Model -->
+        
+        <!-- Logo Settings -->
         <div class="mb-3">
-            <label for="llm_model" class="form-label">Language Model</label>
-            <select class="form-select" id="llm_model" name="llm_model">
-                {% for model in settings.models %}
-                    <option value="{{ model.value }}" {% if settings.llm_model == model.value %}selected{% endif %}>
-                        {{ model.label }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <!-- Configure External APIs -->
-        <div class="form-group form-check form-switch mb-3">
-            <input type="checkbox" class="form-check-input" id="use_external_apis" name="use_external_apis" {% if
-                settings.use_external_apis %}checked{% endif %}>
-            <label class="form-check-label ms-2" for="use_external_apis">Use External APIs for Chunking and
-                Embedding</label>
-        </div>
-
-        <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;" {% endif %}>
-            <!-- External Chunking API Endpoint -->
-            <div class="mb-3">
-                <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
-                <input type="text" class="form-control" id="external_chunking_api" name="external_chunking_api"
-                    value="{{ settings.external_chunking_api }}">
+            <h3>Logo Settings</h3>
+            <div class="form-group form-check form-switch mb-3">
+                <input type="checkbox" class="form-check-input" id="show_logo" name="show_logo" {% if settings.show_logo %}checked{% endif %}>
+                <label class="form-check-label ms-2" for="show_logo">Show Logo</label>
             </div>
-            <!-- External Embedding API Endpoint -->
-            <div class="mb-3">
-                <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
-                <input type="text" class="form-control" id="external_embedding_api" name="external_embedding_api"
-                    value="{{ settings.external_embedding_api }}">
+            <div class="form-group mb-3">
+                <label for="logo_file">Upload Custom Logo</label>
+                <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
             </div>
-            <!-- Test Connection Button -->
-            <button type="button" class="btn btn-secondary mb-3" id="test_connection_button">Test Connection</button>
-            <div id="test_connection_result"></div>
         </div>
-        <!-- Maximum File Size -->
+
+        <!-- Azure OpenAI GPT Settings -->
         <div class="mb-3">
-            <label for="max_file_size_mb" class="form-label">Maximum File Size (MB)</label>
-            <input type="number" class="form-control" id="max_file_size_mb" name="max_file_size_mb"
-                value="{{ settings.max_file_size_mb }}">
+            <h3>Azure OpenAI GPT Settings</h3>
+            <div class="mb-3">
+                <label for="azure_openai_gpt_endpoint" class="form-label">Azure OpenAI GPT Endpoint</label>
+                <input type="text" class="form-control" id="azure_openai_gpt_endpoint" name="azure_openai_gpt_endpoint"
+                    value="{{ settings.azure_openai_gpt_endpoint or '' }}">
+            </div>
+            <div class="mb-3">
+                <label for="azure_openai_gpt_api_version" class="form-label">Azure OpenAI GPT API Version</label>
+                <input type="text" class="form-control" id="azure_openai_gpt_api_version" name="azure_openai_gpt_api_version"
+                    value="{{ settings.azure_openai_gpt_api_version or '' }}">
+            </div>
+            <div class="mb-3">
+                <label for="azure_openai_gpt_authentication_type" class="form-label">Azure OpenAI GPT Authentication Type</label>
+                <select class="form-select" id="azure_openai_gpt_authentication_type" name="azure_openai_gpt_authentication_type">
+                    <option value="key" {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>Key</option>
+                    <option value="managed_identity" {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
+                </select>
+            </div>
+            <div class="mb-3" id="gpt_key_container" {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                <label for="azure_openai_gpt_key" class="form-label">Azure OpenAI GPT Key</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="azure_openai_gpt_key" name="azure_openai_gpt_key"
+                        value="{{ settings.azure_openai_gpt_key or '' }}">
+                    <button type="button" class="btn btn-outline-secondary" id="toggle_gpt_key">Show</button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="gpt_model" class="form-label">GPT Model</label>
+                <select class="form-select" id="gpt_model" name="gpt_model">
+                    <option value="gpt-4o" {% if settings.gpt_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
+                    <option value="gpt-4" {% if settings.gpt_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
+                    <option value="gpt-3.5-turbo" {% if settings.gpt_model=='gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo</option>
+                    <!-- Add other models as needed -->
+                </select>
+            </div>
         </div>
-        <!-- Conversation History Limit -->
+
+        <!-- Azure OpenAI Embedding Settings -->
         <div class="mb-3">
-            <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
-            <input type="number" class="form-control" id="conversation_history_limit" name="conversation_history_limit"
-                value="{{ settings.conversation_history_limit }}">
+            <h3>Azure OpenAI Embedding Settings</h3>
+            <div class="mb-3">
+                <label for="azure_openai_embedding_endpoint" class="form-label">Azure OpenAI Embedding Endpoint</label>
+                <input type="text" class="form-control" id="azure_openai_embedding_endpoint" name="azure_openai_embedding_endpoint"
+                    value="{{ settings.azure_openai_embedding_endpoint or '' }}">
+            </div>
+            <div class="mb-3">
+                <label for="azure_openai_embedding_api_version" class="form-label">Azure OpenAI Embedding API Version</label>
+                <input type="text" class="form-control" id="azure_openai_embedding_api_version" name="azure_openai_embedding_api_version"
+                    value="{{ settings.azure_openai_embedding_api_version or '' }}">
+            </div>
+            <div class="mb-3">
+                <label for="azure_openai_embedding_authentication_type" class="form-label">Azure OpenAI Embedding Authentication Type</label>
+                <select class="form-select" id="azure_openai_embedding_authentication_type" name="azure_openai_embedding_authentication_type">
+                    <option value="key" {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>Key</option>
+                    <option value="managed_identity" {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
+                </select>
+            </div>
+            <div class="mb-3" id="embedding_key_container" {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="azure_openai_embedding_key" name="azure_openai_embedding_key"
+                        value="{{ settings.azure_openai_embedding_key or '' }}">
+                    <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="embedding_model" class="form-label">Embedding Model</label>
+                <select class="form-select" id="embedding_model" name="embedding_model">
+                    <option value="text-embedding-ada-002" {% if settings.embedding_model=='text-embedding-ada-002' %}selected{% endif %}>text-embedding-ada-002</option>
+                    <option value="text-embedding-3-small" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>text-embedding-3-small</option>
+                    <option value="text-embedding-3-large" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>text-embedding-3-large</option>
+                    <!-- Add other models as needed -->
+                </select>
+            </div>
         </div>
-        <!-- Default System Prompt -->
+
+        <!-- Azure OpenAI Image Generation Settings -->
         <div class="mb-3">
-            <label for="default_system_prompt" class="form-label">Default System Prompt</label>
-            <textarea class="form-control" id="default_system_prompt" name="default_system_prompt"
-                rows="5">{{ settings.default_system_prompt }}</textarea>
+            <h3>Azure OpenAI Image Generation Settings</h3>
+            <div class="form-group form-check form-switch mb-3">
+                <input type="checkbox" class="form-check-input" id="enable_image_generation" name="enable_image_generation" {% if settings.enable_image_generation %}checked{% endif %}>
+                <label class="form-check-label ms-2" for="enable_image_generation">Enable Image Generation</label>
+            </div>
+            <div id="image_gen_settings" {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
+                <div class="mb-3">
+                    <label for="azure_openai_image_gen_endpoint" class="form-label">Azure OpenAI Image Generation Endpoint</label>
+                    <input type="text" class="form-control" id="azure_openai_image_gen_endpoint" name="azure_openai_image_gen_endpoint"
+                        value="{{ settings.azure_openai_image_gen_endpoint or '' }}">
+                </div>
+                <div class="mb-3">
+                    <label for="azure_openai_image_gen_api_version" class="form-label">Azure OpenAI Image Gen API Version</label>
+                    <input type="text" class="form-control" id="azure_openai_image_gen_api_version" name="azure_openai_image_gen_api_version"
+                        value="{{ settings.azure_openai_image_gen_api_version or '' }}">
+                </div>
+                <div class="mb-3">
+                    <label for="azure_openai_image_gen_authentication_type" class="form-label">Azure OpenAI Image Generation Authentication Type</label>
+                    <select class="form-select" id="azure_openai_image_gen_authentication_type" name="azure_openai_image_gen_authentication_type">
+                        <option value="key" {% if settings.azure_openai_image_gen_authentication_type=='key' %}selected{% endif %}>Key</option>
+                        <option value="managed_identity" {% if settings.azure_openai_image_gen_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="image_gen_key_container" {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                    <label for="azure_openai_image_gen_key" class="form-label">Azure OpenAI Image Generation Key</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="azure_openai_image_gen_key" name="azure_openai_image_gen_key"
+                            value="{{ settings.azure_openai_image_gen_key or '' }}">
+                        <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="image_gen_model" class="form-label">Image Generation Model</label>
+                    <select class="form-select" id="image_gen_model" name="image_gen_model">
+                        <option value="dall-e-2" {% if settings.image_gen_model=='dall-e-2' %}selected{% endif %}>dall-e-2</option>
+                        <option value="dall-e-3" {% if settings.image_gen_model=='dall-e-3' %}selected{% endif %}>dall-e-3</option>
+                        <!-- Add other models as needed -->
+                    </select>
+                </div>
+            </div>
         </div>
+
+        <!-- External API Settings -->
+        <div class="mb-3">
+            <h3>External API Settings</h3>
+            <div class="form-group form-check form-switch mb-3">
+                <input type="checkbox" class="form-check-input" id="use_external_apis" name="use_external_apis" {% if settings.use_external_apis %}checked{% endif %}>
+                <label class="form-check-label ms-2" for="use_external_apis">Use External APIs for Chunking and Embedding</label>
+            </div>
+            <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;"{% endif %}>
+                <div class="mb-3">
+                    <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
+                    <input type="text" class="form-control" id="external_chunking_api" name="external_chunking_api"
+                        value="{{ settings.external_chunking_api }}">
+                </div>
+                <div class="mb-3">
+                    <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
+                    <input type="text" class="form-control" id="external_embedding_api" name="external_embedding_api"
+                        value="{{ settings.external_embedding_api }}">
+                </div>
+                <button type="button" class="btn btn-secondary mb-3" id="test_connection_button">Test Connection</button>
+                <div id="test_connection_result"></div>
+            </div>
+        </div>
+
+        <!-- Other Settings -->
+        <div class="mb-3">
+            <h3>Other Settings</h3>
+            <div class="mb-3">
+                <label for="max_file_size_mb" class="form-label">Maximum File Size (MB)</label>
+                <input type="number" class="form-control" id="max_file_size_mb" name="max_file_size_mb"
+                    value="{{ settings.max_file_size_mb }}">
+            </div>
+            <div class="mb-3">
+                <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
+                <input type="number" class="form-control" id="conversation_history_limit" name="conversation_history_limit"
+                    value="{{ settings.conversation_history_limit }}">
+            </div>
+            <div class="mb-3">
+                <label for="default_system_prompt" class="form-label">Default System Prompt</label>
+                <textarea class="form-control" id="default_system_prompt" name="default_system_prompt"
+                    rows="5">{{ settings.default_system_prompt }}</textarea>
+            </div>
+        </div>
+
         <!-- Submit Button -->
         <button type="submit" class="btn btn-primary">Save Settings</button>
     </form>
@@ -85,6 +197,46 @@
 
 {% block scripts %}
 <script>
+    // Show/hide GPT key input based on authentication type
+    document.getElementById('azure_openai_gpt_authentication_type').addEventListener('change', function () {
+        var gptKeyContainer = document.getElementById('gpt_key_container');
+        if (this.value === 'key') {
+            gptKeyContainer.style.display = 'block';
+        } else {
+            gptKeyContainer.style.display = 'none';
+        }
+    });
+
+    // Show/hide embedding key input based on authentication type
+    document.getElementById('azure_openai_embedding_authentication_type').addEventListener('change', function () {
+        var embeddingKeyContainer = document.getElementById('embedding_key_container');
+        if (this.value === 'key') {
+            embeddingKeyContainer.style.display = 'block';
+        } else {
+            embeddingKeyContainer.style.display = 'none';
+        }
+    });
+
+    // Show/hide image generation key input based on authentication type
+    document.getElementById('azure_openai_image_gen_authentication_type').addEventListener('change', function () {
+        var imageGenKeyContainer = document.getElementById('image_gen_key_container');
+        if (this.value === 'key') {
+            imageGenKeyContainer.style.display = 'block';
+        } else {
+            imageGenKeyContainer.style.display = 'none';
+        }
+    });
+
+    // Show/hide image generation settings based on checkbox
+    document.getElementById('enable_image_generation').addEventListener('change', function () {
+        var imageGenSettings = document.getElementById('image_gen_settings');
+        if (this.checked) {
+            imageGenSettings.style.display = 'block';
+        } else {
+            imageGenSettings.style.display = 'none';
+        }
+    });
+
     // Show/hide external API settings based on checkbox
     document.getElementById('use_external_apis').addEventListener('change', function () {
         var externalSettings = document.getElementById('external_apis_settings');
@@ -97,6 +249,42 @@
 
     document.getElementById('show_logo').addEventListener('change', function () {
         console.log('Show Logo:', this.checked);
+    });
+
+    // Toggle visibility of GPT key
+    document.getElementById('toggle_gpt_key').addEventListener('click', function () {
+        var gptKeyInput = document.getElementById('azure_openai_gpt_key');
+        if (gptKeyInput.type === 'password') {
+            gptKeyInput.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            gptKeyInput.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
+
+    // Toggle visibility of embedding key
+    document.getElementById('toggle_embedding_key').addEventListener('click', function () {
+        var embeddingKeyInput = document.getElementById('azure_openai_embedding_key');
+        if (embeddingKeyInput.type === 'password') {
+            embeddingKeyInput.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            embeddingKeyInput.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
+
+    // Toggle visibility of image generation key
+    document.getElementById('toggle_image_gen_key').addEventListener('click', function () {
+        var imageGenKeyInput = document.getElementById('azure_openai_image_gen_key');
+        if (imageGenKeyInput.type === 'password') {
+            imageGenKeyInput.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            imageGenKeyInput.type = 'password';
+            this.textContent = 'Show';
+        }
     });
 
     // Test Connection Button

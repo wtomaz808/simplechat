@@ -1,6 +1,7 @@
 from config import *
 from functions_authentication import *
 from functions_documents import *
+from functions_settings import *
 
 def register_route_backend_documents(app):
     @app.route('/api/get_file_content', methods=['POST'])
@@ -46,7 +47,7 @@ def register_route_backend_documents(app):
         except Exception as e:
             #print(f"Error retrieving file content: {str(e)}")
             return jsonify({'error': 'Error retrieving file content'}), 500
-
+    
     @app.route('/api/documents/upload', methods=['POST'])
     @login_required
     def upload_document():
