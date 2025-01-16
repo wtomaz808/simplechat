@@ -65,6 +65,7 @@
                         <td>${doc.num_chunks}</td>
                         <td>
                             <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.id}')">Delete</button>
+                            <button class="btn btn-sm btn-primary" onclick="redirectToChat('${doc.id}')">Search in Chat</button>
                         </td>
                     `;
                     documentsTableBody.appendChild(row);
@@ -138,6 +139,11 @@
         .catch(error => {
             console.error('Error deleting document:', error);
         });
+    }
+
+    // Redirect to Chat with Search Documents enabled and document selected
+    function redirectToChat(documentId) {
+        window.location.href = `/chats?search_documents=true&document_id=${documentId}`;
     }
 
     // Initial fetch

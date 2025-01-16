@@ -18,6 +18,7 @@ def register_route_backend_chats(app):
         user_message = data['message']
         conversation_id = data.get('conversation_id')
         hybrid_search_enabled = data.get('hybrid_search')
+        selected_document_id = data.get('selected_document_id')
         bing_search_enabled = data.get('bing_search')
         image_gen_enabled = data.get('image_generation')
 
@@ -100,7 +101,10 @@ def register_route_backend_chats(app):
 
         # If hybrid search is enabled, perform it and include the results
         if hybrid_search_enabled:
-            search_results = hybrid_search(user_message, user_id, top_n=3)
+            if selected_document_id:
+                search_results = hybrid_search(user_message, user_id, top_n=10, document_id=selected_document_id)
+            else:
+                search_results = hybrid_search(user_message, user_id, top_n=10)
             if search_results:
                 retrieved_texts = []
                 for doc in search_results:

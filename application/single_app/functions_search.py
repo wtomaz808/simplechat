@@ -1,7 +1,7 @@
 from config import *
 from functions_content import *
 
-def hybrid_search(query, user_id, top_n=3):
+def hybrid_search(query, user_id, document_id=None, top_n=3):
     try:
         query_embedding = generate_embedding(query)
 
@@ -11,12 +11,21 @@ def hybrid_search(query, user_id, top_n=3):
 
         vector_query = VectorizedQuery(vector=query_embedding, k_nearest_neighbors=top_n, fields="embedding")
 
-        results = search_client_user.search(
-            search_text=query,
-            vector_queries=[vector_query],
-            filter=f"user_id eq '{user_id}'",
-            select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
-        )
+        if (document_id==None):
+            results = search_client_user.search(
+                search_text=query,
+                vector_queries=[vector_query],
+                filter=f"user_id eq '{user_id}'",
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+            )
+        else:
+            results = search_client_user.search(
+                search_text=query,
+                vector_queries=[vector_query],
+                filter=f"user_id eq '{user_id}' and document_id eq '{document_id}'",
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+            )
+            
 
         limited_results = []
         for i, result in enumerate(results):

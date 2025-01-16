@@ -42,6 +42,13 @@ document
   .getElementById("search-documents-btn")
   .addEventListener("click", function () {
     this.classList.toggle("active");
+    const documentSelect = document.getElementById("document-select");
+    if (this.classList.contains("active")) {
+        documentSelect.style.display = "block";
+        loadDocuments();
+    } else {
+        documentSelect.style.display = "none";
+    }
   });
 
 // Toggle the active class on the button when clicked
@@ -64,17 +71,23 @@ document
     // Grab the two existing search buttons
     const docBtn = document.getElementById("search-documents-btn");
     const webBtn = document.getElementById("search-web-btn");
+    const fileBtn = document.getElementById("choose-file-btn");
+    const documentSelectionContainer = document.getElementById("document-selection-container");
 
     // If image generation is enabled, disable the search buttons
     if (isImageGenEnabled) {
       docBtn.disabled = true;
       webBtn.disabled = true;
+      fileBtn.disabled = true;
       docBtn.classList.remove("active");
       webBtn.classList.remove("active");
+      fileBtn.classList.remove("active");
+      documentSelectionContainer.style.display = "none";
     } else {
       // Otherwise, re-enable them
       docBtn.disabled = false;
       webBtn.disabled = false;
+      fileBtn.disabled = false;
     }
   });
 
@@ -223,20 +236,28 @@ function loadMessages(conversationId) {
 
 // Function to parse citations and convert them into clickable links
 function parseCitations(message) {
-  // Regular expression to match citations in the format:
-  // (Source: filename, Page: page number) [#ID]
-  const citationRegex = /\(Source: ([^,]+), Page: ([^)]+)\) \[#([^\]]+)\]/g;
+    // Regular expression to match citations in the format:
+    // (Source: filename, Pages: page number) [#ID]
+    // (Source: filename, Pages: page number-page number) [#ID] [#ID] [#ID]
+    // (Source: filename, Pages: page number–page number) [#ID], [#ID], and [#ID]
+    const citationRegex = /\(Source: ([^,]+), Page(?:s)?: ([^)]+)\)([^]*)/g;
 
-  // Replace citations with links
-  const parsedMessage = message.replace(
-    citationRegex,
-    (match, filename, pageNumber, citationId) => {
-      const displayText = `(Source: ${filename}, Page: ${pageNumber})`;
-      return `<a href="#" class="citation-link" data-citation-id="${citationId}">${displayText}</a>`;
-    }
-  );
+    // Replace citations with links
+    const parsedMessage = message.replace(citationRegex, (match, filename, pages, ids) => {
+        const pageRange = pages.trim();
+        const idMatches = ids.match(/\[#([^\]]+)\]/g);
+        if (!idMatches) return match;
 
-  return parsedMessage;
+        const citationLinks = idMatches.map(idMatch => {
+            const citationId = idMatch.slice(2, -1); // Remove [# and ]
+            const pageNumber = citationId.split('_').pop(); // Extract the page number
+            return `<a href="#" class="citation-link" data-citation-id="${citationId}">[Page ${pageNumber}]</a>`;
+        }).join(', ');
+
+        return `(Source: ${filename}, Pages: ${pageRange}) ${citationLinks}`;
+    });
+
+    return parsedMessage;
 }
 
 // Event delegation to handle clicks on conversation items and delete buttons
@@ -417,6 +438,9 @@ function sendMessage() {
     .getElementById("search-documents-btn")
     ?.classList.contains("active") || false;
 
+  // Get the selected document ID if hybrid search is enabled
+  const selectedDocumentId = (hybridSearchEnabled && (document.getElementById("document-select").value != "None")) ? document.getElementById("document-select").value : null;
+
   // Get the state of the search web button
   const bingSearchEnabled = document
     .getElementById("search-web-btn")
@@ -436,6 +460,7 @@ function sendMessage() {
       message: userInput,
       conversation_id: currentConversationId,
       hybrid_search: hybridSearchEnabled,
+      selected_document_id: selectedDocumentId, // Include selected document ID
       bing_search: bingSearchEnabled,
       image_generation: imageGenEnabled
     }),
@@ -486,6 +511,49 @@ function sendMessage() {
       hideLoadingIndicatorInChatbox();
       appendMessage("Error", "Could not get a response.");
     });
+}
+
+// Function to load documents for the dropdown
+function loadDocuments() {
+  fetch("/api/documents")
+    .then(response => response.json())
+    .then(data => {
+      const documentSelect = document.getElementById("document-select");
+      documentSelect.innerHTML = "";
+
+      // Add a "None" default
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "None";
+      documentSelect.appendChild(defaultOption);
+
+      data.documents.forEach(doc => {
+        const option = document.createElement("option");
+        option.value = doc.id;
+        option.textContent = doc.file_name; 
+        documentSelect.appendChild(option);
+      });
+
+      // Check URL parameters to pre-select document and enable search
+      const searchDocuments = getUrlParameter('search_documents') === 'true';
+      const documentId = getUrlParameter('document_id');
+      if (searchDocuments && documentId) {
+        document.getElementById("search-documents-btn").classList.add("active");
+        documentSelect.style.display = "block";
+        documentSelect.value = documentId;
+      }
+    })
+    .catch(error => {
+      console.error("Error loading documents:", error);
+    });
+}
+
+// Function to get URL parameters
+function getUrlParameter(name) {
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    const results = regex.exec(location.search);
+    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
 // Event listener for send button
@@ -842,4 +910,12 @@ document.addEventListener("DOMContentLoaded", function () {
 // Load conversations on page load
 window.onload = function () {
   loadConversations();
+
+  // Check URL parameters to enable search documents
+  const searchDocuments = getUrlParameter('search_documents') === 'true';
+  if (searchDocuments) {
+    document.getElementById("search-documents-btn").classList.add("active");
+    document.getElementById("document-select").style.display = "block";
+    loadDocuments();
+  }
 };
