@@ -1,3 +1,5 @@
+# app.py
+
 from config import *
 
 from functions_authentication import *
@@ -12,10 +14,15 @@ from route_frontend_admin_settings import *
 from route_frontend_documents import *
 from route_frontend_chats import *
 from route_frontend_conversations import *
+from route_frontend_groups import *
+from route_frontend_group_documents import *
 
 from route_backend_chats import *
 from route_backend_conversations import *
 from route_backend_documents import *
+from route_backend_groups import *
+from route_backend_users import *
+from route_backend_group_documents import *
 
 # =================== Helper Functions ===================
 @app.context_processor
@@ -36,7 +43,7 @@ def format_datetime_filter(value):
 def index():
     return render_template('index.html')
 
-@app.route('/robots.txt')
+@app.route('/robots933456.txt')
 def robots():
     return send_from_directory('static', 'robots.txt')
 
@@ -63,6 +70,12 @@ register_route_frontend_conversations(app)
 # ------------------- Documents Routes -------------------
 register_route_frontend_documents(app)
 
+# ------------------- Groups Routes ----------------------
+register_route_frontend_groups(app)
+
+# ------------------- Group Documents Routes -------------
+register_route_frontend_group_documents(app)
+
 # =================== Back End Routes ====================
 # ------------------- API Chat Routes --------------------
 register_route_backend_chats(app)
@@ -72,6 +85,15 @@ register_route_backend_conversations(app)
 
 # ------------------- API Documents Routes ---------------
 register_route_backend_documents(app)
+
+# ------------------- API Groups Routes ------------------
+register_route_backend_groups(app)
+
+# ------------------- API User Routes --------------------
+register_route_backend_users(app)
+
+# ------------------- API Group Documents Routes ---------
+register_route_backend_group_documents(app)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,7 +1,12 @@
+// chats.js
+
 // Global variables
+let personalDocs = [];
+let groupDocs = [];
+let activeGroupName = "";
 let currentConversationId = null;
 
-// Function to load all conversations
+// ===================== LOAD / DISPLAY CONVERSATIONS =====================
 function loadConversations() {
   fetch("/api/get_conversations")
     .then((response) => response.json())
@@ -12,23 +17,22 @@ function loadConversations() {
         const convoItem = document.createElement("div");
         convoItem.classList.add("list-group-item", "conversation-item");
         convoItem.setAttribute("data-conversation-id", convo.id);
-        convoItem.setAttribute("data-conversation-title", convo.title); // Add this line
+        convoItem.setAttribute("data-conversation-title", convo.title);
+
         const date = new Date(convo.last_updated);
         convoItem.innerHTML = `
-                      <div class="d-flex justify-content-between align-items-center">
-                          <div>
-                              <span>${
-                                convo.title
-                              }</span><br> <!-- Use convo.title here -->
-                              <small>${date.toLocaleString()}</small>
-                          </div>
-                          <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
-                            convo.id
-                          }">
-                              <i class="bi bi-trash"></i>
-                          </button>
-                      </div>
-                  `;
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <span>${convo.title}</span><br>
+              <small>${date.toLocaleString()}</small>
+            </div>
+            <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
+              convo.id
+            }">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        `;
         conversationsList.appendChild(convoItem);
       });
     })
@@ -37,42 +41,162 @@ function loadConversations() {
     });
 }
 
-// Toggle the active class on the button when clicked
+function populateDocumentSelectScope() {
+  const scopeSel = document.getElementById("doc-scope-select");
+  const docSel = document.getElementById("document-select");
+  docSel.innerHTML = "";
+
+  // Always add a "None" or "No Document Selected"
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "None";
+  docSel.appendChild(noneOpt);
+
+  const scopeVal = scopeSel.value || "all";
+
+  let finalDocs = [];
+  if (scopeVal === "all") {
+    // Merge personal + group docs
+    const pDocs = personalDocs.map((d) => ({
+      id: d.id,
+      label: `[Personal] ${d.file_name}`,
+    }));
+    const gDocs = groupDocs.map((d) => ({
+      id: d.id,
+      label: `[Group: ${activeGroupName}] ${d.file_name}`,
+    }));
+    finalDocs = pDocs.concat(gDocs);
+  } else if (scopeVal === "personal") {
+    finalDocs = personalDocs.map((d) => ({
+      id: d.id,
+      label: `[Personal] ${d.file_name}`,
+    }));
+  } else if (scopeVal === "group") {
+    finalDocs = groupDocs.map((d) => ({
+      id: d.id,
+      label: `[Group: ${activeGroupName}] ${d.file_name}`,
+    }));
+  }
+
+  // Add them to "document-select"
+  finalDocs.forEach((doc) => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.label;
+    docSel.appendChild(opt);
+  });
+}
+
+// Listen for user selecting a different scope
+document
+  .getElementById("doc-scope-select")
+  .addEventListener("change", populateDocumentSelectScope);
+
+// Loads personal documents from /api/documents
+function loadPersonalDocs() {
+  return fetch("/api/documents")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.error) {
+        console.warn("Error fetching user docs:", data.error);
+        personalDocs = [];
+        return;
+      }
+      personalDocs = data.documents || [];
+    })
+    .catch((err) => {
+      console.error("Error loading personal docs:", err);
+      personalDocs = [];
+    });
+}
+
+// Loads group documents from /api/group_documents,
+// but also calls /api/groups to find the active group name
+function loadGroupDocs() {
+  // 1) get user groups to find which is active
+  return fetch("/api/groups")
+    .then((r) => r.json())
+    .then((groups) => {
+      const activeGroup = groups.find((g) => g.isActive);
+      if (activeGroup) {
+        activeGroupName = activeGroup.name || "Active Group";
+        // 2) now fetch the actual docs for that active group
+        return fetch("/api/group_documents")
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.error) {
+              console.warn("Error fetching group docs:", data.error);
+              groupDocs = [];
+              return;
+            }
+            groupDocs = data.documents || [];
+          })
+          .catch((err) => {
+            console.error("Error loading group docs:", err);
+            groupDocs = [];
+          });
+      } else {
+        // If the user has no active group
+        activeGroupName = "";
+        groupDocs = [];
+      }
+    })
+    .catch((err) => {
+      console.error("Error loading groups:", err);
+      groupDocs = [];
+    });
+}
+
+// Helper to load both personal & group docs in sequence
+function loadAllDocs() {
+  return loadPersonalDocs().then(() => loadGroupDocs());
+}
+
+// Toggle the active class for "Search Documents"
 document
   .getElementById("search-documents-btn")
   .addEventListener("click", function () {
     this.classList.toggle("active");
-    const documentSelect = document.getElementById("document-select");
+    const docScopeSel = document.getElementById("doc-scope-select");
+    const docSelectEl = document.getElementById("document-select");
+
     if (this.classList.contains("active")) {
-        documentSelect.style.display = "block";
-        loadDocuments();
+      docScopeSel.style.display = "inline-block";
+      docSelectEl.style.display = "inline-block";
+      // Now that we know docs are loaded (via loadAllDocs in window.onload),
+      // we can populate:
+      populateDocumentSelectScope();
     } else {
-        documentSelect.style.display = "none";
+      docScopeSel.style.display = "none";
+      docSelectEl.style.display = "none";
+      docSelectEl.innerHTML = "";
     }
   });
 
-// Toggle the active class on the button when clicked
+// Toggle the active class for "Search Web"
 document
   .getElementById("search-web-btn")
   .addEventListener("click", function () {
     this.classList.toggle("active");
   });
 
-// Toggle the active class on the image generation button
+// Toggle the active class for "Image Generation"
 document
   .getElementById("image-generate-btn")
   ?.addEventListener("click", function () {
     // Toggle on/off
     this.classList.toggle("active");
-    
+
     // Check if Image Generation is active
     const isImageGenEnabled = this.classList.contains("active");
 
-    // Grab the two existing search buttons
+    // Grab existing search buttons
     const docBtn = document.getElementById("search-documents-btn");
     const webBtn = document.getElementById("search-web-btn");
     const fileBtn = document.getElementById("choose-file-btn");
-    const documentSelectionContainer = document.getElementById("document-selection-container");
+    const documentSelectionContainer = document.getElementById(
+      "document-selection-container"
+    );
 
     // If image generation is enabled, disable the search buttons
     if (isImageGenEnabled) {
@@ -91,11 +215,12 @@ document
     }
   });
 
-// Function to select a conversation
+// ===================== SELECTING A CONVERSATION =====================
 function selectConversation(conversationId) {
   currentConversationId = conversationId;
   document.getElementById("user-input").disabled = false;
   document.getElementById("send-btn").disabled = false;
+
   // Get the conversation title
   const convoItem = document.querySelector(
     `.conversation-item[data-conversation-id="${conversationId}"]`
@@ -103,13 +228,15 @@ function selectConversation(conversationId) {
   const conversationTitle = convoItem
     ? convoItem.getAttribute("data-conversation-title")
     : "Conversation";
+
   document.getElementById("current-conversation-title").textContent =
     conversationTitle;
+
   loadMessages(conversationId);
   highlightSelectedConversation(conversationId);
 }
 
-// Function to highlight the selected conversation
+// Highlight the selected conversation in the list
 function highlightSelectedConversation(conversationId) {
   const items = document.querySelectorAll(".conversation-item");
   items.forEach((item) => {
@@ -121,12 +248,11 @@ function highlightSelectedConversation(conversationId) {
   });
 }
 
-// Function to append a message to the chatbox
+// ===================== APPEND MESSAGE (supports citations) =====================
 function appendMessage(sender, messageContent) {
   const messageDiv = document.createElement("div");
   messageDiv.classList.add("mb-2");
 
-  // Declare variables at the top
   let avatarImg = "";
   let messageClass = "";
   let senderLabel = "";
@@ -138,79 +264,89 @@ function appendMessage(sender, messageContent) {
   }
 
   if (sender === "image") {
-    // Treat it as an AI-style message but replace the text with an <img> tag
+    // An AI-style message but it's an <img> tag
     messageClass = "ai-message";
     senderLabel = "AI";
     avatarImg = "/static/images/ai-avatar.png";
-  
-    // Create an image at 25% size; set a data attribute so we can capture clicks and open a modal
+
+    // Create an image at 25% size
     const imageHtml = `
       <img 
         src="${messageContent}" 
         alt="Generated Image" 
         class="generated-image" 
         style="width: 25%; cursor: pointer;" 
-        data-image-src="${messageContent}" 
+        data-image-src="${messageContent}"
       />
     `;
-  
     messageContentHtml = imageHtml;
   } else if (sender === "You") {
+    // user's own message
     messageClass = "user-message";
     senderLabel = "You";
     avatarImg = "/static/images/user-avatar.png";
 
-    // Optionally, parse and sanitize user messages if they contain Markdown
+    // If you want to parse user content as markdown, or not:
     const sanitizedContent = DOMPurify.sanitize(marked.parse(messageContent));
     messageContentHtml = sanitizedContent;
   } else if (sender === "AI") {
+    // assistant message
     messageClass = "ai-message";
     senderLabel = "AI";
     avatarImg = "/static/images/ai-avatar.png";
 
-    // Clean up message content
-    let cleanedMessage = messageContent.trim();
-    cleanedMessage = cleanedMessage.replace(/\n{3,}/g, "\n\n");
-    // Parse message to convert citations into links
-    const parsedMessage = parseCitations(cleanedMessage);
-    // Parse Markdown and sanitize the output
-    const htmlContent = DOMPurify.sanitize(marked.parse(parsedMessage));
+    // Clean up
+    let cleaned = messageContent.trim().replace(/\n{3,}/g, "\n\n");
+
+    // 1) Parse citations => clickable links
+    const withCitations = parseCitations(cleaned);
+
+    // 2) Convert to Markdown + sanitize
+    const htmlContent = DOMPurify.sanitize(marked.parse(withCitations));
     messageContentHtml = htmlContent;
   } else if (sender === "File") {
+    // If it's a file message
     messageClass = "file-message";
     senderLabel = "File Added";
 
-    // messageContent is the message object
+    // messageContent is the object
     const filename = messageContent.filename;
     const fileId = messageContent.file_id;
-    messageContentHtml = `<a href="#" class="file-link" data-conversation-id="${currentConversationId}" data-file-id="${fileId}">${filename}</a>`;
+    messageContentHtml = `
+      <a href="#" 
+         class="file-link" 
+         data-conversation-id="${currentConversationId}" 
+         data-file-id="${fileId}"
+      >${filename}</a>
+    `;
   }
 
   // Build the message bubble
   messageDiv.classList.add("message", messageClass);
   messageDiv.innerHTML = `
-      <div class="message-content ${
-        sender === "You" || sender === "File" ? "flex-row-reverse" : ""
-      }">
-          ${
-            sender !== "File"
-              ? `<img src="${avatarImg}" alt="${senderLabel}" class="avatar">`
-              : ""
-          }
-          <div class="message-bubble">
-              <div class="message-sender">${senderLabel}</div>
-              <div class="message-text">${messageContentHtml}</div>
-          </div>
+    <div class="message-content ${
+      sender === "You" || sender === "File" ? "flex-row-reverse" : ""
+    }">
+      ${
+        sender !== "File"
+          ? `<img src="${avatarImg}" alt="${senderLabel}" class="avatar">`
+          : ""
+      }
+      <div class="message-bubble">
+        <div class="message-sender">${senderLabel}</div>
+        <div class="message-text">${messageContentHtml}</div>
       </div>
+    </div>
   `;
 
   document.getElementById("chatbox").appendChild(messageDiv);
-  // Scroll to the bottom
+
+  // Scroll to bottom
   document.getElementById("chatbox").scrollTop =
     document.getElementById("chatbox").scrollHeight;
 }
 
-// Function to load messages for a conversation
+// ===================== LOADING MESSAGES FOR CONVERSATION =====================
 function loadMessages(conversationId) {
   fetch(`/conversation/${conversationId}/messages`)
     .then((response) => response.json())
@@ -234,33 +370,44 @@ function loadMessages(conversationId) {
     });
 }
 
-// Function to parse citations and convert them into clickable links
+// ===================== CITATION PARSING =====================
 function parseCitations(message) {
-    // Regular expression to match citations in the format:
-    // (Source: filename, Pages: page number) [#ID]
-    // (Source: filename, Pages: page number-page number) [#ID] [#ID] [#ID]
-    // (Source: filename, Pages: page number–page number) [#ID], [#ID], and [#ID]
-    const citationRegex = /\(Source: ([^,]+), Page(?:s)?: ([^)]+)\)([^]*)/g;
+  /*
+    This regex will match patterns like:
+      (Source: FILENAME, Page(s): PAGE) [#doc_1] [#doc_2] ...
+    We'll capture:
+      1) filename
+      2) the pages
+      3) bracket references
+  */
+  const citationRegex =
+    /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
 
-    // Replace citations with links
-    const parsedMessage = message.replace(citationRegex, (match, filename, pages, ids) => {
-        const pageRange = pages.trim();
-        const idMatches = ids.match(/\[#([^\]]+)\]/g);
-        if (!idMatches) return match;
+  return message.replace(
+    citationRegex,
+    (whole, filename, pages, bracketSection) => {
+      // bracketSection might contain multiple [#...] references
+      const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
+      if (!idMatches) return whole;
 
-        const citationLinks = idMatches.map(idMatch => {
-            const citationId = idMatch.slice(2, -1); // Remove [# and ]
-            const pageNumber = citationId.split('_').pop(); // Extract the page number
-            return `<a href="#" class="citation-link" data-citation-id="${citationId}">[Page ${pageNumber}]</a>`;
-        }).join(', ');
+      // Build clickable links for each bracket
+      const citationLinks = idMatches
+        .map((m) => {
+          // remove "[#" and "]"
+          const rawId = m.slice(2, -1);
+          // guess the page number from the last chunk
+          const pageNumber = rawId.split("_").pop();
+          // Build a link that triggers "fetchCitedText(rawId)"
+          return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
+        })
+        .join(" ");
 
-        return `(Source: ${filename}, Pages: ${pageRange}) ${citationLinks}`;
-    });
-
-    return parsedMessage;
+      return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
+    }
+  );
 }
 
-// Event delegation to handle clicks on conversation items and delete buttons
+// ===================== DELETE A CONVERSATION =====================
 document
   .getElementById("conversations-list")
   .addEventListener("click", (event) => {
@@ -278,32 +425,28 @@ document
     }
   });
 
-// Function to delete a conversation
 function deleteConversation(conversationId) {
   if (confirm("Are you sure you want to delete this conversation?")) {
     fetch(`/api/conversations/${conversationId}`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     })
       .then((response) => {
         if (response.ok) {
-          // Remove the conversation from the list
+          // remove from list
           const convoItem = document.querySelector(
             `.conversation-item[data-conversation-id="${conversationId}"]`
           );
           if (convoItem) {
             convoItem.remove();
           }
-          // If the deleted conversation was selected, clear the chatbox
+          // If it was the selected conversation, clear UI
           if (currentConversationId === conversationId) {
             currentConversationId = null;
             document.getElementById("user-input").disabled = true;
             document.getElementById("send-btn").disabled = true;
-            document.getElementById(
-              "current-conversation-title"
-            ).textContent = "Select a conversation";
+            document.getElementById("current-conversation-title").textContent =
+              "Select a conversation";
             document.getElementById("chatbox").innerHTML = "";
           }
         } else {
@@ -317,9 +460,9 @@ function deleteConversation(conversationId) {
   }
 }
 
-// Function to fetch cited text from the backend
+// ===================== CITED TEXT FUNCTIONS =====================
 function fetchCitedText(citationId) {
-  // Show loading indicator
+  // Show loading
   showLoadingIndicator();
 
   fetch("/api/get_citation", {
@@ -331,12 +474,8 @@ function fetchCitedText(citationId) {
     .then((data) => {
       hideLoadingIndicator();
 
-      if (
-        data.cited_text &&
-        data.file_name &&
-        data.page_number !== undefined
-      ) {
-        // Display the cited text in a popup or sidebar with dynamic title
+      if (data.cited_text && data.file_name && data.page_number !== undefined) {
+        // show in modal
         showCitedTextPopup(data.cited_text, data.file_name, data.page_number);
       } else if (data.error) {
         alert(data.error);
@@ -351,9 +490,7 @@ function fetchCitedText(citationId) {
     });
 }
 
-// Function to display cited text in a Bootstrap modal with dynamic title
 function showCitedTextPopup(citedText, fileName, pageNumber) {
-  // Create the modal container if it doesn't exist
   let modalContainer = document.getElementById("citation-modal");
   if (!modalContainer) {
     modalContainer = document.createElement("div");
@@ -363,46 +500,44 @@ function showCitedTextPopup(citedText, fileName, pageNumber) {
     modalContainer.setAttribute("aria-hidden", "true");
 
     modalContainer.innerHTML = `
-              <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
-                  <div class="modal-content">
-                      <div class="modal-header">
-                          <h5 class="modal-title">Source: ${fileName}, Page: ${pageNumber}</h5>
-                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                      </div>
-                      <div class="modal-body">
-                          <pre id="cited-text-content"></pre>
-                      </div>
-                  </div>
-              </div>
-          `;
+      <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Source: ${fileName}, Page: ${pageNumber}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <pre id="cited-text-content"></pre>
+          </div>
+        </div>
+      </div>
+    `;
     document.body.appendChild(modalContainer);
   } else {
-    // Update the modal title if it already exists
+    // update existing
     const modalTitle = modalContainer.querySelector(".modal-title");
     modalTitle.textContent = `Source: ${fileName}, Page: ${pageNumber}`;
   }
 
-  // Set the cited text content
   const citedTextContent = document.getElementById("cited-text-content");
   citedTextContent.textContent = citedText;
 
-  // Show the modal using Bootstrap's modal plugin
+  // show modal
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
 
-// Function to show loading indicator
+// ===================== LOADING / HIDING INDICATORS =====================
 function showLoadingIndicator() {
-  // Create a loading spinner if it doesn't exist
   let loadingSpinner = document.getElementById("loading-spinner");
   if (!loadingSpinner) {
     loadingSpinner = document.createElement("div");
     loadingSpinner.id = "loading-spinner";
     loadingSpinner.innerHTML = `
-              <div class="spinner-border text-primary" role="status">
-                  <span class="visually-hidden">Loading...</span>
-              </div>
-          `;
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    `;
     loadingSpinner.style.position = "fixed";
     loadingSpinner.style.top = "50%";
     loadingSpinner.style.left = "50%";
@@ -413,91 +548,112 @@ function showLoadingIndicator() {
     loadingSpinner.style.display = "block";
   }
 }
-
-// Function to hide loading indicator
 function hideLoadingIndicator() {
   const loadingSpinner = document.getElementById("loading-spinner");
   if (loadingSpinner) {
     loadingSpinner.style.display = "none";
   }
 }
+function showLoadingIndicatorInChatbox() {
+  const chatbox = document.getElementById("chatbox");
+  const loadingIndicator = document.createElement("div");
+  loadingIndicator.classList.add("loading-indicator");
+  loadingIndicator.id = "loading-indicator";
 
-// Function to send a message (user input)
+  loadingIndicator.innerHTML = `
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">AI is typing...</span>
+    </div>
+    <span>AI is typing...</span>
+  `;
+  chatbox.appendChild(loadingIndicator);
+  chatbox.scrollTop = chatbox.scrollHeight;
+}
+function hideLoadingIndicatorInChatbox() {
+  const loadingIndicator = document.getElementById("loading-indicator");
+  if (loadingIndicator) {
+    loadingIndicator.remove();
+  }
+}
+
+// ===================== SENDING A MESSAGE =====================
 function sendMessage() {
-  const userInput = document.getElementById("user-input").value.trim();
-  if (userInput === "" || !currentConversationId) return;
+  const userInput = document.getElementById("user-input");
+  const textVal = userInput.value.trim();
+  if (textVal === "" || !currentConversationId) return;
 
-  appendMessage("You", userInput);
-  document.getElementById("user-input").value = "";
+  appendMessage("You", textVal);
+  userInput.value = "";
 
-  // Show the loading indicator
+  // Show spinner in chatbox
   showLoadingIndicatorInChatbox();
 
-  // Get the state of the search documents button
+  // Hybrid search?
   const hybridSearchEnabled = document
     .getElementById("search-documents-btn")
-    ?.classList.contains("active") || false;
+    .classList.contains("active");
 
-  // Get the selected document ID if hybrid search is enabled
-  const selectedDocumentId = (hybridSearchEnabled && (document.getElementById("document-select").value != "None")) ? document.getElementById("document-select").value : null;
+  // If doc is selected
+  let selectedDocumentId = null;
+  if (hybridSearchEnabled) {
+    const docSel = document.getElementById("document-select");
+    if (docSel.value !== "" && docSel.value !== "None") {
+      selectedDocumentId = docSel.value;
+    }
+  }
 
-  // Get the state of the search web button
+  // Bing search?
   const bingSearchEnabled = document
     .getElementById("search-web-btn")
-    ?.classList.contains("active") || false;
+    .classList.contains("active");
 
-  // Get the state of the image generation button
+  // Image gen?
   const imageGenEnabled = document
     .getElementById("image-generate-btn")
-    ?.classList.contains("active") || false;
+    ?.classList.contains("active");
 
+  // Post to /api/chat
   fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      message: userInput,
+      message: textVal,
       conversation_id: currentConversationId,
       hybrid_search: hybridSearchEnabled,
-      selected_document_id: selectedDocumentId, // Include selected document ID
+      selected_document_id: selectedDocumentId,
       bing_search: bingSearchEnabled,
-      image_generation: imageGenEnabled
+      image_generation: imageGenEnabled,
     }),
   })
     .then((response) => response.json())
     .then((data) => {
-      // Hide the loading indicator
       hideLoadingIndicatorInChatbox();
-
       if (data.reply) {
         appendMessage("AI", data.reply);
       }
       if (data.conversation_id) {
-        currentConversationId = data.conversation_id; // Update conversation ID if needed
+        currentConversationId = data.conversation_id;
       }
       if (data.conversation_title) {
-        // Update the conversation title in the UI
         document.getElementById("current-conversation-title").textContent =
           data.conversation_title;
-        // Update the conversation item in the list
+        // update the item in list
         const convoItem = document.querySelector(
           `.conversation-item[data-conversation-id="${currentConversationId}"]`
         );
         if (convoItem) {
-          const date = new Date();
+          const d = new Date();
           convoItem.innerHTML = `
-                      <div class="d-flex justify-content-between align-items-center">
-                          <div>
-                              <span>${data.conversation_title}</span><br>
-                              <small>${date.toLocaleString()}</small>
-                          </div>
-                          <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${currentConversationId}">
-                              <i class="bi bi-trash"></i>
-                          </button>
-                      </div>
-                  `;
-          // Update the data-conversation-title attribute
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <span>${data.conversation_title}</span><br>
+                <small>${d.toLocaleString()}</small>
+              </div>
+              <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${currentConversationId}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          `;
           convoItem.setAttribute(
             "data-conversation-title",
             data.conversation_title
@@ -507,17 +663,28 @@ function sendMessage() {
     })
     .catch((error) => {
       console.error("Error:", error);
-      // Hide the loading indicator even if there's an error
       hideLoadingIndicatorInChatbox();
       appendMessage("Error", "Could not get a response.");
     });
 }
 
-// Function to load documents for the dropdown
+// --------------------- User Input Event Listeners ---------------------
+
+document.getElementById("send-btn").addEventListener("click", sendMessage);
+
+document
+  .getElementById("user-input")
+  .addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  });
+
+// ===================== LOADING DOCUMENTS FOR DROPDOWN =====================
 function loadDocuments() {
   fetch("/api/documents")
-    .then(response => response.json())
-    .then(data => {
+    .then((response) => response.json())
+    .then((data) => {
       const documentSelect = document.getElementById("document-select");
       documentSelect.innerHTML = "";
 
@@ -527,55 +694,45 @@ function loadDocuments() {
       defaultOption.textContent = "None";
       documentSelect.appendChild(defaultOption);
 
-      data.documents.forEach(doc => {
+      data.documents.forEach((doc) => {
         const option = document.createElement("option");
         option.value = doc.id;
-        option.textContent = doc.file_name; 
+        option.textContent = doc.file_name;
         documentSelect.appendChild(option);
       });
 
-      // Check URL parameters to pre-select document and enable search
-      const searchDocuments = getUrlParameter('search_documents') === 'true';
-      const documentId = getUrlParameter('document_id');
+      // Check URL params
+      const searchDocuments = getUrlParameter("search_documents") === "true";
+      const documentId = getUrlParameter("document_id");
       if (searchDocuments && documentId) {
         document.getElementById("search-documents-btn").classList.add("active");
         documentSelect.style.display = "block";
         documentSelect.value = documentId;
       }
     })
-    .catch(error => {
+    .catch((error) => {
       console.error("Error loading documents:", error);
     });
 }
 
-// Function to get URL parameters
+// Get a URL parameter
 function getUrlParameter(name) {
-    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    const results = regex.exec(location.search);
-    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+  const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+  const results = regex.exec(location.search);
+  return results === null
+    ? ""
+    : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
-// Event listener for send button
-document.getElementById("send-btn").addEventListener("click", sendMessage);
-
-// Event listener for Enter key
-document
-  .getElementById("user-input")
-  .addEventListener("keypress", function (e) {
-    if (e.key === "Enter") {
-      sendMessage();
-    }
-  });
-
-// Event listener for New Conversation button
+// ===================== CREATE A NEW CONVERSATION =====================
 document
   .getElementById("new-conversation-btn")
   .addEventListener("click", () => {
     fetch("/api/create_conversation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "same-origin", // Include cookies for same-origin requests
+      credentials: "same-origin",
     })
       .then((response) => {
         if (!response.ok) {
@@ -587,9 +744,10 @@ document
       })
       .then((data) => {
         if (data.conversation_id) {
-          // Automatically select the new conversation
+          // automatically select
           selectConversation(data.conversation_id);
-          // Optionally, add it to the top of the conversations list
+
+          // Add it to top of conversation list
           const conversationsList =
             document.getElementById("conversations-list");
           const convoItem = document.createElement("div");
@@ -598,32 +756,29 @@ document
             "conversation-item",
             "active"
           );
-          convoItem.setAttribute(
-            "data-conversation-id",
-            data.conversation_id
-          );
+          convoItem.setAttribute("data-conversation-id", data.conversation_id);
+
           const date = new Date();
           convoItem.innerHTML = `
-              <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                      <span>${data.conversation_id}</span><br>
-                      <small>${date.toLocaleString()}</small>
-                  </div>
-                  <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
-                    data.conversation_id
-                  }">
-                      <i class="bi bi-trash"></i>
-                  </button>
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <span>${data.conversation_id}</span><br>
+                <small>${date.toLocaleString()}</small>
               </div>
+              <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
+                data.conversation_id
+              }">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
           `;
-          // Prepend the new conversation
           conversationsList.prepend(convoItem);
-          // Disable active state for others
+
+          // remove 'active' from others
           const items = document.querySelectorAll(".conversation-item");
           items.forEach((item) => {
             if (
-              item.getAttribute("data-conversation-id") !==
-              data.conversation_id
+              item.getAttribute("data-conversation-id") !== data.conversation_id
             ) {
               item.classList.remove("active");
             }
@@ -633,12 +788,12 @@ document
         }
       })
       .catch((error) => {
-        console.error("Error creating new conversation:", error);
+        console.error("Error creating conversation:", error);
         alert(`Failed to create a new conversation: ${error.message}`);
       });
   });
 
-// Event listener for 'choose-file-btn' click
+// ===================== FILE UPLOAD LOGIC =====================
 document
   .getElementById("choose-file-btn")
   .addEventListener("click", function () {
@@ -646,38 +801,29 @@ document
     document.getElementById("file-input").click();
   });
 
-// Event listener for 'file-input' change
 document.getElementById("file-input").addEventListener("change", function () {
   const fileInput = this;
   const file = fileInput.files[0];
   if (file) {
-    // Get the file name
     const fileName = file.name;
-    // Update the button to display the file name
     const fileBtn = document.getElementById("choose-file-btn");
     fileBtn.classList.add("active");
     fileBtn.querySelector(".file-btn-text").textContent = fileName;
     // Show the upload button
     document.getElementById("upload-btn").style.display = "block";
   } else {
-    // No file selected, reset the button
     resetFileButton();
   }
 });
 
-// Function to reset the file button
 function resetFileButton() {
-  // Clear the file input
   document.getElementById("file-input").value = "";
-  // Reset the button
   const fileBtn = document.getElementById("choose-file-btn");
   fileBtn.classList.remove("active");
   fileBtn.querySelector(".file-btn-text").textContent = "";
-  // Hide the upload button
   document.getElementById("upload-btn").style.display = "none";
 }
 
-// Modify the upload button event listener
 document.getElementById("upload-btn").addEventListener("click", () => {
   const fileInput = document.getElementById("file-input");
   const file = fileInput.files[0];
@@ -699,11 +845,9 @@ document.getElementById("upload-btn").addEventListener("click", () => {
     body: formData,
   })
     .then((response) => {
-      // Clone the response to read the JSON body
       let clonedResponse = response.clone();
       return response.json().then((data) => {
         if (!response.ok) {
-          // Handle HTTP errors
           console.error("Upload failed:", data.error || "Unknown error");
           alert("Error uploading file: " + (data.error || "Unknown error"));
           throw new Error(data.error || "Upload failed");
@@ -714,24 +858,22 @@ document.getElementById("upload-btn").addEventListener("click", () => {
     .then((data) => {
       console.log("Upload response data:", data);
       if (data.conversation_id) {
-        currentConversationId = data.conversation_id; // Update conversation ID
-        loadMessages(currentConversationId); // Fetch and display updated conversation
+        currentConversationId = data.conversation_id;
+        loadMessages(currentConversationId);
       } else {
         console.error("No conversation_id returned from server.");
         alert("Error: No conversation ID returned from server.");
       }
-      // Reset the file input and button
       resetFileButton();
     })
     .catch((error) => {
       console.error("Error:", error);
       alert("Error uploading file: " + error.message);
-      // Reset the file input and button
       resetFileButton();
     });
 });
 
-// Event delegation to handle clicks on citation links and file links
+// ===================== CITATION LINKS & FILE LINKS =====================
 document.getElementById("chatbox").addEventListener("click", (event) => {
   if (event.target && event.target.matches("a.citation-link")) {
     event.preventDefault();
@@ -745,7 +887,7 @@ document.getElementById("chatbox").addEventListener("click", (event) => {
   }
 });
 
-// Listen for clicks on any images with the 'generated-image' class
+// If user clicks on the generated image
 document.getElementById("chatbox").addEventListener("click", (event) => {
   if (event.target.classList.contains("generated-image")) {
     const imageSrc = event.target.getAttribute("data-image-src");
@@ -755,8 +897,6 @@ document.getElementById("chatbox").addEventListener("click", (event) => {
 
 function showImagePopup(imageSrc) {
   let modalContainer = document.getElementById("image-modal");
-  
-  // If the modal doesn't exist yet, create it
   if (!modalContainer) {
     modalContainer = document.createElement("div");
     modalContainer.id = "image-modal";
@@ -775,18 +915,14 @@ function showImagePopup(imageSrc) {
     `;
     document.body.appendChild(modalContainer);
   }
-
-  // Update the src for the image inside the modal
   const modalImage = modalContainer.querySelector("#image-modal-img");
   modalImage.src = imageSrc;
-
-  // Show the modal using Bootstrap
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
 
 function fetchFileContent(conversationId, fileId) {
-  // Show loading indicator
+  // Show loading
   showLoadingIndicator();
 
   fetch("/api/get_file_content", {
@@ -802,7 +938,6 @@ function fetchFileContent(conversationId, fileId) {
       hideLoadingIndicator();
 
       if (data.file_content && data.filename) {
-        // Display the file content in a popup or sidebar with dynamic title
         showFileContentPopup(data.file_content, data.filename, data.is_table);
       } else if (data.error) {
         alert(data.error);
@@ -818,7 +953,6 @@ function fetchFileContent(conversationId, fileId) {
 }
 
 function showFileContentPopup(fileContent, filename, isTable) {
-  // Create the modal container if it doesn't exist
   let modalContainer = document.getElementById("file-modal");
   if (!modalContainer) {
     modalContainer = document.createElement("div");
@@ -828,76 +962,43 @@ function showFileContentPopup(fileContent, filename, isTable) {
     modalContainer.setAttribute("aria-hidden", "true");
 
     modalContainer.innerHTML = `
-          <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
-              <div class="modal-content">
-                  <div class="modal-header">
-                      <h5 class="modal-title">Uploaded File: ${filename}</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                  </div>
-                  <div class="modal-body">
-                      <div id="file-content"></div>
-                  </div>
-              </div>
+      <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Uploaded File: ${filename}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-      `;
+          <div class="modal-body">
+            <div id="file-content"></div>
+          </div>
+        </div>
+      </div>
+    `;
     document.body.appendChild(modalContainer);
   } else {
-    // Update the modal title if it already exists
     const modalTitle = modalContainer.querySelector(".modal-title");
     modalTitle.textContent = `Uploaded File: ${filename}`;
   }
 
-  // Set the file content
   const fileContentElement = document.getElementById("file-content");
   if (isTable) {
     fileContentElement.innerHTML = `<div class="table-responsive">${fileContent}</div>`;
-    // Initialize DataTables
+    // Initialize DataTables if needed
     $(document).ready(function () {
       $("#file-content table").DataTable({
         responsive: true,
-        scrollX: true, // Enable horizontal scrolling
+        scrollX: true,
       });
     });
   } else {
     fileContentElement.innerHTML = `<pre style="white-space: pre-wrap;">${fileContent}</pre>`;
   }
 
-  // Show the modal using Bootstrap's modal plugin
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
 
-function showLoadingIndicatorInChatbox() {
-  const chatbox = document.getElementById("chatbox");
-
-  // Create a loading indicator element
-  const loadingIndicator = document.createElement("div");
-  loadingIndicator.classList.add("loading-indicator");
-  loadingIndicator.id = "loading-indicator"; // Assign an ID for easy reference
-
-  // Use Bootstrap's spinner
-  loadingIndicator.innerHTML = `
-          <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">AI is typing...</span>
-          </div>
-          <span>AI is typing...</span>
-      `;
-
-  // Append the loading indicator to the chatbox
-  chatbox.appendChild(loadingIndicator);
-
-  // Scroll to the bottom to ensure the loading indicator is visible
-  chatbox.scrollTop = chatbox.scrollHeight;
-}
-
-function hideLoadingIndicatorInChatbox() {
-  const loadingIndicator = document.getElementById("loading-indicator");
-  if (loadingIndicator) {
-    loadingIndicator.remove();
-  }
-}
-
-// Initialize Bootstrap tooltips
+// ===================== BOOTSTRAP TOOLTIPS =====================
 document.addEventListener("DOMContentLoaded", function () {
   var tooltipTriggerList = [].slice.call(
     document.querySelectorAll('[data-bs-toggle="tooltip"]')
@@ -907,15 +1008,38 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Load conversations on page load
+// ===================== ON PAGE LOAD =====================
 window.onload = function () {
   loadConversations();
+  loadAllDocs() // personal & group docs
+    .then(() => {
+      // Now read URL params:
+      const searchDocsParam = getUrlParameter("search_documents") === "true";
+      const docScopeParam = getUrlParameter("doc_scope") || ""; // "personal","group","all",""
+      const documentIdParam = getUrlParameter("document_id") || "";
 
-  // Check URL parameters to enable search documents
-  const searchDocuments = getUrlParameter('search_documents') === 'true';
-  if (searchDocuments) {
-    document.getElementById("search-documents-btn").classList.add("active");
-    document.getElementById("document-select").style.display = "block";
-    loadDocuments();
-  }
+      if (searchDocsParam) {
+        // 1) Turn on "Search Documents"
+        document.getElementById("search-documents-btn").classList.add("active");
+
+        // 2) Show doc scope & doc select
+        document.getElementById("doc-scope-select").style.display =
+          "inline-block";
+        document.getElementById("document-select").style.display =
+          "inline-block";
+
+        // 3) If doc_scope param is present, set it
+        if (docScopeParam) {
+          document.getElementById("doc-scope-select").value = docScopeParam;
+        }
+
+        // 4) Now populate the final doc list
+        populateDocumentSelectScope();
+
+        // 5) If there's a doc ID, select it
+        if (documentIdParam) {
+          document.getElementById("document-select").value = documentIdParam;
+        }
+      }
+    });
 };

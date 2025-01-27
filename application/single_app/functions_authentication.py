@@ -1,3 +1,5 @@
+# functions_authentication.py
+
 from config import *
 
 def login_required(f):
@@ -14,3 +16,13 @@ def get_current_user_id():
     if user:
         return user.get('oid')
     return None
+
+def get_current_user_info():
+    user = session.get("user")
+    if not user:
+        return None
+    return {
+        "userId": user.get("oid"), 
+        "email": user.get("preferred_username"),
+        "displayName": user.get("name")
+    }

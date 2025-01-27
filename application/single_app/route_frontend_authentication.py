@@ -1,3 +1,5 @@
+# route_frontend_authentication.py
+
 from config import *
 
 def register_route_frontend_authentication(app):

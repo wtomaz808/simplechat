@@ -1,3 +1,5 @@
+# functions_documents.py
+
 from config import *
 from functions_content import *
 from functions_settings import *
@@ -337,3 +339,35 @@ def get_document_versions(user_id, document_id):
     except Exception as e:
         #print(f'Error retrieving document versions: {str(e)}')
         return []
+    
+def detect_doc_type(document_id, user_id=None):
+    """
+    Check Cosmos to see if this doc belongs to the user's docs (has user_id)
+    or the group's docs (has group_id).
+    Returns one of: "user", "group", or None if not found.
+    Optionally checks if user_id matches (for user docs).
+    """
+
+    # 1) Try user docs container
+    try:
+        # For user docs, the container is "documents_container"
+        doc_item = documents_container.read_item(document_id, partition_key=document_id)
+        # If found, confirm it belongs to this user_id if given
+        if user_id and doc_item.get('user_id') != user_id:
+            # doesn't match the user -> not a user doc for this user
+            pass
+        else:
+            return "user"
+    except:
+        pass  # Not found in user docs
+
+    # 2) Try group docs container
+    try:
+        group_doc_item = group_documents_container.read_item(document_id, partition_key=document_id)
+        # If found, it must be a group doc
+        return "group"
+    except:
+        pass
+
+    # If not found in either container
+    return None

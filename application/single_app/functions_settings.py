@@ -1,3 +1,5 @@
+# functions_settings.py
+
 from config import *
 
 def get_settings():
@@ -72,3 +74,33 @@ def decrypt_key(encrypted_key):
     except InvalidToken:
         print("Decryption failed: Invalid token")
         return None
+
+def get_user_settings(user_id):
+    doc_id = str(user_id)
+    try:
+        return user_settings_container.read_item(item=doc_id, partition_key=doc_id)
+    except exceptions.CosmosResourceNotFoundError:
+        # Return default user settings if not found
+        return {
+            "id": user_id,
+            "settings": {
+                "activeGroupOid": ""
+            },
+            "lastUpdated": None
+        }
+    
+def update_user_settings(user_id, new_settings):
+    doc_id = str(user_id)
+    try:
+        # Try to fetch the existing document
+        doc = user_settings_container.read_item(item=doc_id, partition_key=doc_id)
+        # Update the settings document
+        doc.update(new_settings)
+        user_settings_container.upsert_item(doc)
+    except exceptions.CosmosResourceNotFoundError:
+        # If the document doesn't exist, create a new one
+        doc = {
+            "id": doc_id,
+            **new_settings
+        }
+        user_settings_container.upsert_item(doc)

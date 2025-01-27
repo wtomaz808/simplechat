@@ -1,3 +1,4 @@
+# config.py
 import os
 import requests
 import uuid
@@ -20,22 +21,23 @@ from uuid import uuid4
 from threading import Thread
 from openai import AzureOpenAI
 from cryptography.fernet import Fernet, InvalidToken
+from urllib.parse import quote
 
-from azure.cosmos import CosmosClient, PartitionKey
+from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
-from azure.core.exceptions import AzureError
+from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.core.polling import LROPoller
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.176.doc_target.1'
+app.config['VERSION'] = '0.179.group_documents.13'
 Session(app)
 
 ALLOWED_EXTENSIONS = {
@@ -49,6 +51,7 @@ CLIENT_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
 SCOPE = ["User.Read"]  # Adjust scope according to your needs
+MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
 
 # Azure Document Intelligence Configuration
 AZURE_DI_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
@@ -82,6 +85,7 @@ AZURE_OPENAI_IMAGE_GEN_KEY = os.getenv("AZURE_OPENAI_IMAGE_GEN_KEY")
 AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
 AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
 AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
+AZURE_AI_SEARCH_GROUP_INDEX = os.getenv('AZURE_AI_SEARCH_GROUP_INDEX')
 
 BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
 BING_SEARCH_KEY = os.getenv("BING_SEARCH_KEY")
@@ -111,6 +115,12 @@ search_client_user = SearchClient(
     credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
 )
 
+search_client_group = SearchClient(
+    endpoint=AZURE_AI_SEARCH_ENDPOINT,
+    index_name=AZURE_AI_SEARCH_GROUP_INDEX,
+    credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
+)
+
 settings_container_name = "settings"
 settings_container = database.create_container_if_not_exists(
     id=settings_container_name,
@@ -118,3 +128,23 @@ settings_container = database.create_container_if_not_exists(
     offer_throughput=400
 )
 
+groups_container_name = "groups"
+groups_container = database.create_container_if_not_exists(
+    id=groups_container_name,
+    partition_key=PartitionKey(path="/id"),
+    offer_throughput=400
+)
+
+group_documents_container_name = "group_documents"
+group_documents_container = database.create_container_if_not_exists(
+    id=group_documents_container_name,
+    partition_key=PartitionKey(path="/id"),
+    offer_throughput=400
+)
+
+user_settings_container_name = "user_settings"
+user_settings_container = database.create_container_if_not_exists(
+    id=user_settings_container_name,
+    partition_key=PartitionKey(path="/id"),
+    offer_throughput=400
+)

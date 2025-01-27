@@ -1,3 +1,5 @@
+# route_backend_chats.py
+
 from config import *
 from functions_authentication import *
 from functions_search import *
@@ -102,7 +104,7 @@ def register_route_backend_chats(app):
         # If hybrid search is enabled, perform it and include the results
         if hybrid_search_enabled:
             if selected_document_id:
-                search_results = hybrid_search(user_message, user_id, top_n=10, document_id=selected_document_id)
+                search_results = hybrid_search(user_message, user_id, document_id=selected_document_id, top_n=10)
             else:
                 search_results = hybrid_search(user_message, user_id, top_n=10)
             if search_results:

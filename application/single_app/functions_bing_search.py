@@ -1,3 +1,5 @@
+# functions_bing_search.py
+
 from config import *
 
 def get_suggestions(query):
