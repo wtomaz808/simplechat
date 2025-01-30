@@ -10,8 +10,10 @@ import time
 import threading
 import random
 import base64
+import markdown2
+import re
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
 from functools import wraps
@@ -37,7 +39,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.179.group_documents.13'
+app.config['VERSION'] = '0.185.0'
 Session(app)
 
 ALLOWED_EXTENSIONS = {

@@ -1,50 +1,48 @@
-{% extends "base.html" %}
-{% block title %}My Groups - {{ app_settings.app_title }}{% endblock %}
+{% extends "base.html" %} {% block title %}My Groups - {{ app_settings.app_title
+}}{% endblock %} {% block content %}
+<div class="container">
+  <h2>My Groups</h2>
 
-{% block content %}
-<div class="container mt-4">
-    <h2>My Groups</h2>
+  <!-- Create Group Button trigger modal -->
+  <button
+    type="button"
+    class="btn btn-success mb-3"
+    data-bs-toggle="modal"
+    data-bs-target="#createGroupModal"
+  >
+    Create New Group
+  </button>
 
-    <!-- Create Group Button trigger modal -->
-    <button
-      type="button"
-      class="btn btn-success mb-3"
-      data-bs-toggle="modal"
-      data-bs-target="#createGroupModal"
-    >
-      Create New Group
-    </button>
+  <!-- Find Group Button trigger modal -->
+  <button
+    type="button"
+    class="btn btn-info mb-3"
+    data-bs-toggle="modal"
+    data-bs-target="#findGroupModal"
+  >
+    Find Group
+  </button>
 
-    <!-- Find Group Button trigger modal -->
-    <button
-      type="button"
-      class="btn btn-info mb-3"
-      data-bs-toggle="modal"
-      data-bs-target="#findGroupModal"
-    >
-      Find Group
-    </button>
+  <div class="mb-3">
+    <!-- Search form -->
+    <form class="d-flex" id="searchGroupsForm">
+      <input
+        class="form-control me-2"
+        type="search"
+        placeholder="Search my groups..."
+        aria-label="Search"
+        name="searchQuery"
+        id="searchQuery"
+      />
+      <button class="btn btn-outline-primary" type="submit">Search</button>
+    </form>
+  </div>
 
-    <div class="mb-3">
-        <!-- Search form -->
-        <form class="d-flex" id="searchGroupsForm">
-            <input
-                class="form-control me-2"
-                type="search"
-                placeholder="Search my groups..."
-                aria-label="Search"
-                name="searchQuery"
-                id="searchQuery"
-            />
-            <button class="btn btn-outline-primary" type="submit">Search</button>
-        </form>
-    </div>
-
-    <!-- Group List Section -->
-    <div id="groupsSection">
-        <!-- This will be updated dynamically via JavaScript -->
-        <p>Loading groups...</p>
-    </div>
+  <!-- Group List Section -->
+  <div id="groupsSection">
+    <!-- This will be updated dynamically via JavaScript -->
+    <p>Loading groups...</p>
+  </div>
 </div>
 
 <!-- Create Group Modal -->
@@ -59,7 +57,9 @@
     <form id="createGroupForm">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="createGroupModalLabel">Create a New Group</h5>
+          <h5 class="modal-title" id="createGroupModalLabel">
+            Create a New Group
+          </h5>
           <button
             type="button"
             class="btn-close"
@@ -68,14 +68,14 @@
           ></button>
         </div>
         <div class="modal-body">
-            <div class="mb-3">
-                <label for="groupName" class="form-label">Group Name</label>
-                <input type="text" class="form-control" id="groupName" required />
-            </div>
-            <div class="mb-3">
-                <label for="groupDescription" class="form-label">Description</label>
-                <textarea class="form-control" id="groupDescription"></textarea>
-            </div>
+          <div class="mb-3">
+            <label for="groupName" class="form-label">Group Name</label>
+            <input type="text" class="form-control" id="groupName" required />
+          </div>
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="groupDescription"></textarea>
+          </div>
         </div>
         <div class="modal-footer">
           <button
@@ -85,9 +85,7 @@
           >
             Cancel
           </button>
-          <button type="submit" class="btn btn-primary">
-            Create
-          </button>
+          <button type="submit" class="btn btn-primary">Create</button>
         </div>
       </div>
     </form>
@@ -105,7 +103,9 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="findGroupModalLabel">Find a Group to Join</h5>
+        <h5 class="modal-title" id="findGroupModalLabel">
+          Find a Group to Join
+        </h5>
         <button
           type="button"
           class="btn-close"
@@ -148,11 +148,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button
-          type="button"
-          class="btn btn-secondary"
-          data-bs-dismiss="modal"
-        >
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           Close
         </button>
       </div>
@@ -160,24 +156,21 @@
   </div>
 </div>
 
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
+{% endblock %} {% block scripts %} {{ super() }}
 <script>
   // On page load, fetch the user's groups
-  $(document).ready(function() {
+  $(document).ready(function () {
     loadUserGroups("");
 
     // Handle searching for groups
-    $("#searchGroupsForm").on("submit", function(e) {
+    $("#searchGroupsForm").on("submit", function (e) {
       e.preventDefault();
       const query = $("#searchQuery").val();
       loadUserGroups(query);
     });
 
     // Handle form submission for creating a group
-    $("#createGroupForm").on("submit", function(e) {
+    $("#createGroupForm").on("submit", function (e) {
       e.preventDefault();
       const name = $("#groupName").val();
       const description = $("#groupDescription").val();
@@ -186,15 +179,15 @@
         method: "POST",
         contentType: "application/json",
         data: JSON.stringify({ name, description }),
-        success: function(data) {
+        success: function (data) {
           // Reload groups after creation
           $("#createGroupModal").modal("hide");
           loadUserGroups("");
         },
-        error: function(err) {
+        error: function (err) {
           alert("Error creating group. Check console for details.");
           console.error(err);
-        }
+        },
       });
     });
   });
@@ -204,9 +197,9 @@
     if (searchQuery && searchQuery.trim() !== "") {
       url += "?search=" + encodeURIComponent(searchQuery.trim());
     }
-    $.get(url, function(data) {
+    $.get(url, function (data) {
       renderGroups(data);
-    }).fail(function(err) {
+    }).fail(function (err) {
       $("#groupsSection").html(
         "<p class='text-danger'>Failed to load groups. Check console for details.</p>"
       );
@@ -250,7 +243,9 @@
             }
           </td>
           <td>
-            <a class="btn btn-sm btn-secondary" href="/groups/${g.id}">Manage</a>
+            <a class="btn btn-sm btn-secondary" href="/groups/${
+              g.id
+            }">Manage</a>
           </td>
         </tr>
       `;
@@ -266,21 +261,21 @@
       method: "PATCH",
       contentType: "application/json",
       data: JSON.stringify({ groupId }),
-      success: function(data) {
+      success: function (data) {
         // Reload groups to update which one is active
         loadUserGroups("");
       },
-      error: function(err) {
+      error: function (err) {
         console.error(err);
         alert("Failed to set active workspace.");
-      }
+      },
     });
   }
 
   $(document).ready(function () {
     // Existing .ready code ...
     // Add a new click handler for searching all groups
-    $("#globalGroupSearchBtn").on("click", function() {
+    $("#globalGroupSearchBtn").on("click", function () {
       const term = $("#globalGroupSearchInput").val().trim();
       searchAllGroups(term);
     });
@@ -302,10 +297,10 @@
     }
 
     $.get(url)
-      .done(function(data) {
+      .done(function (data) {
         renderGlobalGroupResults(data);
       })
-      .fail(function(err) {
+      .fail(function (err) {
         console.error(err);
         alert("Failed to load global groups. Check console for details.");
       });
@@ -325,7 +320,7 @@
     }
 
     let rows = "";
-    groups.forEach(g => {
+    groups.forEach((g) => {
       rows += `
         <tr>
           <td>${escapeHtml(g.name)}</td>
@@ -348,18 +343,18 @@
     $.ajax({
       url: "/api/groups/" + encodeURIComponent(groupId) + "/requests",
       method: "POST",
-      success: function(response) {
+      success: function (response) {
         alert("Join request sent!");
         // You might disable the button or remove the row after success
       },
-      error: function(err) {
+      error: function (err) {
         console.error(err);
         if (err.responseJSON && err.responseJSON.error) {
           alert("Failed to request join: " + err.responseJSON.error);
         } else {
           alert("Error sending request.");
         }
-      }
+      },
     });
   }
 
@@ -369,6 +364,5 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
   }
-
 </script>
 {% endblock %}

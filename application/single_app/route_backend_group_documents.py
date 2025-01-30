@@ -88,30 +88,27 @@ def register_route_backend_group_documents(app):
     @app.route('/api/group_documents/<doc_id>', methods=['DELETE'])
     @login_required
     def api_delete_group_document(doc_id):
-        """
-        Delete a document from the active group, if user role
-        is Owner/Admin/Document Manager.
-        """
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
 
-        # Retrieve the user's active group
-        user_settings = get_user_settings(user_id)
-        active_group_id = user_settings["settings"].get("activeGroupOid")
-        if not active_group_id:
-            return jsonify({'error': 'No active group selected'}), 400
+        # Retrieve group_id from the query params
+        group_id = request.args.get('group_id')
+        if not group_id:
+            return jsonify({'error': 'No group_id provided'}), 400
 
-        group_doc = find_group_by_id(active_group_id)
+        group_doc = find_group_by_id(group_id)
         if not group_doc:
-            return jsonify({'error': 'Active group not found'}), 404
+            return jsonify({'error': 'Group not found'}), 404
 
+        # Check the user's role in that group
         role = get_user_role_in_group(group_doc, user_id)
         if role not in ["Owner", "Admin", "DocumentManager"]:
-            return jsonify({'error': 'You do not have permission to delete documents'}), 403
+            return jsonify({'error': 'You do not have permission to delete...'}), 403
 
         try:
-            delete_group_document(doc_id, active_group_id)
+            delete_group_document(group_id, doc_id)
             return jsonify({'message': 'Document deleted successfully'}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+

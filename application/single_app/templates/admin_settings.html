@@ -3,194 +3,405 @@
 
 {% block content %}
 <div class="container">
-    <h1>Admin Settings</h1>
+    <h2>Admin Settings</h2>
     <form method="post" enctype="multipart/form-data">
-        <!-- Application Title -->
-        <div class="mb-3">
-            <label for="app_title" class="form-label">Application Title</label>
-            <input type="text" class="form-control" id="app_title" name="app_title" value="{{ settings.app_title }}">
-        </div>
-        
-        <!-- Logo Settings -->
-        <div class="mb-3">
-            <h3>Logo Settings</h3>
-            <div class="form-group form-check form-switch mb-3">
-                <input type="checkbox" class="form-check-input" id="show_logo" name="show_logo" {% if settings.show_logo %}checked{% endif %}>
-                <label class="form-check-label ms-2" for="show_logo">Show Logo</label>
-            </div>
-            <div class="form-group mb-3">
-                <label for="logo_file">Upload Custom Logo</label>
-                <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
-            </div>
-        </div>
+        <!-- Nav Tabs -->
+        <ul class="nav nav-tabs" id="adminSettingsTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="general-tab"
+                        data-bs-toggle="tab" data-bs-target="#general"
+                        type="button" role="tab" aria-controls="general" aria-selected="true">
+                    General
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="gpt-tab"
+                        data-bs-toggle="tab" data-bs-target="#gpt"
+                        type="button" role="tab" aria-controls="gpt" aria-selected="false">
+                    GPT
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="embeddings-tab"
+                        data-bs-toggle="tab" data-bs-target="#embeddings"
+                        type="button" role="tab" aria-controls="embeddings" aria-selected="false">
+                    Embeddings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="image-gen-tab"
+                        data-bs-toggle="tab" data-bs-target="#image-gen"
+                        type="button" role="tab" aria-controls="image-gen" aria-selected="false">
+                    Image Generation
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="web-search-tab"
+                        data-bs-toggle="tab" data-bs-target="#web-search"
+                        type="button" role="tab" aria-controls="web-search" aria-selected="false">
+                    Web Search
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="external-apis-tab"
+                        data-bs-toggle="tab" data-bs-target="#external-apis"
+                        type="button" role="tab" aria-controls="external-apis" aria-selected="false">
+                    External APIs
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="other-tab"
+                        data-bs-toggle="tab" data-bs-target="#other"
+                        type="button" role="tab" aria-controls="other" aria-selected="false">
+                    Other
+                </button>
+            </li>
+        </ul>
 
-        <!-- Azure OpenAI GPT Settings -->
-        <div class="mb-3">
-            <h3>Azure OpenAI GPT Settings</h3>
-            <div class="mb-3">
-                <label for="azure_openai_gpt_endpoint" class="form-label">Azure OpenAI GPT Endpoint</label>
-                <input type="text" class="form-control" id="azure_openai_gpt_endpoint" name="azure_openai_gpt_endpoint"
-                    value="{{ settings.azure_openai_gpt_endpoint or '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="azure_openai_gpt_api_version" class="form-label">Azure OpenAI GPT API Version</label>
-                <input type="text" class="form-control" id="azure_openai_gpt_api_version" name="azure_openai_gpt_api_version"
-                    value="{{ settings.azure_openai_gpt_api_version or '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="azure_openai_gpt_authentication_type" class="form-label">Azure OpenAI GPT Authentication Type</label>
-                <select class="form-select" id="azure_openai_gpt_authentication_type" name="azure_openai_gpt_authentication_type">
-                    <option value="key" {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>Key</option>
-                    <option value="managed_identity" {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                </select>
-            </div>
-            <div class="mb-3" id="gpt_key_container" {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                <label for="azure_openai_gpt_key" class="form-label">Azure OpenAI GPT Key</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" id="azure_openai_gpt_key" name="azure_openai_gpt_key"
-                        value="{{ settings.azure_openai_gpt_key or '' }}">
-                    <button type="button" class="btn btn-outline-secondary" id="toggle_gpt_key">Show</button>
-                </div>
-            </div>
-            <div class="mb-3">
-                <label for="gpt_model" class="form-label">GPT Model</label>
-                <select class="form-select" id="gpt_model" name="gpt_model">
-                    <option value="gpt-4o" {% if settings.gpt_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
-                    <option value="gpt-4" {% if settings.gpt_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
-                    <option value="gpt-3.5-turbo" {% if settings.gpt_model=='gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo</option>
-                    <!-- Add other models as needed -->
-                </select>
-            </div>
-        </div>
-
-        <!-- Azure OpenAI Embedding Settings -->
-        <div class="mb-3">
-            <h3>Azure OpenAI Embedding Settings</h3>
-            <div class="mb-3">
-                <label for="azure_openai_embedding_endpoint" class="form-label">Azure OpenAI Embedding Endpoint</label>
-                <input type="text" class="form-control" id="azure_openai_embedding_endpoint" name="azure_openai_embedding_endpoint"
-                    value="{{ settings.azure_openai_embedding_endpoint or '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="azure_openai_embedding_api_version" class="form-label">Azure OpenAI Embedding API Version</label>
-                <input type="text" class="form-control" id="azure_openai_embedding_api_version" name="azure_openai_embedding_api_version"
-                    value="{{ settings.azure_openai_embedding_api_version or '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="azure_openai_embedding_authentication_type" class="form-label">Azure OpenAI Embedding Authentication Type</label>
-                <select class="form-select" id="azure_openai_embedding_authentication_type" name="azure_openai_embedding_authentication_type">
-                    <option value="key" {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>Key</option>
-                    <option value="managed_identity" {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                </select>
-            </div>
-            <div class="mb-3" id="embedding_key_container" {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" id="azure_openai_embedding_key" name="azure_openai_embedding_key"
-                        value="{{ settings.azure_openai_embedding_key or '' }}">
-                    <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
-                </div>
-            </div>
-            <div class="mb-3">
-                <label for="embedding_model" class="form-label">Embedding Model</label>
-                <select class="form-select" id="embedding_model" name="embedding_model">
-                    <option value="text-embedding-ada-002" {% if settings.embedding_model=='text-embedding-ada-002' %}selected{% endif %}>text-embedding-ada-002</option>
-                    <option value="text-embedding-3-small" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>text-embedding-3-small</option>
-                    <option value="text-embedding-3-large" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>text-embedding-3-large</option>
-                    <!-- Add other models as needed -->
-                </select>
-            </div>
-        </div>
-
-        <!-- Azure OpenAI Image Generation Settings -->
-        <div class="mb-3">
-            <h3>Azure OpenAI Image Generation Settings</h3>
-            <div class="form-group form-check form-switch mb-3">
-                <input type="checkbox" class="form-check-input" id="enable_image_generation" name="enable_image_generation" {% if settings.enable_image_generation %}checked{% endif %}>
-                <label class="form-check-label ms-2" for="enable_image_generation">Enable Image Generation</label>
-            </div>
-            <div id="image_gen_settings" {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
-                <div class="mb-3">
-                    <label for="azure_openai_image_gen_endpoint" class="form-label">Azure OpenAI Image Generation Endpoint</label>
-                    <input type="text" class="form-control" id="azure_openai_image_gen_endpoint" name="azure_openai_image_gen_endpoint"
-                        value="{{ settings.azure_openai_image_gen_endpoint or '' }}">
-                </div>
-                <div class="mb-3">
-                    <label for="azure_openai_image_gen_api_version" class="form-label">Azure OpenAI Image Gen API Version</label>
-                    <input type="text" class="form-control" id="azure_openai_image_gen_api_version" name="azure_openai_image_gen_api_version"
-                        value="{{ settings.azure_openai_image_gen_api_version or '' }}">
-                </div>
-                <div class="mb-3">
-                    <label for="azure_openai_image_gen_authentication_type" class="form-label">Azure OpenAI Image Generation Authentication Type</label>
-                    <select class="form-select" id="azure_openai_image_gen_authentication_type" name="azure_openai_image_gen_authentication_type">
-                        <option value="key" {% if settings.azure_openai_image_gen_authentication_type=='key' %}selected{% endif %}>Key</option>
-                        <option value="managed_identity" {% if settings.azure_openai_image_gen_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                    </select>
-                </div>
-                <div class="mb-3" id="image_gen_key_container" {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                    <label for="azure_openai_image_gen_key" class="form-label">Azure OpenAI Image Generation Key</label>
-                    <div class="input-group">
-                        <input type="password" class="form-control" id="azure_openai_image_gen_key" name="azure_openai_image_gen_key"
-                            value="{{ settings.azure_openai_image_gen_key or '' }}">
-                        <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
+        <!-- Tab Panes -->
+        <div class="tab-content mt-3" id="adminSettingsTabContent">
+            <!-- GENERAL TAB -->
+            <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
+                <p class="text-muted">
+                    Configure general application settings, including the application’s title, logo, and landing page text.
+                </p>
+                <div class="card p-3 mb-3">
+                    <div class="mb-3">
+                        <label for="app_title" class="form-label">Application Title</label>
+                        <input type="text" class="form-control" id="app_title" name="app_title"
+                               value="{{ settings.app_title }}">
+                    </div>
+                    <h5 class="mt-3">Logo Settings</h5>
+                    <div class="form-group form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input" id="show_logo" name="show_logo"
+                               {% if settings.show_logo %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="show_logo">Show Logo</label>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="logo_file">Upload Custom Logo</label>
+                        <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label for="image_gen_model" class="form-label">Image Generation Model</label>
-                    <select class="form-select" id="image_gen_model" name="image_gen_model">
-                        <option value="dall-e-2" {% if settings.image_gen_model=='dall-e-2' %}selected{% endif %}>dall-e-2</option>
-                        <option value="dall-e-3" {% if settings.image_gen_model=='dall-e-3' %}selected{% endif %}>dall-e-3</option>
-                        <!-- Add other models as needed -->
-                    </select>
+                <div class="card p-3">
+                    <label for="landing_page_text" class="form-label">Landing Page Text (Markdown Supported)</label>
+                    <textarea class="form-control" id="landing_page_text" name="landing_page_text"
+                              rows="3">{{ settings.landing_page_text }}</textarea>
                 </div>
             </div>
-        </div>
 
-        <!-- External API Settings -->
-        <div class="mb-3">
-            <h3>External API Settings</h3>
-            <div class="form-group form-check form-switch mb-3">
-                <input type="checkbox" class="form-check-input" id="use_external_apis" name="use_external_apis" {% if settings.use_external_apis %}checked{% endif %}>
-                <label class="form-check-label ms-2" for="use_external_apis">Use External APIs for Chunking and Embedding</label>
-            </div>
-            <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;"{% endif %}>
-                <div class="mb-3">
-                    <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
-                    <input type="text" class="form-control" id="external_chunking_api" name="external_chunking_api"
-                        value="{{ settings.external_chunking_api }}">
-                </div>
-                <div class="mb-3">
-                    <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
-                    <input type="text" class="form-control" id="external_embedding_api" name="external_embedding_api"
-                        value="{{ settings.external_embedding_api }}">
-                </div>
-                <button type="button" class="btn btn-secondary mb-3" id="test_connection_button">Test Connection</button>
-                <div id="test_connection_result"></div>
-            </div>
-        </div>
+            <!-- GPT TAB -->
+            <div class="tab-pane fade" id="gpt" role="tabpanel" aria-labelledby="gpt-tab">
+                <p class="text-muted">
+                    Configure your GPT model settings. These are used for generating AI text responses.
+                </p>
+                <div class="card p-3 mb-3">
+                    <div class="mb-3">
+                        <label for="azure_openai_gpt_endpoint" class="form-label">Azure OpenAI GPT Endpoint</label>
+                        <input type="text" class="form-control" id="azure_openai_gpt_endpoint"
+                               name="azure_openai_gpt_endpoint"
+                               value="{{ settings.azure_openai_gpt_endpoint or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_gpt_authentication_type" class="form-label">Authentication Type</label>
+                        <select class="form-select" id="azure_openai_gpt_authentication_type"
+                                name="azure_openai_gpt_authentication_type">
+                            <option value="key" {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>
+                                Key
+                            </option>
+                            <option value="managed_identity" {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>
+                                Managed Identity
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="gpt_key_container"
+                         {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                        <label for="azure_openai_gpt_key" class="form-label">Azure OpenAI GPT Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_openai_gpt_key"
+                                   name="azure_openai_gpt_key"
+                                   value="{{ settings.azure_openai_gpt_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_gpt_key">Show</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gpt_model" class="form-label">GPT Model</label>
+                        <select class="form-select" id="gpt_model" name="gpt_model">
+                            <option value="gpt-4o" {% if settings.gpt_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
+                            <option value="gpt-4" {% if settings.gpt_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
+                            <option value="gpt-3.5-turbo" {% if settings.gpt_model=='gpt-3.5-turbo' %}selected{% endif %}>
+                                GPT-3.5 Turbo
+                            </option>
+                        </select>
+                    </div>
 
-        <!-- Other Settings -->
-        <div class="mb-3">
-            <h3>Other Settings</h3>
-            <div class="mb-3">
-                <label for="max_file_size_mb" class="form-label">Maximum File Size (MB)</label>
-                <input type="number" class="form-control" id="max_file_size_mb" name="max_file_size_mb"
-                    value="{{ settings.max_file_size_mb }}">
+                    <!-- SHOW ADVANCED for GPT (API Version, etc.) -->
+                    <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
+                       data-bs-target="#advancedGptFields" aria-expanded="false" aria-controls="advancedGptFields">
+                       Show Advanced
+                    </a>
+                    <div class="collapse" id="advancedGptFields">
+                        <div class="card card-body mt-2">
+                            <div class="mb-3">
+                                <label for="azure_openai_gpt_api_version" class="form-label">Azure OpenAI GPT API Version</label>
+                                <input type="text" class="form-control" id="azure_openai_gpt_api_version"
+                                       name="azure_openai_gpt_api_version"
+                                       value="{{ settings.azure_openai_gpt_api_version or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test GPT Button -->
+                <button type="button" class="btn btn-secondary" id="test_gpt_button">
+                    Test GPT Connection
+                </button>
+                <div id="test_gpt_result" class="mt-2"></div>
             </div>
-            <div class="mb-3">
-                <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
-                <input type="number" class="form-control" id="conversation_history_limit" name="conversation_history_limit"
-                    value="{{ settings.conversation_history_limit }}">
+
+            <!-- EMBEDDINGS TAB -->
+            <div class="tab-pane fade" id="embeddings" role="tabpanel" aria-labelledby="embeddings-tab">
+                <p class="text-muted">
+                    Configure your embeddings settings. These are used for semantic search, knowledge-base lookups, etc.
+                </p>
+                <div class="card p-3 mb-3">
+                    <div class="mb-3">
+                        <label for="azure_openai_embedding_endpoint" class="form-label">Azure OpenAI Embedding Endpoint</label>
+                        <input type="text" class="form-control" id="azure_openai_embedding_endpoint"
+                               name="azure_openai_embedding_endpoint"
+                               value="{{ settings.azure_openai_embedding_endpoint or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_embedding_authentication_type" class="form-label">Authentication Type</label>
+                        <select class="form-select" id="azure_openai_embedding_authentication_type"
+                                name="azure_openai_embedding_authentication_type">
+                            <option value="key" {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>
+                                Key
+                            </option>
+                            <option value="managed_identity" {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
+                                Managed Identity
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="embedding_key_container"
+                         {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                        <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_openai_embedding_key"
+                                   name="azure_openai_embedding_key"
+                                   value="{{ settings.azure_openai_embedding_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="embedding_model" class="form-label">Embedding Model</label>
+                        <select class="form-select" id="embedding_model" name="embedding_model">
+                            <option value="text-embedding-ada-002" {% if settings.embedding_model=='text-embedding-ada-002' %}selected{% endif %}>
+                                text-embedding-ada-002
+                            </option>
+                            <option value="text-embedding-3-small" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>
+                                text-embedding-3-small
+                            </option>
+                            <option value="text-embedding-3-large" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>
+                                text-embedding-3-large
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- SHOW ADVANCED for Embeddings (API version, etc.) -->
+                    <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
+                       data-bs-target="#advancedEmbeddingsFields" aria-expanded="false"
+                       aria-controls="advancedEmbeddingsFields">
+                       Show Advanced
+                    </a>
+                    <div class="collapse" id="advancedEmbeddingsFields">
+                        <div class="card card-body mt-2">
+                            <div class="mb-3">
+                                <label for="azure_openai_embedding_api_version" class="form-label">
+                                    Azure OpenAI Embedding API Version
+                                </label>
+                                <input type="text" class="form-control" id="azure_openai_embedding_api_version"
+                                       name="azure_openai_embedding_api_version"
+                                       value="{{ settings.azure_openai_embedding_api_version or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Embeddings Button -->
+                <button type="button" class="btn btn-secondary" id="test_embedding_button">
+                    Test Embeddings Connection
+                </button>
+                <div id="test_embedding_result" class="mt-2"></div>
             </div>
-            <div class="mb-3">
-                <label for="default_system_prompt" class="form-label">Default System Prompt</label>
-                <textarea class="form-control" id="default_system_prompt" name="default_system_prompt"
-                    rows="5">{{ settings.default_system_prompt }}</textarea>
+
+            <!-- IMAGE GENERATION TAB -->
+            <div class="tab-pane fade" id="image-gen" role="tabpanel" aria-labelledby="image-gen-tab">
+                <p class="text-muted">
+                    Configure image generation settings. Enable/disable, set endpoints, and choose a model.
+                </p>
+                <div class="card p-3">
+                    <div class="form-group form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input" id="enable_image_generation"
+                               name="enable_image_generation" {% if settings.enable_image_generation %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_image_generation">
+                            Enable Image Generation
+                        </label>
+                    </div>
+                    <div id="image_gen_settings" {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label for="azure_openai_image_gen_endpoint" class="form-label">
+                                Azure OpenAI Image Generation Endpoint
+                            </label>
+                            <input type="text" class="form-control" id="azure_openai_image_gen_endpoint"
+                                   name="azure_openai_image_gen_endpoint"
+                                   value="{{ settings.azure_openai_image_gen_endpoint or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_image_gen_authentication_type" class="form-label">
+                                Authentication Type
+                            </label>
+                            <select class="form-select" id="azure_openai_image_gen_authentication_type"
+                                    name="azure_openai_image_gen_authentication_type">
+                                <option value="key" {% if settings.azure_openai_image_gen_authentication_type=='key' %}selected{% endif %}>
+                                    Key
+                                </option>
+                                <option value="managed_identity" {% if settings.azure_openai_image_gen_authentication_type=='managed_identity' %}selected{% endif %}>
+                                    Managed Identity
+                                </option>
+                            </select>
+                        </div>
+                        <div class="mb-3" id="image_gen_key_container"
+                             {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                            <label for="azure_openai_image_gen_key" class="form-label">
+                                Azure OpenAI Image Generation Key
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="azure_openai_image_gen_key"
+                                       name="azure_openai_image_gen_key"
+                                       value="{{ settings.azure_openai_image_gen_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image_gen_model" class="form-label">Image Generation Model</label>
+                            <select class="form-select" id="image_gen_model" name="image_gen_model">
+                                <option value="dall-e-2" {% if settings.image_gen_model=='dall-e-2' %}selected{% endif %}>dall-e-2</option>
+                                <option value="dall-e-3" {% if settings.image_gen_model=='dall-e-3' %}selected{% endif %}>dall-e-3</option>
+                            </select>
+                        </div>
+
+                        <!-- SHOW ADVANCED for Image Gen (API Version, etc.) -->
+                        <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
+                           data-bs-target="#advancedImageGenFields" aria-expanded="false"
+                           aria-controls="advancedImageGenFields">
+                           Show Advanced
+                        </a>
+                        <div class="collapse" id="advancedImageGenFields">
+                            <div class="card card-body mt-2">
+                                <div class="mb-3">
+                                    <label for="azure_openai_image_gen_api_version" class="form-label">
+                                        Azure OpenAI Image Gen API Version
+                                    </label>
+                                    <input type="text" class="form-control" id="azure_openai_image_gen_api_version"
+                                           name="azure_openai_image_gen_api_version"
+                                           value="{{ settings.azure_openai_image_gen_api_version or '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WEB SEARCH TAB -->
+            <div class="tab-pane fade" id="web-search" role="tabpanel" aria-labelledby="web-search-tab">
+                <p class="text-muted">
+                    Configure Bing Web Search. Enable or disable web search capabilities and set the API key.
+                </p>
+                <div class="card p-3">
+                    <div class="form-group form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input" id="enable_web_search" name="enable_web_search"
+                               {% if settings.enable_web_search %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_web_search">
+                            Enable Web Search
+                        </label>
+                    </div>
+                    <div id="web_search_settings" {% if not settings.enable_web_search %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label for="bing_search_key" class="form-label">Bing Search Key</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="bing_search_key"
+                                       name="bing_search_key"
+                                       value="{{ settings.bing_search_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_bing_search_key">Show</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EXTERNAL APIS TAB -->
+            <div class="tab-pane fade" id="external-apis" role="tabpanel" aria-labelledby="external-apis-tab">
+                <p class="text-muted">
+                    Enable and configure external APIs for chunking and embedding functionality.
+                </p>
+                <div class="card p-3">
+                    <div class="form-group form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input" id="use_external_apis" name="use_external_apis"
+                               {% if settings.use_external_apis %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="use_external_apis">
+                            Use External APIs for Chunking and Embedding
+                        </label>
+                    </div>
+                    <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
+                            <input type="text" class="form-control" id="external_chunking_api"
+                                   name="external_chunking_api"
+                                   value="{{ settings.external_chunking_api }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
+                            <input type="text" class="form-control" id="external_embedding_api"
+                                   name="external_embedding_api"
+                                   value="{{ settings.external_embedding_api }}">
+                        </div>
+                        <button type="button" class="btn btn-secondary mb-3" id="test_connection_button">
+                            Test Connection
+                        </button>
+                        <div id="test_connection_result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OTHER TAB -->
+            <div class="tab-pane fade" id="other" role="tabpanel" aria-labelledby="other-tab">
+                <p class="text-muted">
+                    Miscellaneous or rarely changed settings, such as maximum file size, conversation history limits, etc.
+                </p>
+                <div class="card p-3 mb-3">
+                    <div class="mb-3">
+                        <label for="max_file_size_mb" class="form-label">Maximum File Size (MB)</label>
+                        <input type="number" class="form-control" id="max_file_size_mb"
+                               name="max_file_size_mb"
+                               value="{{ settings.max_file_size_mb }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
+                        <input type="number" class="form-control" id="conversation_history_limit"
+                               name="conversation_history_limit"
+                               value="{{ settings.conversation_history_limit }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="default_system_prompt" class="form-label">Default System Prompt</label>
+                        <textarea class="form-control" id="default_system_prompt"
+                                  name="default_system_prompt" rows="5">{{ settings.default_system_prompt }}</textarea>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Submit Button -->
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button type="submit" class="btn btn-primary mt-3">Save Settings</button>
     </form>
 </div>
 {% endblock %}
@@ -198,58 +409,46 @@
 {% block scripts %}
 <script>
     // Show/hide GPT key input based on authentication type
-    document.getElementById('azure_openai_gpt_authentication_type').addEventListener('change', function () {
-        var gptKeyContainer = document.getElementById('gpt_key_container');
-        if (this.value === 'key') {
-            gptKeyContainer.style.display = 'block';
-        } else {
-            gptKeyContainer.style.display = 'none';
-        }
-    });
+    document.getElementById('azure_openai_gpt_authentication_type')
+        .addEventListener('change', function () {
+            var gptKeyContainer = document.getElementById('gpt_key_container');
+            gptKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+        });
 
     // Show/hide embedding key input based on authentication type
-    document.getElementById('azure_openai_embedding_authentication_type').addEventListener('change', function () {
-        var embeddingKeyContainer = document.getElementById('embedding_key_container');
-        if (this.value === 'key') {
-            embeddingKeyContainer.style.display = 'block';
-        } else {
-            embeddingKeyContainer.style.display = 'none';
-        }
-    });
+    document.getElementById('azure_openai_embedding_authentication_type')
+        .addEventListener('change', function () {
+            var embeddingKeyContainer = document.getElementById('embedding_key_container');
+            embeddingKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+        });
 
     // Show/hide image generation key input based on authentication type
-    document.getElementById('azure_openai_image_gen_authentication_type').addEventListener('change', function () {
-        var imageGenKeyContainer = document.getElementById('image_gen_key_container');
-        if (this.value === 'key') {
-            imageGenKeyContainer.style.display = 'block';
-        } else {
-            imageGenKeyContainer.style.display = 'none';
-        }
-    });
+    document.getElementById('azure_openai_image_gen_authentication_type')
+        .addEventListener('change', function () {
+            var imageGenKeyContainer = document.getElementById('image_gen_key_container');
+            imageGenKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+        });
 
     // Show/hide image generation settings based on checkbox
-    document.getElementById('enable_image_generation').addEventListener('change', function () {
-        var imageGenSettings = document.getElementById('image_gen_settings');
-        if (this.checked) {
-            imageGenSettings.style.display = 'block';
-        } else {
-            imageGenSettings.style.display = 'none';
-        }
-    });
+    document.getElementById('enable_image_generation')
+        .addEventListener('change', function () {
+            var imageGenSettings = document.getElementById('image_gen_settings');
+            imageGenSettings.style.display = this.checked ? 'block' : 'none';
+        });
 
     // Show/hide external API settings based on checkbox
-    document.getElementById('use_external_apis').addEventListener('change', function () {
-        var externalSettings = document.getElementById('external_apis_settings');
-        if (this.checked) {
-            externalSettings.style.display = 'block';
-        } else {
-            externalSettings.style.display = 'none';
-        }
-    });
+    document.getElementById('use_external_apis')
+        .addEventListener('change', function () {
+            var externalSettings = document.getElementById('external_apis_settings');
+            externalSettings.style.display = this.checked ? 'block' : 'none';
+        });
 
-    document.getElementById('show_logo').addEventListener('change', function () {
-        console.log('Show Logo:', this.checked);
-    });
+    // Show/hide web search settings based on checkbox
+    document.getElementById('enable_web_search')
+        .addEventListener('change', function () {
+            var webSearchSettings = document.getElementById('web_search_settings');
+            webSearchSettings.style.display = this.checked ? 'block' : 'none';
+        });
 
     // Toggle visibility of GPT key
     document.getElementById('toggle_gpt_key').addEventListener('click', function () {
@@ -287,13 +486,66 @@
         }
     });
 
-    // Test Connection Button
+    // Toggle visibility of the Bing search key
+    document.getElementById('toggle_bing_search_key').addEventListener('click', function () {
+        var bingKeyInput = document.getElementById('bing_search_key');
+        if (bingKeyInput.type === 'password') {
+            bingKeyInput.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            bingKeyInput.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
+
+    // Test GPT Button (example only)
+    document.getElementById('test_gpt_button').addEventListener('click', function () {
+        var endpoint = document.getElementById('azure_openai_gpt_endpoint').value;
+        var resultDiv = document.getElementById('test_gpt_result');
+        resultDiv.innerHTML = 'Testing GPT...';
+
+        // Simple fetch call example (replace with an actual test endpoint or method)
+        fetch(endpoint, { method: 'GET' })
+            .then(response => {
+                if (response.ok) {
+                    resultDiv.innerHTML = 'GPT Endpoint is reachable!';
+                } else {
+                    resultDiv.innerHTML = 'GPT Endpoint returned an error.';
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = 'Failed to connect to GPT Endpoint.';
+            });
+    });
+
+    // Test Embeddings Button (example only)
+    document.getElementById('test_embedding_button').addEventListener('click', function () {
+        var endpoint = document.getElementById('azure_openai_embedding_endpoint').value;
+        var resultDiv = document.getElementById('test_embedding_result');
+        resultDiv.innerHTML = 'Testing Embeddings...';
+
+        // Simple fetch call example (replace with an actual test endpoint or method)
+        fetch(endpoint, { method: 'GET' })
+            .then(response => {
+                if (response.ok) {
+                    resultDiv.innerHTML = 'Embedding Endpoint is reachable!';
+                } else {
+                    resultDiv.innerHTML = 'Embedding Endpoint returned an error.';
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = 'Failed to connect to Embedding Endpoint.';
+            });
+    });
+
+    // Test External APIs Connection
     document.getElementById('test_connection_button').addEventListener('click', function () {
         var chunkingApiUrl = document.getElementById('external_chunking_api').value;
         var embeddingApiUrl = document.getElementById('external_embedding_api').value;
         var resultDiv = document.getElementById('test_connection_result');
         resultDiv.innerHTML = 'Testing...';
 
+        // Check Chunking API
         fetch(chunkingApiUrl + '/api/version')
             .then(response => response.json())
             .then(data => {
@@ -303,6 +555,7 @@
                 resultDiv.innerHTML = 'Chunking API Connection Failed.';
             });
 
+        // Check Embedding API
         fetch(embeddingApiUrl + '/api/version')
             .then(response => response.json())
             .then(data => {

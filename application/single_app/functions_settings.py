@@ -23,8 +23,6 @@ def get_settings():
             'use_external_apis': False,
             'external_chunking_api': '',
             'external_embedding_api': '',
-            
-            # New fields for Azure OpenAI GPT / Embedding / Image Gen
             'azure_openai_gpt_endpoint': '',
             'azure_openai_gpt_api_version': '',
             'azure_openai_gpt_authentication_type': 'key',
@@ -41,6 +39,9 @@ def get_settings():
             'azure_openai_image_gen_authentication_type': 'key',
             'azure_openai_image_gen_key': '',
             'image_gen_model': 'dall-e-2',
+            'enable_web_search': False,
+            'bing_search_key': '',
+            'landing_page_text': 'Click the button below to start chatting with the AI assistant.'
         }
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")

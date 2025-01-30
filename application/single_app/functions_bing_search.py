@@ -1,10 +1,20 @@
 # functions_bing_search.py
 
 from config import *
+from functions_settings import *
 
 def get_suggestions(query):
+    settings = get_settings()
+    if not settings.get('enable_web_search'):
+        # Return empty if web search is disabled
+        return []
+
+    bing_key = settings.get('bing_search_key', '')
+    if not bing_key:
+        return []
+
     autosuggest_url = f"{BING_SEARCH_ENDPOINT}/v7.0/suggestions"
-    headers = {"Ocp-Apim-Subscription-Key": BING_SEARCH_KEY}
+    headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query}
     response = requests.get(autosuggest_url, headers=headers, params=params)
     response.raise_for_status()
@@ -12,13 +22,22 @@ def get_suggestions(query):
     return [s["displayText"] for s in suggestions]
 
 def get_search_results(query, top_n=5):
+    settings = get_settings()
+    if not settings.get('enable_web_search'):
+        return []
+
+    bing_key = settings.get('bing_search_key', '')
+    if not bing_key:
+        return []
+
     search_url = f"{BING_SEARCH_ENDPOINT}/v7.0/search"
-    headers = {"Ocp-Apim-Subscription-Key": BING_SEARCH_KEY}
+    headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query, "count": top_n}
     response = requests.get(search_url, headers=headers, params=params)
     response.raise_for_status()
     results = response.json().get("webPages", {}).get("value", [])
     return [{"name": r["name"], "url": r["url"], "snippet": r["snippet"]} for r in results]
+
 
 def process_query_with_bing_and_llm(user_query):
     print(f"Original Query: {user_query}")
@@ -32,6 +51,5 @@ def process_query_with_bing_and_llm(user_query):
 
     search_results = get_search_results(refined_query, top_n=5)
     print(f"Search Results: {search_results}")
-
 
     return search_results

@@ -9,7 +9,9 @@
         <img src="{{ url_for('static', filename=app_settings.logo_path) }}" alt="Logo" height="100" class="mb-4">
     {% endif %}
     <h2>Welcome to {{ app_settings.app_title }}</h2>
-    <p>Click the button below to start chatting with the AI assistant.</p>
+    <div>
+        {{ landing_html | safe }}
+    </div>
     <a href="{{ url_for('chats') }}" class="btn btn-primary btn-lg">Start Chatting</a>
 </div>
 {% endblock %}

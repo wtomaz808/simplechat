@@ -57,6 +57,7 @@
                         <span class="search-btn-text">Search Documents</span>
                     </button>
                     <!-- Search Web Button -->
+                    {% if settings.enable_web_search  %}
                     <button
                         id="search-web-btn"
                         class="btn btn-outline-secondary search-btn me-2"
@@ -67,6 +68,7 @@
                         <i class="bi bi-globe"></i>
                         <span class="search-btn-text">Web Search</span>
                     </button>
+                    {% endif %}
                     <!-- File Upload Elements -->
                     <input
                         type="file"

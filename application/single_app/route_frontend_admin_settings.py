@@ -42,6 +42,8 @@ def register_route_frontend_admin_settings(app):
 
             image_gen_model = request.form.get('image_gen_model', 'dall-e-2')
 
+            landing_page_text = request.form.get('landing_page_text', '')
+
             logo_file = request.files.get('logo_file')
             if logo_file and allowed_file(logo_file.filename, allowed_extensions={'png', 'jpg', 'jpeg'}):
                 filename = secure_filename(logo_file.filename)
@@ -51,6 +53,9 @@ def register_route_frontend_admin_settings(app):
                 logo_path_relative = 'images/custom_logo.png'
             else:
                 logo_path_relative = 'images/logo.svg'
+
+            enable_web_search = request.form.get('enable_web_search') == 'on'
+            bing_search_key = request.form.get('bing_search_key', '')
 
             new_settings = {
                 'app_title': app_title,
@@ -77,7 +82,10 @@ def register_route_frontend_admin_settings(app):
                 'external_chunking_api': external_chunking_api,
                 'external_embedding_api': external_embedding_api,
                 'logo_path': logo_path_relative,
-                'show_logo': show_logo
+                'show_logo': show_logo,
+                'enable_web_search': enable_web_search,
+                'bing_search_key': bing_search_key,
+                'landing_page_text': landing_page_text
             }
             update_settings(new_settings)
             settings.update(new_settings)

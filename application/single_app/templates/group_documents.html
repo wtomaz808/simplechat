@@ -2,7 +2,7 @@
 Application{% endblock %} {% block content %}
 <div class="container">
   <h2>Group Documents</h2>
-
+  <h3 id="active-group-name" style="margin-bottom: 20px; display: none"></h3>
   <!-- Loading Modal (for "Uploading your document, please wait..." overlay) -->
   <div
     class="modal fade"
@@ -25,9 +25,6 @@ Application{% endblock %} {% block content %}
 
   <!-- Group Selector -->
   <div class="row mb-3">
-    <label for="group-select" class="col-sm-2 col-form-label"
-      >Active Group:</label
-    >
     <div class="col-sm-6">
       <select class="form-select" id="group-select"></select>
     </div>
@@ -83,21 +80,34 @@ Application{% endblock %} {% block content %}
     return fetch("/api/groups")
       .then((r) => r.json())
       .then((data) => {
-        userGroups = data; // array of {id, name, description, userRole, isActive}
-        // Populate the select
+        userGroups = data;
         const sel = document.getElementById("group-select");
         sel.innerHTML = "";
+        // We might also create a variable for the <h3>:
+        const activeGroupNameEl = document.getElementById("active-group-name");
+
         userGroups.forEach((g) => {
           const opt = document.createElement("option");
           opt.value = g.id;
           opt.text = g.name;
+
           if (g.isActive) {
             opt.selected = true;
             activeGroupId = g.id;
             userRoleInActiveGroup = g.userRole;
+
+            // **Store** the active group name in a new variable:
+            window.activeGroupName = g.name; // or a local variable
+
+            // **Set** the <h3>'s text & show it:
+            activeGroupNameEl.textContent = g.name;
+            activeGroupNameEl.style.display = "block";
           }
+
           sel.appendChild(opt);
         });
+
+        // Now call updateRoleDisplay():
         updateRoleDisplay();
       })
       .catch((err) => console.error("Error fetching groups", err));
@@ -139,7 +149,7 @@ Application{% endblock %} {% block content %}
                 userRoleInActiveGroup === "Owner" ||
                 userRoleInActiveGroup === "Admin" ||
                 userRoleInActiveGroup === "DocumentManager"
-                  ? `<button class="btn btn-sm btn-danger" onclick="onDeleteDocument('${doc.id}')">Delete</button>`
+                  ? `<button class="btn btn-sm btn-danger" onclick="onDeleteDocument('${doc.id}', '${doc.group_id}')">Delete</button>`
                   : ``
               }
               <button class="btn btn-sm btn-primary" onclick="onSearchInChat('${
@@ -156,11 +166,13 @@ Application{% endblock %} {% block content %}
       });
   }
 
-  function onDeleteDocument(docId) {
+  function onDeleteDocument(docId, groupId) {
     if (!confirm("Are you sure you want to delete this group document?")) {
       return;
     }
-    fetch(`/api/group_documents/${docId}`, { method: "DELETE" })
+    fetch(`/api/group_documents/${docId}?group_id=${groupId}`, {
+      method: "DELETE",
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
@@ -168,7 +180,7 @@ Application{% endblock %} {% block content %}
           throw new Error(data.error);
         }
         alert(data.message || "Document deleted");
-        fetchGroupDocuments();
+        fetchGroupDocuments(); // re-fetch the updated list
       })
       .catch((err) => console.error(err));
   }

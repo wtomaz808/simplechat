@@ -49,7 +49,7 @@ function populateDocumentSelectScope() {
   // Always add a "None" or "No Document Selected"
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
-  noneOpt.textContent = "None";
+  noneOpt.textContent = "All Documents";
   docSel.appendChild(noneOpt);
 
   const scopeVal = scopeSel.value || "all";
@@ -174,46 +174,45 @@ document
   });
 
 // Toggle the active class for "Search Web"
-document
-  .getElementById("search-web-btn")
-  .addEventListener("click", function () {
+const webSearchBtn = document.getElementById("search-web-btn");
+if (webSearchBtn) {
+  webSearchBtn.addEventListener("click", function () {
     this.classList.toggle("active");
   });
+}
 
 // Toggle the active class for "Image Generation"
-document
-  .getElementById("image-generate-btn")
-  ?.addEventListener("click", function () {
+const imageGenBtn = document.getElementById("image-generate-btn");
+// Check if imageGenBtn exists before adding event listeners:
+if (imageGenBtn) {
+  imageGenBtn.addEventListener("click", function () {
     // Toggle on/off
     this.classList.toggle("active");
 
     // Check if Image Generation is active
     const isImageGenEnabled = this.classList.contains("active");
 
-    // Grab existing search buttons
+    // Example code that disables other buttons, etc.
     const docBtn = document.getElementById("search-documents-btn");
     const webBtn = document.getElementById("search-web-btn");
     const fileBtn = document.getElementById("choose-file-btn");
-    const documentSelectionContainer = document.getElementById(
-      "document-selection-container"
-    );
 
-    // If image generation is enabled, disable the search buttons
     if (isImageGenEnabled) {
+      // disable other options
       docBtn.disabled = true;
       webBtn.disabled = true;
       fileBtn.disabled = true;
       docBtn.classList.remove("active");
       webBtn.classList.remove("active");
       fileBtn.classList.remove("active");
-      documentSelectionContainer.style.display = "none";
     } else {
-      // Otherwise, re-enable them
+      // re-enable them
       docBtn.disabled = false;
       webBtn.disabled = false;
       fileBtn.disabled = false;
     }
   });
+}
 
 // ===================== SELECTING A CONVERSATION =====================
 function selectConversation(conversationId) {
@@ -597,20 +596,24 @@ function sendMessage() {
   let selectedDocumentId = null;
   if (hybridSearchEnabled) {
     const docSel = document.getElementById("document-select");
-    if (docSel.value !== "" && docSel.value !== "None") {
+    if (docSel.value !== "" && docSel.value !== "All Documents") {
       selectedDocumentId = docSel.value;
     }
   }
 
   // Bing search?
-  const bingSearchEnabled = document
-    .getElementById("search-web-btn")
-    .classList.contains("active");
+  let bingSearchEnabled = false;
+  const webSearchBtn = document.getElementById("search-web-btn");
+  if (webSearchBtn && webSearchBtn.classList.contains("active")) {
+    bingSearchEnabled = true;
+  }
 
   // Image gen?
-  const imageGenEnabled = document
-    .getElementById("image-generate-btn")
-    ?.classList.contains("active");
+  let imageGenEnabled = false;
+  const imageGenBtn = document.getElementById("image-generate-btn");
+  if (imageGenBtn && imageGenBtn.classList.contains("active")) {
+    imageGenEnabled = true;
+  }
 
   // Post to /api/chat
   fetch("/api/chat", {
