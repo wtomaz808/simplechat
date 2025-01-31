@@ -122,7 +122,7 @@ def generate_embedding(
             #print(f"Embedding generated successfully: Length {len(embedding)}")
             return embedding
 
-        except embedding_client.RateLimitError as e:
+        except RateLimitError as e:
             retries += 1
             if retries > max_retries:
                 #print("Max retries reached due to RateLimitError. Returning None.")

@@ -21,7 +21,7 @@ from msal import ConfidentialClientApplication
 from flask_session import Session
 from uuid import uuid4
 from threading import Thread
-from openai import AzureOpenAI
+from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
 
