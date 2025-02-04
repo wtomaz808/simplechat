@@ -8,6 +8,7 @@ from functions_settings import *
 def register_route_frontend_chats(app):
     @app.route('/chats', methods=['GET'])
     @login_required
+    @user_required
     def chats():
         user_id = get_current_user_id()
         settings = get_settings()
@@ -17,6 +18,7 @@ def register_route_frontend_chats(app):
         return render_template('chats.html', settings=settings)
     @app.route('/upload', methods=['POST'])
     @login_required
+    @user_required
     def upload_file():
         settings = get_settings()
         user_id = get_current_user_id()

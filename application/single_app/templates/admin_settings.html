@@ -5,6 +5,11 @@
 <div class="container">
     <h2>Admin Settings</h2>
     <form method="post" enctype="multipart/form-data">
+        <p class="text-muted">Use this form to configure the administrative settings for your application.</p>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary mt-3 mb-3">Save Settings</button>
+
         <!-- Nav Tabs -->
         <ul class="nav nav-tabs" id="adminSettingsTab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -60,6 +65,7 @@
 
         <!-- Tab Panes -->
         <div class="tab-content mt-3" id="adminSettingsTabContent">
+
             <!-- GENERAL TAB -->
             <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
                 <p class="text-muted">
@@ -96,22 +102,40 @@
                 </p>
                 <div class="card p-3 mb-3">
                     <div class="mb-3">
-                        <label for="azure_openai_gpt_endpoint" class="form-label">Azure OpenAI GPT Endpoint</label>
+                        <label for="azure_openai_gpt_endpoint" class="form-label">
+                            Azure OpenAI GPT Endpoint
+                        </label>
                         <input type="text" class="form-control" id="azure_openai_gpt_endpoint"
                                name="azure_openai_gpt_endpoint"
                                value="{{ settings.azure_openai_gpt_endpoint or '' }}">
                     </div>
                     <div class="mb-3">
-                        <label for="azure_openai_gpt_authentication_type" class="form-label">Authentication Type</label>
+                        <label for="azure_openai_gpt_authentication_type" class="form-label">
+                            Authentication Type
+                        </label>
                         <select class="form-select" id="azure_openai_gpt_authentication_type"
                                 name="azure_openai_gpt_authentication_type">
-                            <option value="key" {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>
+                            <option value="key" 
+                                {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>
                                 Key
                             </option>
-                            <option value="managed_identity" {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>
+                            <option value="managed_identity"
+                                {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>
                                 Managed Identity
                             </option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_gpt_subscription_id" class="form-label">Subscription ID</label>
+                        <input type="text" class="form-control" id="azure_openai_gpt_subscription_id"
+                               name="azure_openai_gpt_subscription_id"
+                               value="{{ settings.azure_openai_gpt_subscription_id or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_gpt_resource_group" class="form-label">Resource Group</label>
+                        <input type="text" class="form-control" id="azure_openai_gpt_resource_group"
+                               name="azure_openai_gpt_resource_group"
+                               value="{{ settings.azure_openai_gpt_resource_group or '' }}">
                     </div>
                     <div class="mb-3" id="gpt_key_container"
                          {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
@@ -124,14 +148,20 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="gpt_model" class="form-label">GPT Model</label>
-                        <select class="form-select" id="gpt_model" name="gpt_model">
-                            <option value="gpt-4o" {% if settings.gpt_model=='gpt-4o' %}selected{% endif %}>GPT-4o</option>
-                            <option value="gpt-4" {% if settings.gpt_model=='gpt-4' %}selected{% endif %}>GPT-4</option>
-                            <option value="gpt-3.5-turbo" {% if settings.gpt_model=='gpt-3.5-turbo' %}selected{% endif %}>
-                                GPT-3.5 Turbo
-                            </option>
-                        </select>
+                        <div id="gpt_models_list" class="mt-2 mb-3">
+                            <!-- Dynamically show the "all" models returned from /api/models/gpt -->
+                        </div>
+                        <!-- Hidden input that will store the final "selected" GPT JSON -->
+                        <input type="hidden" name="gpt_model_json" id="gpt_model_json" />
+
+                        <!-- Also hidden input for the actual selected deployment name,
+                             so the test code can read: document.getElementById('gpt_model').value -->
+                        <input type="hidden" id="gpt_model" value="" />
+
+                        <!-- FETCH GPT MODELS Button -->
+                        <button type="button" class="btn btn-secondary" id="fetch_gpt_models_btn">
+                            Fetch GPT Models
+                        </button>
                     </div>
 
                     <!-- SHOW ADVANCED for GPT (API Version, etc.) -->
@@ -142,7 +172,9 @@
                     <div class="collapse" id="advancedGptFields">
                         <div class="card card-body mt-2">
                             <div class="mb-3">
-                                <label for="azure_openai_gpt_api_version" class="form-label">Azure OpenAI GPT API Version</label>
+                                <label for="azure_openai_gpt_api_version" class="form-label">
+                                    Azure OpenAI GPT API Version
+                                </label>
                                 <input type="text" class="form-control" id="azure_openai_gpt_api_version"
                                        name="azure_openai_gpt_api_version"
                                        value="{{ settings.azure_openai_gpt_api_version or '' }}">
@@ -165,23 +197,41 @@
                 </p>
                 <div class="card p-3 mb-3">
                     <div class="mb-3">
-                        <label for="azure_openai_embedding_endpoint" class="form-label">Azure OpenAI Embedding Endpoint</label>
+                        <label for="azure_openai_embedding_endpoint" class="form-label">
+                            Azure OpenAI Embedding Endpoint
+                        </label>
                         <input type="text" class="form-control" id="azure_openai_embedding_endpoint"
                                name="azure_openai_embedding_endpoint"
                                value="{{ settings.azure_openai_embedding_endpoint or '' }}">
                     </div>
                     <div class="mb-3">
-                        <label for="azure_openai_embedding_authentication_type" class="form-label">Authentication Type</label>
+                        <label for="azure_openai_embedding_authentication_type" class="form-label">
+                            Authentication Type
+                        </label>
                         <select class="form-select" id="azure_openai_embedding_authentication_type"
                                 name="azure_openai_embedding_authentication_type">
-                            <option value="key" {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>
+                            <option value="key"
+                                {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>
                                 Key
                             </option>
-                            <option value="managed_identity" {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
+                            <option value="managed_identity"
+                                {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
                                 Managed Identity
                             </option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_embedding_subscription_id" class="form-label">Subscription ID</label>
+                        <input type="text" class="form-control" id="azure_openai_embedding_subscription_id"
+                               name="azure_openai_embedding_subscription_id"
+                               value="{{ settings.azure_openai_embedding_subscription_id or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_openai_embedding_resource_group" class="form-label">Resource Group</label>
+                        <input type="text" class="form-control" id="azure_openai_embedding_resource_group"
+                               name="azure_openai_embedding_resource_group"
+                               value="{{ settings.azure_openai_embedding_resource_group or '' }}">
+                    </div>                    
                     <div class="mb-3" id="embedding_key_container"
                          {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
                         <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
@@ -193,20 +243,20 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="embedding_model" class="form-label">Embedding Model</label>
-                        <select class="form-select" id="embedding_model" name="embedding_model">
-                            <option value="text-embedding-ada-002" {% if settings.embedding_model=='text-embedding-ada-002' %}selected{% endif %}>
-                                text-embedding-ada-002
-                            </option>
-                            <option value="text-embedding-3-small" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>
-                                text-embedding-3-small
-                            </option>
-                            <option value="text-embedding-3-large" {% if settings.embedding_model=='text-embedding-3-small' %}selected{% endif %}>
-                                text-embedding-3-large
-                            </option>
-                        </select>
-                    </div>
+                        <div id="embedding_models_list" class="mt-2 mb-3">
+                            <!-- Dynamically show the "all" models returned from /api/models/embedding -->
+                        </div>
+                        <!-- Hidden input that will store the final "selected" Embedding JSON -->
+                        <input type="hidden" name="embedding_model_json" id="embedding_model_json" />
 
+                        <!-- Also hidden input for the actual selected deployment name -->
+                        <input type="hidden" id="embedding_model" value="" />
+
+                        <!-- FETCH Embedding MODELS Button -->
+                        <button type="button" class="btn btn-secondary" id="fetch_embedding_models_btn">
+                            Fetch Embedding Models
+                        </button>
+                    </div>
                     <!-- SHOW ADVANCED for Embeddings (API version, etc.) -->
                     <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
                        data-bs-target="#advancedEmbeddingsFields" aria-expanded="false"
@@ -242,12 +292,14 @@
                 <div class="card p-3">
                     <div class="form-group form-check form-switch mb-3">
                         <input type="checkbox" class="form-check-input" id="enable_image_generation"
-                               name="enable_image_generation" {% if settings.enable_image_generation %}checked{% endif %}>
+                               name="enable_image_generation" 
+                               {% if settings.enable_image_generation %}checked{% endif %}>
                         <label class="form-check-label ms-2" for="enable_image_generation">
                             Enable Image Generation
                         </label>
                     </div>
-                    <div id="image_gen_settings" {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
+                    <div id="image_gen_settings" 
+                         {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
                         <div class="mb-3">
                             <label for="azure_openai_image_gen_endpoint" class="form-label">
                                 Azure OpenAI Image Generation Endpoint
@@ -262,34 +314,53 @@
                             </label>
                             <select class="form-select" id="azure_openai_image_gen_authentication_type"
                                     name="azure_openai_image_gen_authentication_type">
-                                <option value="key" {% if settings.azure_openai_image_gen_authentication_type=='key' %}selected{% endif %}>
+                                <option value="key" 
+                                    {% if settings.azure_openai_image_gen_authentication_type=='key' %}selected{% endif %}>
                                     Key
                                 </option>
-                                <option value="managed_identity" {% if settings.azure_openai_image_gen_authentication_type=='managed_identity' %}selected{% endif %}>
+                                <option value="managed_identity" 
+                                    {% if settings.azure_openai_image_gen_authentication_type=='managed_identity' %}selected{% endif %}>
                                     Managed Identity
                                 </option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_image_gen_subscription_id" class="form-label">Subscription ID</label>
+                            <input type="text" class="form-control" id="azure_openai_image_gen_subscription_id"
+                                   name="azure_openai_image_gen_subscription_id"
+                                   value="{{ settings.azure_openai_image_gen_subscription_id or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_image_gen_resource_group" class="form-label">Resource Group</label>
+                            <input type="text" class="form-control" id="azure_openai_image_gen_resource_group"
+                                   name="azure_openai_image_gen_resource_group"
+                                   value="{{ settings.azure_openai_image_gen_resource_group or '' }}">
+                        </div>                        
                         <div class="mb-3" id="image_gen_key_container"
-                             {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                            <label for="azure_openai_image_gen_key" class="form-label">
-                                Azure OpenAI Image Generation Key
-                            </label>
+                            {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                            <label for="azure_openai_image_gen_key" class="form-label">Azure OpenAI Image Generation Key</label>
                             <div class="input-group">
                                 <input type="password" class="form-control" id="azure_openai_image_gen_key"
-                                       name="azure_openai_image_gen_key"
-                                       value="{{ settings.azure_openai_image_gen_key or '' }}">
-                                <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
+                                    name="azure_openai_image_gen_key"
+                                    value="{{ settings.azure_openai_image_gen_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="image_gen_model" class="form-label">Image Generation Model</label>
-                            <select class="form-select" id="image_gen_model" name="image_gen_model">
-                                <option value="dall-e-2" {% if settings.image_gen_model=='dall-e-2' %}selected{% endif %}>dall-e-2</option>
-                                <option value="dall-e-3" {% if settings.image_gen_model=='dall-e-3' %}selected{% endif %}>dall-e-3</option>
-                            </select>
-                        </div>
+                            <div id="image_models_list" class="mt-2 mb-3">
+                                <!-- Dynamically show the "all" models returned from /api/models/embedding -->
+                            </div>
+                            <!-- Hidden input that will store the final "selected" Embedding JSON -->
+                            <input type="hidden" name="image_gen_model_json" id="image_gen_model_json" />
 
+                            <!-- Also hidden input for the actual selected deployment name -->
+                            <input type="hidden" id="image_gen_model" value="" />
+
+                            <!-- FETCH Image Generation MODELS Button -->
+                            <button type="button" class="btn btn-secondary" id="fetch_image_models_btn">
+                                Fetch Image Generation Models
+                            </button>
+                        </div>
                         <!-- SHOW ADVANCED for Image Gen (API Version, etc.) -->
                         <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
                            data-bs-target="#advancedImageGenFields" aria-expanded="false"
@@ -310,6 +381,12 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Test Image Connection Button -->
+                <button type="button" class="btn btn-secondary mt-3" id="test_image_button">
+                    Test Image Connection
+                </button>
+                <div id="test_image_result" class="mt-2"></div>
             </div>
 
             <!-- WEB SEARCH TAB -->
@@ -325,7 +402,8 @@
                             Enable Web Search
                         </label>
                     </div>
-                    <div id="web_search_settings" {% if not settings.enable_web_search %}style="display: none;"{% endif %}>
+                    <div id="web_search_settings" 
+                         {% if not settings.enable_web_search %}style="display: none;"{% endif %}>
                         <div class="mb-3">
                             <label for="bing_search_key" class="form-label">Bing Search Key</label>
                             <div class="input-group">
@@ -352,15 +430,20 @@
                             Use External APIs for Chunking and Embedding
                         </label>
                     </div>
-                    <div id="external_apis_settings" {% if not settings.use_external_apis %}style="display: none;"{% endif %}>
+                    <div id="external_apis_settings" 
+                         {% if not settings.use_external_apis %}style="display: none;"{% endif %}>
                         <div class="mb-3">
-                            <label for="external_chunking_api" class="form-label">Chunking API Endpoint</label>
+                            <label for="external_chunking_api" class="form-label">
+                                Chunking API Endpoint
+                            </label>
                             <input type="text" class="form-control" id="external_chunking_api"
                                    name="external_chunking_api"
                                    value="{{ settings.external_chunking_api }}">
                         </div>
                         <div class="mb-3">
-                            <label for="external_embedding_api" class="form-label">Embedding API Endpoint</label>
+                            <label for="external_embedding_api" class="form-label">
+                                Embedding API Endpoint
+                            </label>
                             <input type="text" class="form-control" id="external_embedding_api"
                                    name="external_embedding_api"
                                    value="{{ settings.external_embedding_api }}">
@@ -386,7 +469,9 @@
                                value="{{ settings.max_file_size_mb }}">
                     </div>
                     <div class="mb-3">
-                        <label for="conversation_history_limit" class="form-label">Conversation History Limit</label>
+                        <label for="conversation_history_limit" class="form-label">
+                            Conversation History Limit
+                        </label>
                         <input type="number" class="form-control" id="conversation_history_limit"
                                name="conversation_history_limit"
                                value="{{ settings.conversation_history_limit }}">
@@ -399,171 +484,613 @@
                 </div>
             </div>
         </div>
-
-        <!-- Submit Button -->
-        <button type="submit" class="btn btn-primary mt-3">Save Settings</button>
     </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Show/hide GPT key input based on authentication type
+    document.addEventListener('DOMContentLoaded', () => {
+        // Render whatever is in memory on page load
+        renderGPTModels();
+        renderEmbeddingModels();
+        renderImageModels();
+    });
+
+    function renderGPTModels() {
+        const listDiv = document.getElementById('gpt_models_list');
+        
+        if (!gptAll || gptAll.length === 0) {
+            listDiv.innerHTML = '<p class="text-warning">No GPT models found. Click "Fetch GPT Models" to populate.</p>';
+            return;
+        }
+
+        let html = '<ul class="list-group">';
+        gptAll.forEach(m => {
+            // Check if this item is currently in the selected array
+            const isSelected = gptSelected.some(sel =>
+                sel.deploymentName === m.deploymentName && 
+                sel.modelName === m.modelName
+            );
+
+            // If it’s selected, you can highlight or disable the button
+            const buttonLabel = isSelected ? 'Selected' : 'Select';
+            const buttonDisabled = isSelected ? 'disabled' : '';
+
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
+                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
+                        onclick="selectGptModel('${m.deploymentName}', '${m.modelName}')">
+                        ${buttonLabel}
+                    </button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+
+        listDiv.innerHTML = html;
+    }
+
+    function renderEmbeddingModels() {
+        const listDiv = document.getElementById('embedding_models_list');
+        
+        if (!embeddingAll || embeddingAll.length === 0) {
+            listDiv.innerHTML = '<p class="text-warning">No embedding models found. Click "Fetch Embedding Models" to populate.</p>';
+            return;
+        }
+
+        let html = '<ul class="list-group">';
+        embeddingAll.forEach(m => {
+            const isSelected = embeddingSelected.some(sel => 
+                sel.deploymentName === m.deploymentName && 
+                sel.modelName === m.modelName
+            );
+
+            const buttonLabel = isSelected ? 'Selected' : 'Select';
+            const buttonDisabled = isSelected ? 'disabled' : '';
+
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
+                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
+                        onclick="selectEmbeddingModel('${m.deploymentName}', '${m.modelName}')">
+                        ${buttonLabel}
+                    </button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+
+        listDiv.innerHTML = html;
+    }
+
+    function renderImageModels() {
+        const listDiv = document.getElementById('image_models_list');
+        
+        if (!imageAll || imageAll.length === 0) {
+            listDiv.innerHTML = '<p class="text-warning">No image models found. Click "Fetch Image Models" to populate.</p>';
+            return;
+        }
+
+        let html = '<ul class="list-group">';
+        imageAll.forEach(m => {
+            const isSelected = imageSelected.some(sel =>
+                sel.deploymentName === m.deploymentName && 
+                sel.modelName === m.modelName
+            );
+
+            const buttonLabel = isSelected ? 'Selected' : 'Select';
+            const buttonDisabled = isSelected ? 'disabled' : '';
+
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
+                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
+                        onclick="selectImageModel('${m.deploymentName}', '${m.modelName}')">
+                        ${buttonLabel}
+                    </button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+
+        listDiv.innerHTML = html;
+    }
+    ///////////////////////////////////////////////////////////////////////////
+    //  GPT: FETCH AND SELECT
+    ///////////////////////////////////////////////////////////////////////////
+    document.getElementById('fetch_gpt_models_btn').addEventListener('click', async () => {
+        const listDiv = document.getElementById('gpt_models_list');
+        listDiv.innerHTML = 'Fetching...';
+
+        try {
+            const resp = await fetch('/api/models/gpt');
+            const data = await resp.json();
+
+            if (resp.ok) {
+                if (data.models && data.models.length > 0) {
+                    gptAll = data.models;
+                    renderGPTModels();
+                    updateGptHiddenInput();
+
+                } else {
+                    listDiv.innerHTML = '<p class="text-warning">No GPT models found</p>';
+                }
+            } else {
+                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
+            }
+        } catch (err) {
+            listDiv.innerHTML = `<p class="text-danger">Error fetching GPT models: ${err.message}</p>`;
+        }
+    });
+
+    let gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}');
+    let gptAll = JSON.parse('{{ settings.gpt_model.all|tojson()|safe }}');
+
+    window.selectGptModel = (deploymentName, modelName) => {
+        gptSelected = [{ deploymentName, modelName }];
+        document.getElementById('gpt_model').value = deploymentName;
+        renderGPTModels();
+        updateGptHiddenInput();
+        alert(`Selected GPT model: ${deploymentName}`);
+    };
+
+    function updateGptHiddenInput() {
+        const payload = {
+            selected: gptSelected,
+            all: gptAll
+        };
+        document.getElementById('gpt_model_json').value = JSON.stringify(payload);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    //  EMBEDDINGS: FETCH AND SELECT
+    ///////////////////////////////////////////////////////////////////////////
+    document.getElementById('fetch_embedding_models_btn').addEventListener('click', async () => {
+        const listDiv = document.getElementById('embedding_models_list');
+        listDiv.innerHTML = 'Fetching...';
+
+        try {
+            const resp = await fetch('/api/models/embedding');
+            const data = await resp.json();
+
+            if (resp.ok) {
+                if (data.models && data.models.length > 0) {
+                    embeddingAll = data.models;
+                    renderEmbeddingModels();
+                    updateEmbeddingHiddenInput();
+
+                } else {
+                    listDiv.innerHTML = '<p class="text-warning">No embedding models found</p>';
+                }
+            } else {
+                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
+            }
+        } catch (err) {
+            listDiv.innerHTML = `<p class="text-danger">Error fetching embedding models: ${err.message}</p>`;
+        }
+    });
+
+
+    let embeddingSelected = JSON.parse('{{ settings.embedding_model.selected|tojson()|safe }}');
+    let embeddingAll = JSON.parse('{{ settings.embedding_model.all|tojson()|safe }}');
+
+    window.selectEmbeddingModel = (deploymentName, modelName) => {
+        embeddingSelected = [{ deploymentName, modelName }];
+        document.getElementById('embedding_model').value = deploymentName;
+        renderEmbeddingModels();
+        updateEmbeddingHiddenInput();
+        alert(`Selected embedding model: ${deploymentName}`);
+    };
+
+    function updateEmbeddingHiddenInput() {
+        const payload = {
+            selected: embeddingSelected,
+            all: embeddingAll
+        };
+        document.getElementById('embedding_model_json').value = JSON.stringify(payload);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    //  IMAGE: FETCH AND SELECT
+    ///////////////////////////////////////////////////////////////////////////
+    document.getElementById('fetch_image_models_btn').addEventListener('click', async () => {
+        const listDiv = document.getElementById('image_models_list');
+        listDiv.innerHTML = 'Fetching...';
+
+        try {
+            const resp = await fetch('/api/models/image');
+            const data = await resp.json();
+
+            if (resp.ok) {
+                if (data.models && data.models.length > 0) {
+                    imageAll = data.models;
+                    renderImageModels();
+                    updateImageHiddenInput();
+
+                } else {
+                    listDiv.innerHTML = '<p class="text-warning">No image models found</p>';
+                }
+            } else {
+                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
+            }
+        } catch (err) {
+            listDiv.innerHTML = `<p class="text-danger">Error fetching Image models: ${err.message}</p>`;
+        }
+    });
+
+    let imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}');
+    let imageAll = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}');
+
+    window.selectImageModel = (deploymentName, modelName) => {
+        imageSelected = [{ deploymentName, modelName }];
+        document.getElementById('image_gen_model').value = deploymentName;
+        renderImageModels();
+        updateImageHiddenInput();
+        alert(`Selected image model: ${deploymentName}`);
+    };
+
+    function updateImageHiddenInput() {
+        const payload = { 
+            selected: imageSelected, 
+            all: imageAll };
+        document.getElementById('image_gen_model_json').value = JSON.stringify(payload);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    //  TOGGLES & COLLAPSING FIELDS
+    ///////////////////////////////////////////////////////////////////////////
+    // GPT Auth Type
     document.getElementById('azure_openai_gpt_authentication_type')
         .addEventListener('change', function () {
-            var gptKeyContainer = document.getElementById('gpt_key_container');
-            gptKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+            document.getElementById('gpt_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
         });
 
-    // Show/hide embedding key input based on authentication type
+    // Embeddings Auth Type
     document.getElementById('azure_openai_embedding_authentication_type')
         .addEventListener('change', function () {
-            var embeddingKeyContainer = document.getElementById('embedding_key_container');
-            embeddingKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+            document.getElementById('embedding_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
         });
 
-    // Show/hide image generation key input based on authentication type
+    // Image Auth Type
     document.getElementById('azure_openai_image_gen_authentication_type')
         .addEventListener('change', function () {
-            var imageGenKeyContainer = document.getElementById('image_gen_key_container');
-            imageGenKeyContainer.style.display = (this.value === 'key') ? 'block' : 'none';
+            document.getElementById('image_gen_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
         });
 
-    // Show/hide image generation settings based on checkbox
+    // Enable/disable Image Gen
     document.getElementById('enable_image_generation')
         .addEventListener('change', function () {
-            var imageGenSettings = document.getElementById('image_gen_settings');
-            imageGenSettings.style.display = this.checked ? 'block' : 'none';
+            document.getElementById('image_gen_settings').style.display =
+                this.checked ? 'block' : 'none';
         });
 
-    // Show/hide external API settings based on checkbox
+    // External APIs
     document.getElementById('use_external_apis')
         .addEventListener('change', function () {
-            var externalSettings = document.getElementById('external_apis_settings');
-            externalSettings.style.display = this.checked ? 'block' : 'none';
+            document.getElementById('external_apis_settings').style.display =
+                this.checked ? 'block' : 'none';
         });
 
-    // Show/hide web search settings based on checkbox
+    // Web Search
     document.getElementById('enable_web_search')
         .addEventListener('change', function () {
-            var webSearchSettings = document.getElementById('web_search_settings');
-            webSearchSettings.style.display = this.checked ? 'block' : 'none';
+            document.getElementById('web_search_settings').style.display =
+                this.checked ? 'block' : 'none';
         });
 
-    // Toggle visibility of GPT key
+    ///////////////////////////////////////////////////////////////////////////
+    //  SHOW/HIDE KEY FIELDS
+    ///////////////////////////////////////////////////////////////////////////
     document.getElementById('toggle_gpt_key').addEventListener('click', function () {
-        var gptKeyInput = document.getElementById('azure_openai_gpt_key');
-        if (gptKeyInput.type === 'password') {
-            gptKeyInput.type = 'text';
+        const inp = document.getElementById('azure_openai_gpt_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
             this.textContent = 'Hide';
         } else {
-            gptKeyInput.type = 'password';
+            inp.type = 'password';
             this.textContent = 'Show';
         }
     });
-
-    // Toggle visibility of embedding key
     document.getElementById('toggle_embedding_key').addEventListener('click', function () {
-        var embeddingKeyInput = document.getElementById('azure_openai_embedding_key');
-        if (embeddingKeyInput.type === 'password') {
-            embeddingKeyInput.type = 'text';
+        const inp = document.getElementById('azure_openai_embedding_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
             this.textContent = 'Hide';
         } else {
-            embeddingKeyInput.type = 'password';
+            inp.type = 'password';
             this.textContent = 'Show';
         }
     });
-
-    // Toggle visibility of image generation key
     document.getElementById('toggle_image_gen_key').addEventListener('click', function () {
-        var imageGenKeyInput = document.getElementById('azure_openai_image_gen_key');
-        if (imageGenKeyInput.type === 'password') {
-            imageGenKeyInput.type = 'text';
+        const inp = document.getElementById('azure_openai_image_gen_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
             this.textContent = 'Hide';
         } else {
-            imageGenKeyInput.type = 'password';
+            inp.type = 'password';
             this.textContent = 'Show';
         }
     });
 
-    // Toggle visibility of the Bing search key
     document.getElementById('toggle_bing_search_key').addEventListener('click', function () {
-        var bingKeyInput = document.getElementById('bing_search_key');
-        if (bingKeyInput.type === 'password') {
-            bingKeyInput.type = 'text';
+        const inp = document.getElementById('bing_search_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
             this.textContent = 'Hide';
         } else {
-            bingKeyInput.type = 'password';
+            inp.type = 'password';
             this.textContent = 'Show';
         }
     });
 
-    // Test GPT Button (example only)
-    document.getElementById('test_gpt_button').addEventListener('click', function () {
-        var endpoint = document.getElementById('azure_openai_gpt_endpoint').value;
-        var resultDiv = document.getElementById('test_gpt_result');
+
+    // ------------------------------------------------------------------------
+    //  Test GPT Connection
+    // ------------------------------------------------------------------------
+    document.getElementById('test_gpt_button').addEventListener('click', async function () {
+        const resultDiv = document.getElementById('test_gpt_result');
         resultDiv.innerHTML = 'Testing GPT...';
 
-        // Simple fetch call example (replace with an actual test endpoint or method)
-        fetch(endpoint, { method: 'GET' })
-            .then(response => {
-                if (response.ok) {
-                    resultDiv.innerHTML = 'GPT Endpoint is reachable!';
-                } else {
-                    resultDiv.innerHTML = 'GPT Endpoint returned an error.';
-                }
-            })
-            .catch(error => {
-                resultDiv.innerHTML = 'Failed to connect to GPT Endpoint.';
+        // Get endpoint, API version, authentication type, and key from their input fields.
+        let endpoint = document.getElementById('azure_openai_gpt_endpoint').value.trim();
+        if (endpoint.endsWith('/')) {
+            endpoint = endpoint.slice(0, -1);
+        }
+        const apiVersion = document.getElementById('azure_openai_gpt_api_version').value.trim();
+        const authType = document.getElementById('azure_openai_gpt_authentication_type').value;
+        const gptKey = document.getElementById('azure_openai_gpt_key').value.trim();
+
+        if (!endpoint) {
+            resultDiv.innerHTML = 'Please provide a GPT Endpoint.';
+            return;
+        }
+
+        // Get the selected GPT model from the Cosmos settings structure.
+        const selectedModel = (gptSelected && gptSelected.length > 0) ? gptSelected[0] : null;
+        if (!selectedModel) {
+            resultDiv.innerHTML = 'Please select a GPT model first.';
+            return;
+        }
+        const deploymentName = selectedModel.deploymentName;
+        const modelName = selectedModel.modelName;
+
+        // Determine if this is a "chat" model
+        const isChatModel = (
+            modelName.toLowerCase().includes("gpt") ||
+            modelName.toLowerCase().includes("o1") ||
+            modelName.toLowerCase().includes("o3")
+        );
+
+        // Construct the URL based on model type.
+        let testUrl;
+        if (isChatModel) {
+            testUrl = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+        } else {
+            testUrl = `${endpoint}/openai/deployments/${deploymentName}/completions?api-version=${apiVersion}`;
+        }
+
+        // Build the test payload.
+        let testPayload;
+        if (isChatModel) {
+            testPayload = {
+                messages: [
+                    { role: "user", content: "Hello GPT!" }
+                ],
+                max_tokens: 50
+            };
+        } else {
+            testPayload = {
+                prompt: "Hello GPT!",
+                max_tokens: 50
+            };
+        }
+
+        try {
+            // Prepare headers. For key-based authentication, include the "api-key" header.
+            const headers = { "Content-Type": "application/json" };
+            if (authType === "key" && gptKey) {
+                headers["api-key"] = gptKey;
+            }
+
+            // Send the test request.
+            const response = await fetch(testUrl, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(testPayload)
             });
+
+            if (response.ok) {
+                resultDiv.innerHTML = 'GPT endpoint test succeeded!';
+            } else {
+                const errorText = await response.text();
+                resultDiv.innerHTML = 
+                `GPT endpoint returned error (HTTP ${response.status}): ${errorText}`;
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = 'Failed to connect to GPT Endpoint: ' + error.message;
+        }
     });
 
-    // Test Embeddings Button (example only)
-    document.getElementById('test_embedding_button').addEventListener('click', function () {
-        var endpoint = document.getElementById('azure_openai_embedding_endpoint').value;
-        var resultDiv = document.getElementById('test_embedding_result');
+
+
+    // ------------------------------------------------------------------------
+    //  Test Embeddings Connection
+    // ------------------------------------------------------------------------
+    document.getElementById('test_embedding_button').addEventListener('click', async function () {
+        const resultDiv = document.getElementById('test_embedding_result');
         resultDiv.innerHTML = 'Testing Embeddings...';
 
-        // Simple fetch call example (replace with an actual test endpoint or method)
-        fetch(endpoint, { method: 'GET' })
-            .then(response => {
-                if (response.ok) {
-                    resultDiv.innerHTML = 'Embedding Endpoint is reachable!';
-                } else {
-                    resultDiv.innerHTML = 'Embedding Endpoint returned an error.';
-                }
-            })
-            .catch(error => {
-                resultDiv.innerHTML = 'Failed to connect to Embedding Endpoint.';
+        // Get endpoint, API version, authentication type, and key from their input fields.
+        const endpoint = document.getElementById('azure_openai_embedding_endpoint').value.trim();
+        if (endpoint.endsWith('/')) {
+            endpoint = endpoint.slice(0, -1);
+        }
+        const apiVersion = document.getElementById('azure_openai_embedding_api_version').value.trim();
+        const authType = document.getElementById('azure_openai_embedding_authentication_type').value;
+        const embedKey = document.getElementById('azure_openai_embedding_key').value.trim();
+
+        if (!endpoint) {
+            resultDiv.innerHTML = 'Please provide an Embedding Endpoint.';
+            return;
+        }
+
+        // Get the selected Embedding model from the Cosmos settings structure.
+        const selectedEmbedding = (embeddingSelected && embeddingSelected.length > 0) ? embeddingSelected[0] : null;
+        if (!selectedEmbedding) {
+            resultDiv.innerHTML = 'Please select an Embedding model first.';
+            return;
+        }
+        const deploymentName = selectedEmbedding.deploymentName;
+        // The model name can be used to further adjust your test payload if needed.
+        // const modelName = selectedEmbedding.modelName;
+
+        // Construct the test URL.
+        // Format: <endpoint>/openai/deployments/<deploymentName>/embeddings?api-version=<apiVersion>
+        const testUrl = `${endpoint}/openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
+
+        const testPayload = {
+            input: 'Hello world'
+        };
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (authType === 'key' && embedKey) {
+                headers['api-key'] = embedKey;
+            }
+
+            const response = await fetch(testUrl, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(testPayload)
             });
+
+            if (response.ok) {
+                resultDiv.innerHTML = 'Embedding endpoint test succeeded!';
+            } else {
+                const errorText = await response.text();
+                resultDiv.innerHTML = 
+                `Embedding endpoint returned error (HTTP ${response.status}): ${errorText}`;
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = 'Failed to connect to Embedding Endpoint: ' + error.message;
+        }
     });
 
-    // Test External APIs Connection
+    // ------------------------------------------------------------------------
+    //  Test Image Connection
+    // ------------------------------------------------------------------------
+    document.getElementById('test_image_button').addEventListener('click', async function () {
+        const resultDiv = document.getElementById('test_image_result');
+        resultDiv.innerHTML = 'Testing Image Generation...';
+
+        // Get the endpoint, API version, authentication type, and key from the corresponding fields.
+        const endpoint = document.getElementById('azure_openai_image_gen_endpoint').value.trim();
+        if (endpoint.endsWith('/')) {
+            endpoint = endpoint.slice(0, -1);
+        }
+        const apiVersion = document.getElementById('azure_openai_image_gen_api_version').value.trim();
+        const authType = document.getElementById('azure_openai_image_gen_authentication_type').value;
+        const imageKey = document.getElementById('azure_openai_image_gen_key').value.trim();
+
+        if (!endpoint) {
+            resultDiv.innerHTML = 'Please provide an Image Generation Endpoint.';
+            return;
+        }
+
+        // Get the selected image generation model from your Cosmos settings structure.
+        // (Assumes you are populating and tracking imageSelected from your Cosmos document.)
+        const selectedImage = (imageSelected && imageSelected.length > 0) ? imageSelected[0] : null;
+        if (!selectedImage) {
+            resultDiv.innerHTML = 'Please select an Image Generation model first.';
+            return;
+        }
+        const deploymentName = selectedImage.deploymentName;
+        // Optionally, you can use modelName for additional logic:
+        // const modelName = selectedImage.modelName;
+
+        // Construct the test URL.
+        // For Azure OpenAI image generation, the endpoint might look like:
+        // <endpoint>/openai/deployments/<deploymentName>/images/generations?api-version=<apiVersion>
+        const testUrl = `${endpoint}/openai/deployments/${deploymentName}/images/generations?api-version=${apiVersion}`;
+
+        // Construct a test payload.
+        // This payload is an example—you may need to adjust parameters to match your API's requirements.
+        const testPayload = {
+            prompt: "Generate an image of a sunset over the mountains.",
+            n: 1,             // Number of images to generate
+            size: "1024x1024" // Image size
+        };
+
+        try {
+            // Prepare headers. For key-based authentication, include the "api-key" header.
+            const headers = { "Content-Type": "application/json" };
+            if (authType === "key" && imageKey) {
+                headers["api-key"] = imageKey;
+            }
+
+            // Send the test request.
+            const response = await fetch(testUrl, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(testPayload)
+            });
+
+            if (response.ok) {
+                resultDiv.innerHTML = "Image generation endpoint test succeeded!";
+            } else {
+                const errorText = await response.text();
+                resultDiv.innerHTML = `Image generation endpoint returned error (HTTP ${response.status}): ${errorText}`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = "Failed to connect to Image Generation Endpoint: " + error.message;
+        }
+    });
+
+
+
+    // ------------------------------------------------------------------------
+    //  Test External APIs Connection
+    // ------------------------------------------------------------------------
     document.getElementById('test_connection_button').addEventListener('click', function () {
-        var chunkingApiUrl = document.getElementById('external_chunking_api').value;
-        var embeddingApiUrl = document.getElementById('external_embedding_api').value;
+        var chunkingApiUrl = document.getElementById('external_chunking_api').value.trim();
+        var embeddingApiUrl = document.getElementById('external_embedding_api').value.trim();
         var resultDiv = document.getElementById('test_connection_result');
-        resultDiv.innerHTML = 'Testing...';
+        resultDiv.innerHTML = 'Testing connections...';
 
-        // Check Chunking API
-        fetch(chunkingApiUrl + '/api/version')
-            .then(response => response.json())
-            .then(data => {
-                resultDiv.innerHTML = 'Chunking API Connected: ' + data.version;
-            })
-            .catch(error => {
-                resultDiv.innerHTML = 'Chunking API Connection Failed.';
-            });
+        // 1) Check Chunking API
+        if (chunkingApiUrl) {
+            fetch(chunkingApiUrl + '/api/version')
+                .then(response => response.json())
+                .then(data => {
+                    resultDiv.innerHTML = 'Chunking API Connected: ' + data.version;
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = 'Chunking API Connection Failed: ' + error.message;
+                });
+        } else {
+            resultDiv.innerHTML = 'No Chunking API URL provided.<br/>';
+        }
 
-        // Check Embedding API
-        fetch(embeddingApiUrl + '/api/version')
-            .then(response => response.json())
-            .then(data => {
-                resultDiv.innerHTML += '<br>Embedding API Connected: ' + data.version;
-            })
-            .catch(error => {
-                resultDiv.innerHTML += '<br>Embedding API Connection Failed.';
-            });
+        // 2) Check Embedding API
+        if (embeddingApiUrl) {
+            fetch(embeddingApiUrl + '/api/version')
+                .then(response => response.json())
+                .then(data => {
+                    resultDiv.innerHTML += '<br>Embedding API Connected: ' + data.version;
+                })
+                .catch(error => {
+                    resultDiv.innerHTML += '<br>Embedding API Connection Failed: ' + error.message;
+                });
+        } else {
+            resultDiv.innerHTML += '<br>No Embedding API URL provided.';
+        }
     });
 </script>
 {% endblock %}

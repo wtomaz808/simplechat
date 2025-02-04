@@ -1,6 +1,7 @@
 # functions_settings.py
 
 from config import *
+from functions_authentication import *
 
 def get_settings():
     try:
@@ -11,7 +12,7 @@ def get_settings():
         print("Successfully retrieved settings.")
         return settings_item
     except CosmosResourceNotFoundError:
-        # If settings do not exist, return default settings
+        # Default settings with new structure for models
         default_settings = {
             'id': 'app_settings',
             'app_title': 'AI Chat Application',
@@ -26,19 +27,34 @@ def get_settings():
             'azure_openai_gpt_endpoint': '',
             'azure_openai_gpt_api_version': '',
             'azure_openai_gpt_authentication_type': 'key',
+            'azure_openai_gpt_subscription_id': '',
+            'azure_openai_gpt_resource_group': '',
             'azure_openai_gpt_key': '',
-            'gpt_model': 'gpt-4o',
+            'gpt_model': {
+                "selected": [],
+                "all": [] 
+            },
             'azure_openai_embedding_endpoint': '',
             'azure_openai_embedding_api_version': '',
             'azure_openai_embedding_authentication_type': 'key',
+            'azure_openai_embedding_subscription_id': '',
+            'azure_openai_embedding_resource_group': '',
             'azure_openai_embedding_key': '',
-            'embedding_model': 'text-embedding-ada-002',
+            'embedding_model': {
+                "selected": [],
+                "all": []
+            },
             'enable_image_generation': False,
             'azure_openai_image_gen_endpoint': '',
             'azure_openai_image_gen_api_version': '',
             'azure_openai_image_gen_authentication_type': 'key',
+            'azure_openai_image_gen_subscription_id': '',
+            'azure_openai_image_gen_resource_group': '',
             'azure_openai_image_gen_key': '',
-            'image_gen_model': 'dall-e-2',
+            'image_gen_model': {
+                "selected": [],
+                "all": []
+            },
             'enable_web_search': False,
             'bing_search_key': '',
             'landing_page_text': 'Click the button below to start chatting with the AI assistant.'
@@ -49,6 +65,7 @@ def get_settings():
     except Exception as e:
         print(f"Error retrieving settings: {str(e)}")
         return None
+
 
 def update_settings(new_settings):
     try:

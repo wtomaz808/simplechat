@@ -1,3 +1,4 @@
+# requirements.txt
 Flask==2.2.5
 gunicorn
 Werkzeug==3.0.6
@@ -22,3 +23,5 @@ azure-ai-formrecognizer==3.3.3
 pyjwt==2.9.0
 pandas==2.2.3
 markdown2==2.5.3
+azure-mgmt-cognitiveservices==13.6.0
+azure-identity==1.17.1

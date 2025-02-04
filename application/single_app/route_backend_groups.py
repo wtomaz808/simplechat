@@ -11,6 +11,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/discover", methods=["GET"])
     @login_required
+    @user_required
     def discover_groups():
         """
         GET /api/groups/discover?search=<term>&showAll=<true|false>
@@ -61,6 +62,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups", methods=["GET"])
     @login_required
+    @user_required
     def api_list_groups():
         user_info = get_current_user_info()
         user_id = user_info["userId"]
@@ -91,6 +93,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups", methods=["POST"])
     @login_required
+    @user_required
     def api_create_group():
         """
         POST /api/groups
@@ -109,6 +112,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>", methods=["GET"])
     @login_required
+    @user_required
     def api_get_group_details(group_id):
         """
         GET /api/groups/<group_id>
@@ -121,6 +125,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>", methods=["DELETE"])
     @login_required
+    @user_required
     def api_delete_group(group_id):
         """
         DELETE /api/groups/<group_id>
@@ -141,6 +146,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>", methods=["PATCH", "PUT"])
     @login_required
+    @user_required
     def api_update_group(group_id):
         """
         PATCH /api/groups/<group_id> or PUT /api/groups/<group_id>
@@ -173,6 +179,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/setActive", methods=["PATCH"])
     @login_required
+    @user_required
     def api_set_active_group():
         """
         PATCH /api/groups/setActive
@@ -207,6 +214,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/requests", methods=["POST"])
     @login_required
+    @user_required
     def request_to_join(group_id):
         """
         POST /api/groups/<group_id>/requests
@@ -243,6 +251,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/requests", methods=["GET"])
     @login_required
+    @user_required
     def view_pending_requests(group_id):
         """
         GET /api/groups/<group_id>/requests
@@ -262,6 +271,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/requests/<request_id>", methods=["PATCH"])
     @login_required
+    @user_required
     def approve_reject_request(group_id, request_id):
         """
         PATCH /api/groups/<group_id>/requests/<request_id>
@@ -310,6 +320,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/members", methods=["POST"])
     @login_required
+    @user_required
     def add_member_directly(group_id):
         """
         POST /api/groups/<group_id>/members
@@ -350,6 +361,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["DELETE"])
     @login_required
+    @user_required
     def remove_member(group_id, member_id):
         """
         DELETE /api/groups/<group_id>/members/<member_id>
@@ -432,6 +444,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["PATCH"])
     @login_required
+    @user_required
     def update_member_role(group_id, member_id):
         """
         PATCH /api/groups/<group_id>/members/<member_id>
@@ -485,6 +498,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/members", methods=["GET"])
     @login_required
+    @user_required
     def view_group_members(group_id):
         """
         GET /api/groups/<group_id>/members?search=<term>&role=<role>
@@ -539,6 +553,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/transferOwnership", methods=["PATCH"])
     @login_required
+    @user_required
     def transfer_ownership(group_id):
         """
         PATCH /api/groups/<group_id>/transferOwnership
@@ -623,6 +638,7 @@ def register_route_backend_groups(app):
 
     @app.route("/api/groups/<group_id>/fileCount", methods=["GET"])
     @login_required
+    @user_required
     def get_group_file_count(group_id):
         """
         GET /api/groups/<group_id>/fileCount

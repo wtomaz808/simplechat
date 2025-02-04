@@ -6,6 +6,7 @@ from functions_authentication import *
 def register_route_frontend_conversations(app):
     @app.route('/conversations')
     @login_required
+    @user_required
     def conversations():
         user_id = get_current_user_id()
         if not user_id:
@@ -18,6 +19,7 @@ def register_route_frontend_conversations(app):
 
     @app.route('/conversation/<conversation_id>')
     @login_required
+    @user_required
     def view_conversation(conversation_id):
         user_id = get_current_user_id()
         if not user_id:
@@ -37,6 +39,7 @@ def register_route_frontend_conversations(app):
 
     @app.route('/conversation/<conversation_id>/messages', methods=['GET'])
     @login_required
+    @user_required
     def get_conversation_messages(conversation_id):
         user_id = get_current_user_id()
         if not user_id:

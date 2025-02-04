@@ -23,6 +23,7 @@ from route_backend_documents import *
 from route_backend_groups import *
 from route_backend_users import *
 from route_backend_group_documents import *
+from route_backend_models import *
 
 # =================== Helper Functions ===================
 @app.context_processor
@@ -122,6 +123,9 @@ register_route_backend_users(app)
 
 # ------------------- API Group Documents Routes ---------
 register_route_backend_group_documents(app)
+
+# ------------------- API Model Routes -------------------
+register_route_backend_models(app)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -7,6 +7,7 @@ def register_route_backend_conversations(app):
 
     @app.route('/api/get_messages', methods=['GET'])
     @login_required
+    @user_required
     def api_get_messages():
         conversation_id = request.args.get('conversation_id')
         user_id = get_current_user_id()
@@ -34,6 +35,7 @@ def register_route_backend_conversations(app):
         
     @app.route('/api/get_conversations', methods=['GET'])
     @login_required
+    @user_required
     def get_conversations():
         user_id = get_current_user_id()
         if not user_id:
@@ -47,6 +49,7 @@ def register_route_backend_conversations(app):
 
     @app.route('/api/create_conversation', methods=['POST'])
     @login_required
+    @user_required
     def create_conversation():
         user_id = get_current_user_id()
         if not user_id:
@@ -68,6 +71,7 @@ def register_route_backend_conversations(app):
     
     @app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
     @login_required
+    @user_required
     def delete_conversation(conversation_id):
         user_id = get_current_user_id()
         if not user_id:

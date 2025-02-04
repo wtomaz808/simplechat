@@ -1,3 +1,5 @@
+# route_backend_group_documents.py:
+
 from config import *
 from functions_authentication import *
 from functions_settings import get_user_settings
@@ -14,6 +16,7 @@ def register_route_backend_group_documents(app):
 
     @app.route('/api/group_documents', methods=['GET'])
     @login_required
+    @user_required
     def api_get_group_documents():
         """
         Return the list of documents for the user's *active* group.
@@ -48,6 +51,7 @@ def register_route_backend_group_documents(app):
 
     @app.route('/api/group_documents/upload', methods=['POST'])
     @login_required
+    @user_required
     def api_upload_group_document():
         """
         Upload a new document into the active group’s collection, if user role
@@ -87,6 +91,7 @@ def register_route_backend_group_documents(app):
 
     @app.route('/api/group_documents/<doc_id>', methods=['DELETE'])
     @login_required
+    @user_required
     def api_delete_group_document(doc_id):
         user_id = get_current_user_id()
         if not user_id:

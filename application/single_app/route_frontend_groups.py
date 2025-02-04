@@ -6,6 +6,7 @@ from functions_authentication import *
 def register_route_frontend_groups(app):
     @app.route("/my_groups", methods=["GET"])
     @login_required
+    @user_required
     def my_groups():
         """
         Renders the My Groups page (templates/my_groups.html).
@@ -14,6 +15,7 @@ def register_route_frontend_groups(app):
 
     @app.route("/groups/<group_id>", methods=["GET"])
     @login_required
+    @user_required
     def manage_group(group_id):
         """
         Renders a page or view for managing a single group (not shown in detail here).

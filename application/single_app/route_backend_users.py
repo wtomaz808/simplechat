@@ -17,6 +17,7 @@ from config import *
 def register_route_backend_users(app):
     @app.route("/api/userSearch", methods=["GET"])
     @login_required
+    @user_required
     def api_user_search():
         query = request.args.get("query", "").strip()
         if not query:
@@ -67,6 +68,7 @@ def register_route_backend_users(app):
     
     @app.route('/api/user/settings', methods=['GET', 'POST'])
     @login_required
+    @user_required
     def user_settings():
         user_id = get_current_user_id()
         

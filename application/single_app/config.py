@@ -34,12 +34,14 @@ from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
 from azure.core.exceptions import AzureError, ResourceNotFoundError
 from azure.core.polling import LROPoller
+from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+from azure.identity import ClientSecretCredential
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.185.1'
+app.config['VERSION'] = '0.190.0'
 Session(app)
 
 ALLOWED_EXTENSIONS = {
@@ -49,6 +51,7 @@ MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
 # Azure AD Configuration
 CLIENT_ID = os.getenv("CLIENT_ID")
+APP_URI = f"api://{CLIENT_ID}"
 CLIENT_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"

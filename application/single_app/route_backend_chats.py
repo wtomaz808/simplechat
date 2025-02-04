@@ -9,6 +9,7 @@ from functions_settings import *
 def register_route_backend_chats(app):
     @app.route('/api/chat', methods=['POST'])
     @login_required
+    @user_required
     def chat_api():
         settings = get_settings()
         data = request.get_json()
@@ -32,7 +33,11 @@ def register_route_backend_chats(app):
         )
 
 
-        gpt_model = settings.get('gpt_model')
+        gpt_model_obj = settings.get('gpt_model', {})
+        if gpt_model_obj and gpt_model_obj.get('selected'):
+            # Typically you’d just take the first selected item
+            selected_gpt_model = gpt_model_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
+            gpt_model = selected_gpt_model['deploymentName']  # or modelName
 
 
         image_gen_client = AzureOpenAI(
@@ -42,7 +47,11 @@ def register_route_backend_chats(app):
         )
 
 
-        image_gen_model = settings.get('image_gen_model')
+        image_gen_obj = settings.get('image_gen_model', {})
+        if image_gen_obj and image_gen_obj.get('selected'):
+            # Typically you’d just take the first selected item
+            selected_image_gen_model = image_gen_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
+            image_gen_model = selected_image_gen_model['deploymentName']  # or modelName
 
         # Convert hybrid_search_enabled to boolean if necessary
         if isinstance(hybrid_search_enabled, str):

@@ -8,6 +8,7 @@ from functions_settings import *
 def register_route_backend_documents(app):
     @app.route('/api/get_file_content', methods=['POST'])
     @login_required
+    @user_required
     def get_file_content():
         data = request.get_json()
         user_id = get_current_user_id()
@@ -52,6 +53,7 @@ def register_route_backend_documents(app):
     
     @app.route('/api/documents/upload', methods=['POST'])
     @login_required
+    @user_required
     def upload_document():
         settings = get_settings()
         user_id = get_current_user_id()
@@ -117,6 +119,7 @@ def register_route_backend_documents(app):
 
     @app.route('/api/documents', methods=['GET'])
     @login_required
+    @user_required
     def api_get_user_documents():
         user_id = get_current_user_id()
         if not user_id:
@@ -126,6 +129,7 @@ def register_route_backend_documents(app):
 
     @app.route('/api/documents/<document_id>', methods=['GET'])
     @login_required
+    @user_required
     def api_get_user_document(document_id):
         user_id = get_current_user_id()
         if not user_id:
@@ -135,6 +139,7 @@ def register_route_backend_documents(app):
 
     @app.route('/api/documents/<document_id>', methods=['DELETE'])
     @login_required
+    @user_required
     def api_delete_user_document(document_id):
         user_id = get_current_user_id()
         if not user_id:
@@ -151,6 +156,7 @@ def register_route_backend_documents(app):
         
     @app.route("/api/get_citation", methods=["POST"])
     @login_required
+    @user_required
     def get_citation():
         data = request.get_json()
         user_id = get_current_user_id()
