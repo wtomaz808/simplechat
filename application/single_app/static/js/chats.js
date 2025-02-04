@@ -248,11 +248,13 @@ function highlightSelectedConversation(conversationId) {
 }
 
 // ===================== APPEND MESSAGE (supports citations) =====================
-function appendMessage(sender, messageContent) {
+// CHANGE 1: Add a third parameter, modelName (default null)
+function appendMessage(sender, messageContent, modelName = null) {
   const messageDiv = document.createElement("div");
   messageDiv.classList.add("mb-2");
 
   let avatarImg = "";
+  let avatarAltText = "";
   let messageClass = "";
   let senderLabel = "";
   let messageContentHtml = "";
@@ -283,6 +285,7 @@ function appendMessage(sender, messageContent) {
     // user's own message
     messageClass = "user-message";
     senderLabel = "You";
+    avatarAltText = "User Avatar";
     avatarImg = "/static/images/user-avatar.png";
 
     // If you want to parse user content as markdown, or not:
@@ -291,8 +294,16 @@ function appendMessage(sender, messageContent) {
   } else if (sender === "AI") {
     // assistant message
     messageClass = "ai-message";
-    senderLabel = "AI";
+    avatarAltText = "AI Avatar";
     avatarImg = "/static/images/ai-avatar.png";
+
+    // If modelName is present, show it in parentheses
+    if (modelName) {
+      // Subtle text with smaller font
+      senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
+    } else {
+      senderLabel = "AI";
+    }
 
     // Clean up
     let cleaned = messageContent.trim().replace(/\n{3,}/g, "\n\n");
@@ -328,7 +339,7 @@ function appendMessage(sender, messageContent) {
     }">
       ${
         sender !== "File"
-          ? `<img src="${avatarImg}" alt="${senderLabel}" class="avatar">`
+          ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
           : ""
       }
       <div class="message-bubble">
@@ -356,10 +367,12 @@ function loadMessages(conversationId) {
         if (msg.role === "user") {
           appendMessage("You", msg.content);
         } else if (msg.role === "assistant") {
-          appendMessage("AI", msg.content);
+          // CHANGE 2: Pass msg.model_deployment_name to appendMessage
+          appendMessage("AI", msg.content, msg.model_deployment_name);
         } else if (msg.role === "file") {
           appendMessage("File", msg);
         } else if (msg.role === "image") {
+          // If images also have a model name, you can pass it as well
           appendMessage("image", msg.content);
         }
       });
@@ -374,36 +387,25 @@ function parseCitations(message) {
   /*
     This regex will match patterns like:
       (Source: FILENAME, Page(s): PAGE) [#doc_1] [#doc_2] ...
-    We'll capture:
-      1) filename
-      2) the pages
-      3) bracket references
   */
   const citationRegex =
     /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
 
-  return message.replace(
-    citationRegex,
-    (whole, filename, pages, bracketSection) => {
-      // bracketSection might contain multiple [#...] references
-      const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
-      if (!idMatches) return whole;
+  return message.replace(citationRegex, (whole, filename, pages, bracketSection) => {
+    const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
+    if (!idMatches) return whole;
 
-      // Build clickable links for each bracket
-      const citationLinks = idMatches
-        .map((m) => {
-          // remove "[#" and "]"
-          const rawId = m.slice(2, -1);
-          // guess the page number from the last chunk
-          const pageNumber = rawId.split("_").pop();
-          // Build a link that triggers "fetchCitedText(rawId)"
-          return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
-        })
-        .join(" ");
+    // Build clickable links for each bracket
+    const citationLinks = idMatches
+      .map((m) => {
+        const rawId = m.slice(2, -1); 
+        const pageNumber = rawId.split("_").pop();
+        return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
+      })
+      .join(" ");
 
-      return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
-    }
-  );
+    return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
+  });
 }
 
 // ===================== DELETE A CONVERSATION =====================
@@ -461,9 +463,7 @@ function deleteConversation(conversationId) {
 
 // ===================== CITED TEXT FUNCTIONS =====================
 function fetchCitedText(citationId) {
-  // Show loading
   showLoadingIndicator();
-
   fetch("/api/get_citation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -474,7 +474,6 @@ function fetchCitedText(citationId) {
       hideLoadingIndicator();
 
       if (data.cited_text && data.file_name && data.page_number !== undefined) {
-        // show in modal
         showCitedTextPopup(data.cited_text, data.file_name, data.page_number);
       } else if (data.error) {
         alert(data.error);
@@ -513,7 +512,6 @@ function showCitedTextPopup(citedText, fileName, pageNumber) {
     `;
     document.body.appendChild(modalContainer);
   } else {
-    // update existing
     const modalTitle = modalContainer.querySelector(".modal-title");
     modalTitle.textContent = `Source: ${fileName}, Page: ${pageNumber}`;
   }
@@ -521,7 +519,6 @@ function showCitedTextPopup(citedText, fileName, pageNumber) {
   const citedTextContent = document.getElementById("cited-text-content");
   citedTextContent.textContent = citedText;
 
-  // show modal
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
@@ -632,7 +629,7 @@ function sendMessage() {
     .then((data) => {
       hideLoadingIndicatorInChatbox();
       if (data.reply) {
-        appendMessage("AI", data.reply);
+        appendMessage("AI", data.reply, data.model_deployment_name); 
       }
       if (data.conversation_id) {
         currentConversationId = data.conversation_id;
@@ -672,7 +669,6 @@ function sendMessage() {
 }
 
 // --------------------- User Input Event Listeners ---------------------
-
 document.getElementById("send-btn").addEventListener("click", sendMessage);
 
 document
@@ -925,9 +921,7 @@ function showImagePopup(imageSrc) {
 }
 
 function fetchFileContent(conversationId, fileId) {
-  // Show loading
   showLoadingIndicator();
-
   fetch("/api/get_file_content", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

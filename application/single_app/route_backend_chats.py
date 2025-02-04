@@ -97,7 +97,11 @@ def register_route_backend_chats(app):
                 return jsonify({'error': 'An error occurred'}), 500
 
         # Append the new user message
-        conversation_item['messages'].append({'role': 'user', 'content': user_message})
+        conversation_item['messages'].append({
+            'role': 'user', 
+            'content': user_message,
+            'model_deployment_name': None
+            })
 
         # If first user message, set conversation title
         if conversation_item.get('title', 'New Conversation') == 'New Conversation':
@@ -107,7 +111,11 @@ def register_route_backend_chats(app):
         # Optionally, if we want a default system prompt at the start
         if len(conversation_item['messages']) == 1 and settings.get('default_system_prompt'):
             conversation_item['messages'].insert(
-                0, {'role': 'system', 'content': settings.get('default_system_prompt')}
+                0, {
+                    'role': 'system', 
+                    'content': settings.get('default_system_prompt'),
+                    'model_deployment_name': None
+                }
             )
 
         # If hybrid search is enabled, perform it and include the results
@@ -142,7 +150,8 @@ def register_route_backend_chats(app):
                 )
                 conversation_item['messages'].append({
                     'role': 'system', 
-                    'content': system_prompt
+                    'content': system_prompt,
+                    'model_deployment_name': None
                 })
                 #print("System prompt with hybrid search results added to conversation.")
 
@@ -173,7 +182,8 @@ def register_route_backend_chats(app):
                 )
                 conversation_item['messages'].append({
                     'role': 'system',
-                    'content': system_prompt
+                    'content': system_prompt,
+                    'model_deployment_name': None
                 })
                 container.upsert_item(body=conversation_item)
 
@@ -192,6 +202,7 @@ def register_route_backend_chats(app):
                     'content': generated_image_url,
                     'prompt': user_message,
                     'created_at': datetime.utcnow().isoformat(),
+                    'model_deployment_name': image_gen_model
                 })
 
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
@@ -226,26 +237,40 @@ def register_route_backend_chats(app):
 
                 system_message = {
                     'role': 'system',
-                    'content': f"The user has uploaded a file named '{filename}' with the following content:\n\n{file_content}\n\nPlease use this information to assist the user."
+                    'content': f"The user has uploaded a file named '{filename}' with the following content:\n\n{file_content}\n\nPlease use this information to assist the user.",
+                    'model_deployment_name': None
                 }
                 conversation_history_for_api.append(system_message)
             else:
                 continue
 
-        response = gpt_client.chat.completions.create(
-            model=gpt_model,
-            messages=conversation_history_for_api
-        )
+        try:
+            response = gpt_client.chat.completions.create(
+                model=gpt_model,
+                messages=conversation_history_for_api
+            )
+            ai_message = response.choices[0].message.content
+        except Exception as e:
+            return jsonify({'error': f'Error generating model response: {str(e)}'}), 500
 
-        ai_message = response.choices[0].message.content
-        conversation_item['messages'].append({'role': 'assistant', 'content': ai_message})
+
+        conversation_item['messages'].append({
+            'role': 'assistant',
+            'content': ai_message,
+            'model_deployment_name': gpt_model
+        })
+
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
-
         container.upsert_item(body=conversation_item)
         #print("AI response generated and conversation updated.")
+
+        # for msg in conversation_item['messages']:
+        #     if 'model_deployment_name' not in msg:
+        #         msg['model_deployment_name'] = None
 
         return jsonify({
             'reply': ai_message,
             'conversation_id': conversation_id,
-            'conversation_title': conversation_item['title']
+            'conversation_title': conversation_item['title'],
+            'model_deployment_name': gpt_model
         })

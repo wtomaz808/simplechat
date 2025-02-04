@@ -114,7 +114,8 @@ def register_route_frontend_chats(app):
                 'file_id': str(uuid.uuid4()),
                 'timestamp': datetime.utcnow().isoformat(),
                 'file_content': extracted_content,
-                'is_table': is_table
+                'is_table': is_table,
+                'model_deployment_name': None
             }
 
             conversation_item['messages'].append(file_message)
