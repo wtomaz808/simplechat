@@ -375,20 +375,3 @@ For deployments in **Azure Government**, ensure that the endpoints for **Azure C
 4. **Attach Docs**: Upload personal or group docs to store or ephemeral docs for a single conversation.
 5. **Hybrid Search**: Enable searching your personal or group docs for context.
 6. **Review Past Chats**: The user can revisit conversation history stored in Azure Cosmos DB.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](https://chatgpt.com/c/LICENSE) file for details.
-
-------
-
-```
-### Key Updates at a Glance
-
-1. **Azure OpenAI & Bing**: No longer configured in `.env`; use the **Admin Settings** page to set endpoints, authentication types, and keys.  
-2. **Groups**: Manage group membership, set active group, control group documents.  
-3. **Ephemeral Documents**: Files can be uploaded “just in time” for a single conversation without indexing in Azure Cognitive Search.  
-4. **Optional Feature Toggles**: Web Search (Bing), Image Generation, and more are managed in the Admin Settings UI.  
-
-This consolidated `README.md` reflects all known features and the new configuration approach. Make sure to keep your environment variables for other Azure services (Cosmos DB, Cognitive Search, etc.) in `.env` or in Azure Portal → Configuration, but **not** your Azure OpenAI or Bing keys anymore—those belong in the in-app Admin Settings.
-```
