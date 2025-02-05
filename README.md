@@ -2,15 +2,17 @@
 
 ## Overview
 
-The **Simple Chat Application** is designed to enable users to interact with a generative AI model via a web-based chat interface. It supports **Retrieval-Augmented Generation (RAG)**, allowing users to enhance the AI’s responses with custom data by uploading documents. The application uses **inline temporary file storage** for short-term processing and **Azure AI Search** for long-term document retrieval and storage, enabling efficient hybrid searches. The application is built to run on **Azure App Service**, tailored for use in **Azure Government**, but it also works seamlessly in **Azure Commercial** environments.
+The **Simple Chat Application** is designed to enable users to interact with a generative AI model via a web-based chat interface. It supports **Retrieval-Augmented Generation (RAG)**, allowing users to enhance the AI’s responses with custom data by uploading documents. The application uses **inline temporary file storage** for short-term processing and **Azure AI Search** for long-term document retrieval and storage, enabling efficient hybrid searches. The application is built to run on **Azure App Service** both in **Azure Commercial** and **Azure Government**.
 
-https://github.com/user-attachments/assets/855bb942-4110-47b4-8b5e-1988fd933a6c
+Full Demo for v0.190
+https://github.com/user-attachments/assets/a1045817-e2e4-4336-8a18-d4f83a6a02af
 
 ## Features
 
 - **Chat with AI**: Interact with an AI model based on OpenAI's GPT.
 - **RAG with Hybrid Search**: Upload documents and perform hybrid searches, retrieving relevant information from your files.
 - **Document Management**: Upload, store, and manage multiple versions of documents.
+- **Groups** and **Group Documents**: Create teams to work together on RBAC controlled documents.
 - **Azure Cosmos DB**: Stores conversations and document metadata.
 - **Azure Cognitive Search**: Facilitates efficient search and retrieval of document data.
 - **Azure Document Intelligence**: Extracts data from various document formats, including PDFs, Word documents, and images.
