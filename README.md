@@ -4,256 +4,222 @@
 
 The **Simple Chat Application** is designed to enable users to interact with a generative AI model via a web-based chat interface. It supports **Retrieval-Augmented Generation (RAG)**, allowing users to enhance the AI’s responses with custom data by uploading documents. The application uses **inline temporary file storage** for short-term processing and **Azure AI Search** for long-term document retrieval and storage, enabling efficient hybrid searches. The application is built to run on **Azure App Service** both in **Azure Commercial** and **Azure Government**.
 
-
 https://github.com/user-attachments/assets/a1045817-e2e4-4336-8a18-d4f83a6a02af
+
+**Important Change**:  
+
+- **Azure OpenAI** and **Bing Search** configuration is now done via the **Admin Settings** page within the application, rather than being stored directly in environment variables (`.env` file). This allows for easier updates and toggling of features like GPT, embeddings, web search (Bing), and image generation at runtime.
+
+![Screenshot: Chat UI](./images/chat.png)
 
 ## Features
 
 - **Chat with AI**: Interact with an AI model based on OpenAI's GPT.
 - **RAG with Hybrid Search**: Upload documents and perform hybrid searches, retrieving relevant information from your files.
-- **Document Management**: Upload, store, and manage multiple versions of documents.
-- **Groups** and **Group Documents**: Create teams to work together on RBAC controlled documents.
-- **Azure Cosmos DB**: Stores conversations and document metadata.
+- **Document Management**: Upload, store, and manage multiple versions of documents (personal or group-level).
+- **Group Management**: Create and join groups to share access to group-specific documents (RBAC).
+- **Ephemeral (Single-Convo) Documents**: Upload temporary documents available only during the current chat session.
+- **Azure Cosmos DB**: Stores conversations, documents, and metadata.
 - **Azure Cognitive Search**: Facilitates efficient search and retrieval of document data.
 - **Azure Document Intelligence**: Extracts data from various document formats, including PDFs, Word documents, and images.
-- **Authentication**: Secured via Azure Active Directory (AAD) integration using MSAL (Microsoft Authentication Library).
+- **Optional Bing Web Search**: Toggle web-search-based augmentation from the Admin Settings.  
+- **Optional Image Generation**: Toggle image generation with Azure OpenAI from the Admin Settings.
+- **Authentication & RBAC**: Secured via Azure Active Directory (AAD) integration, using MSAL (Microsoft Authentication Library), plus group-based access control and app roles.
 
-![chat](./images/chat.png)
+![Architecture Diagram](./images/architecture.png)
+
+## Latest Features (v0.190+)
+
+1. **Admin Settings UI**  
+   - Configure Azure OpenAI GPT, Embeddings, Image Generation, and Bing Search settings directly through an in-app interface (rather than `.env`).  
+   - Choose between **key-based** or **managed identity** authentication for GPT, Embeddings, and Image Generation.  
+   - Dynamically switch models/deployments without redeploying the app.
+
+2. **Multiple Roles & Group Permissions**  
+   - Roles include `Owner`, `Admin`, `DocumentManager`, and `User`.  
+   - Group Owners/Admins can invite or remove members, manage documents, and set “active workspace” for group-based search.
+
+3. **One-Click Switching of Active Group**  
+   - Users in multiple groups can quickly switch their active group to see group-specific documents and chat references.
+
+4. **Ephemeral Document Upload**  
+   - Upload a file for a single conversation. The file is not saved in Azure Cognitive Search; instead, it is only used for the session’s RAG context.
+
+5. **Inline File Previews in Chat**  
+   - Files attached to a conversation can be previewed directly from the chat, with text or data displayed in a pop-up.
+
+6. **Optional Bing Web Search**  
+   - Administrators can enable or disable web search. When enabled, the user can toggle “Search the Web” while chatting to incorporate Bing results.
+
+7. **Optional Image Generation**  
+   - Users can toggle an “Image” button to create images via Azure OpenAI (e.g., DALL·E) when configured in Admin Settings.
+
+8. **App Roles & Enterprise Application**  
+   - Provides a robust way to control user access at scale.  
+   - Admins can assign roles to new users or entire Azure AD groups.
 
 ## Technology Stack
 
-- **Flask**: Web framework for handling requests and rendering web pages.
+- **Flask (Python)**: Web framework for handling requests and rendering web pages.
 - **Azure OpenAI**: Used for generating AI responses and creating document embeddings for RAG.
 - **Azure Cosmos DB**: For storing conversations, documents, and metadata.
 - **Azure Cognitive Search**: Enables document retrieval based on AI-embedded vectors.
 - **Azure Document Intelligence**: Extracts text from uploaded documents in various formats.
 - **MSAL**: Handles authentication with Azure Active Directory (AAD).
 
-![architecture](./images/architecture.png)
-
 ## Demos
 
-### Upload document
+### Upload Document
 
 ![Upload Document Demo](./images/UploadDocumentDemo.gif)
 
 ### Chat with Searching your Documents
 
-![hat with Searching your Documents Demo](./images/ChatwithSearchingYourDocsDemo.gif)
+![Chat with Searching your Documents Demo](./images/ChatwithSearchingYourDocsDemo.gif)
 
-### Chat with temporary documents with a single conversation
+### Chat with temporary documents in a single conversation
 
 ![Chat with Temp Docs](./images/ChatwithTempDocs.gif)
 
 ## Setup Instructions
 
-### Prerequisites
+### Initializing Indexes in Azure AI Search
 
-- **Azure Subscription**: An active Azure subscription with Azure OpenAI, Cosmos DB, and Cognitive Search services enabled.
-- **Azure App Service**: The application is deployed on Azure App Service. Ensure the service is available in your Azure environment.
+The **Simple Chat Application** uses Azure AI Search to store user (personal) and group documents. You’ll create **two** indexes:
 
-### Initializing an Index in Azure AI Search Using the Azure Portal
+1. **User Index**  
+2. **Group Index**  
 
-The **Simple Chat Application** utilizes Azure AI Search for document retrieval. The `user-index.json` file contains the schema for creating the search index that will store user documents and metadata. Here's how to initialize the Azure AI Search index directly through the Azure portal using the `user-index.json` file.
+Both schemas are found in the `artifacts/` folder (`user-index.json` and `group-index.json`).
 
-#### Steps to Initialize the Index in the Azure Portal
-
-1. **Access the Azure Portal**:
-   - Go to the [Azure Portal](https://portal.azure.com/).
-   - In the search bar at the top, search for **"Azure Cognitive Search"** and select your Azure AI Search resource.
-
-2. **Navigate to Indexes**:
-   - In the left-hand menu, select **Indexes** under the **Search Management** section.
-   - Click on **+ Add Index from JSON**  to create a new index.
-
-3. **Create Index from `user-index.json`**:
-   - In the **Add Index from JSON** screen, you'll need to manually enter the index schema. Open the `user-index.json` file from the `artifacts/` folder in your project to view the schema, which includes fields, types, and configurations.
-   
-     ```
+```
      📁 SimpleChat
      └── 📁 artifacts
          └── user-index.json
-     ```
-   
-4. **Copy and Paste from `user-index.json` file into the open menu on the right** 
+         └── group-index.json
+```
 
-7. **Verify Index Creation**:
-   - After the index is created, go back to the **Indexes** section in Azure AI Search.
-   - You should now see the new index listed (e.g., `simplechat-user-index`).
-   - Click on the index to verify that all the fields are set up correctly.
+#### Steps to Initialize the Indexes in the Azure Portal
+
+1. **Access the Azure Portal**  
+   - Go to the [Azure Portal](https://portal.azure.com/).  
+   - In the search bar, search for **"Azure Cognitive Search"** and select your Azure AI Search resource.
+
+2. **Navigate to Indexes**  
+   - In the left-hand menu, select **Indexes** under **Search Management**.
+   - Click on **+ Add Index from JSON** to create a new index.
+
+3. **Create Index from JSON**  
+   - Open `user-index.json` in your local editor. Copy its JSON and paste into the Azure portal’s **Add Index from JSON** screen.  
+   - Do the same for `group-index.json`.
+
+4. **Verify Index Creation**  
+   - After creation, you should see `simplechat-user-index` and `simplechat-group-index` listed under Indexes.
 
 ### Setting Up Authentication for the Simple Chat Application
 
-To secure access to the **Simple Chat Application**, we configure authentication using **Azure Active Directory (Azure AD)**. The app is registered in **Microsoft Entra ID** (formerly Azure AD) to allow users to log in using their organizational credentials. Below are the steps for setting up authentication in **Azure App Service** and configuring the **Azure AD App Registration** for the application.
+The application secures access using **Azure Active Directory**. Users log in with their organizational credentials. Access is further refined with roles (`Owner`, `Admin`, `DocumentManager`, `User`) assigned in your tenant’s **Enterprise Applications**.
 
-#### 1. **Enable Authentication in Azure App Service**
+1. **Enable App Service Authentication**  
+   - In the **App Service** → **Authentication** blade, add **Microsoft** as an identity provider, linking to your Azure AD app registration.  
+   - Require authentication so only logged-in users can access the app.
 
-Authentication is enabled directly in the **Azure App Service** that hosts the application, ensuring that only authenticated users can access the app.
+2. **App Registration**  
+   - In **Azure AD** → **App Registrations**, find your registration (e.g., `my-webapp-simplechat`).  
+   - Configure Redirect URIs (e.g., `https://my-webapp.azurewebsites.net/getAToken`) and permissions.  
+   - Grant admin consent if needed (e.g., `User.Read`, `User.ReadBasic.All`, etc.).
 
-##### Steps to Enable Authentication:
-1. **Access the Azure Portal**:
-   - Open the Azure portal and navigate to the **App Service** hosting your application.
-   - Under the **Settings** section, select **Authentication**.
+3. **Assign Users in Enterprise Applications**  
+   - Under **Enterprise Applications** → **Users and groups**, assign users or groups to the app, specifying the appropriate role.
 
-2. **Add a Provider (Microsoft)**:
-   - Click on **Add Identity Provider**.
-   - Select **Microsoft** as the identity provider.
-   - Under **App Registration**, choose the existing app registration or create a new one. In this case, the registration is **azgov-webapp-demo-chat-az**.
-   - Set **Supported Account Types** to **Single tenant** to limit sign-ins to the current Azure AD tenant.
+### Configured Permissions
 
-3. **Edit Authentication Settings**:
-   - **Enabled**: Ensure that authentication is enabled.
-   - **Restrict Access**: Set to **Require Authentication**. This ensures that only authenticated users can access the app.
-   - **Token Store**: This feature is optional but enables storing tokens in the app service for authenticated users.
-   - **Allowed External Redirect URLs**: You may specify external redirect URLs here if needed for your app flow.
+Your application is authorized to call APIs when granted permissions by users or administrators. Below are the currently configured permissions for **Microsoft Graph** in this application.
 
-##### Example Configuration:
-- **App Registration Name**: `az-webapp-demo-chat`
-- **Supported Account Types**: Current tenant - Single tenant
-- **Application (client) ID**: `00000000-0000-0000-0000-000000000000`
-- **Client Secret Setting Name**: `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`
-- **Issuer URL**: `https://sts.windows.net/00000000-0000-0000-0000-000000000000/v2.0`
-- **Allowed Token Audiences**: `api://000000000-0000-0000-0000-000000000000`
+| API / Permission Name  | Type      | Description                                         |
+| ---------------------- | --------- | --------------------------------------------------- |
+| **email**              | Delegated | View users' email address                           |
+| **offline_access**     | Delegated | Maintain access to data you have given it access to |
+| **openid**             | Delegated | Sign users in                                       |
+| **People.Read.All**    | Delegated | Read all users' relevant people lists               |
+| **profile**            | Delegated | View users' basic profile                           |
+| **User.Read**          | Delegated | Sign in and read user profile                       |
+| **User.ReadBasic.All** | Delegated | Read all users' basic profiles                      |
 
-4. **Configure Additional Authentication Settings**:
-   - **Client Application Requirement**: Select **Allow requests only from this application itself**.
-   - **Identity Requirement**: Configure based on your app’s needs, such as allowing only specific identities or the current tenant.
+### Granting Admin Consent
 
-#### 2. **App Registration in Azure Active Directory**
+For the permissions that require **admin consent**, ensure that an administrator grants consent by:
 
-The **App Registration** is where you define how users will authenticate against Azure AD when accessing your application.
+1. Navigating to **Azure Portal > Azure Active Directory**.
+2. Selecting **App registrations** and locating your registered application.
+3. Clicking on **API permissions**.
+4. Selecting **Grant admin consent for [your tenant]**.
+5. Confirming the operation.
 
-##### Steps to Configure App Registration:
-1. **Navigate to App Registrations**:
-   - In the Azure portal, search for **App Registrations** under **Microsoft Entra ID** (formerly Azure AD).
-   - Locate the registration for your app, e.g., `az-webapp-demo-chat`.
+### Adding Additional Permissions
 
-2. **Set Redirect URIs**:
-   Under the **Authentication** tab in the app registration, configure the following URIs:
-   - **Web Redirect URIs**:
-     ```
-     https://az-webapp-demo-chat.azurewebsites.us/getAToken
-     ```
-     This URI is used to handle the OAuth 2.0 authorization code flow and retrieve the authentication token.
-   - **Front-channel Logout URL**:
-     ```
-     https://az-webapp-demo-chat.azurewebsites.us/logout
-     ```
-     This URL is used to log out users from the application and Azure AD session.
+If your application requires further permissions:
 
-3. **Configure API Permissions**:
-   - Under the **API Permissions** tab, ensure the app has at least the **User.Read** permission granted. This allows the application to access basic profile information of the signed-in user.
+1. Click **+ Add a permission**.
+2. Select **Microsoft Graph** or another API.
+3. Choose either **Delegated permissions** (acting on behalf of the user) or **Application permissions** (acting as a service).
+4. Select the required permissions and **Add** them.
+5. If admin consent is required, follow the **Granting Admin Consent** steps above.
 
-4. **Client Secret**:
-   - In the **Certificates & Secrets** section, create a new client secret if needed and store the value securely. This secret is referenced as `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET` in your app's environment variables.
+By ensuring the correct permissions and admin consent, your application can securely interact with Microsoft Graph APIs while respecting user and security policies.
+### App Roles
 
-#### 3. **Configure Enterprise Application Access (Users and Groups)**
+**Description**: App roles are custom roles to assign permissions to users or apps. The application defines and publishes these app roles, which are then interpreted as permissions during authorization.
 
-Once authentication is set up, you can configure access controls using Azure AD’s **Enterprise Applications**. This allows you to manage which users or groups can sign in to your application.
+| Display Name | Description            | Allowed Member Types | Value | State   |
+| ------------ | ---------------------- | -------------------- | ----- | ------- |
+| **Admins**   | Manage the application | Users/Groups         | Admin | Enabled |
+| **Users**    | Normal user            | Users/Groups         | User  | Enabled |
 
-##### Steps to Assign Users and Groups:
-1. **Navigate to Enterprise Applications**:
-   - In the Azure portal, go to **Enterprise Applications** under **Microsoft Entra ID**.
+### Adding Users to the Application
 
-2. **Select the Application**:
-   - Find the enterprise application created during app registration (e.g., `azgov-webapp-demo-chat-az`).
+To allow users to sign in to your application and automatically be assigned the correct role (Admin or User), you must add these users in the **Enterprise application** that is associated with your **Registered app** in Azure Active Directory:
 
-3. **Assign Users and Groups**:
-   - Under the **Users and Groups** section, click **+ Add user/group**.
-   - Search for and select the users or groups who should have access to the application.
-   - Assign the appropriate role (if roles are defined in your app).
+1. **Go to Azure Active Directory**  
+   - In the [Azure Portal](https://portal.azure.com), go to **Azure Active Directory** from the main menu.
 
-4. **Verify Access**:
-   - Once the users and groups are assigned, they will be able to log into the application using their Azure AD credentials.
+2. **Select ‘Enterprise applications’**  
+   - Under the **Manage** section in Azure AD, choose **Enterprise applications**.
 
----
+3. **Locate Your Application**  
+   - Find and select the Enterprise application that was automatically created when you registered your app (the name should match or be closely related to the registered app’s name).
 
-### Summary of Authentication Configuration
+4. **Go to ‘Users and groups’**  
+   - Under **Manage** for that Enterprise application, select **Users and groups** to manage role assignments.
 
-- **App Service Authentication**: Enable and require authentication through the Azure App Service settings, using **Microsoft** as the identity provider.
-- **App Registration**: Set up redirect URIs for authentication and logout, and ensure permissions such as **User.Read** are granted.
-- **Enterprise Application Users and Groups**: Assign specific users or groups to the enterprise application to control who can log into the app.
+5. **Click on ‘Add user/group’**  
+   - Here, you can choose to add either **individual users** or entire **Azure AD groups** to the application.
 
-By following these steps, you'll ensure that your **Simple Chat Application** is secure and accessible only to authorized users via Azure AD.
+6. **Assign the Appropriate Role**  
+   - When adding users or groups, you will see the available app roles (e.g., **Admins**, **Users**).  
+   - Select the relevant role to ensure the user or group is granted the correct permissions.
 
-## Configuring Environment Variables and Uploading `.env` File
+7. **Save Your Changes**  
+   - Confirm your assignments and click **Assign** (or **Save**) to finalize.
 
-The application relies on several environment variables for proper configuration. These variables are defined in the `.env` file. Follow the steps below to modify the `example.env` file and upload it to your Azure App Service.
+8. **Verification**  
+   - Once a user is assigned, they can sign in and be granted the permissions associated with their role in your application.
 
-### Modify the `example.env` File
+### Configuring Environment Variables and `.env` File
 
-1. Rename the `example.env` file to `.env`:
-   - Right-click the file in your project folder and select **Rename**.
-   - Change the name from `example.env` to `.env`.
+While **Azure OpenAI** (GPT, Embeddings, Image Gen) and **Bing Search** are now configured via the in-app **Admin Settings**, you still need some basic environment variables for the rest of the services. These are typically set in the Azure Portal under **Configuration** or uploaded via a `.env` file.
 
-2. Open the `.env` file in your text editor (e.g., VS Code) and replace the placeholder values with your specific configuration details. Here’s an example:
+1. **Modify `example.env`**  
+   - Rename `example.env` to `.env`.  
+   - Update placeholders for **Azure Cosmos DB**, **Azure Cognitive Search**, **Azure Document Intelligence**, and **AAD** values.  
+   - **Omit** any direct references to Azure OpenAI or Bing Search here, since these are now set in the admin UI.
 
-   ```bash
-   # General Application Settings
-   SCM_DO_BUILD_DURING_DEPLOYMENT="true"
-   WEBSITE_HTTPLOGGING_RETENTION_DAYS="7"
-   FLASK_KEY="<your-flask-secret-key>"
-   
-   # Application Insights
-   APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=<your-instrumentation-key>;EndpointSuffix=<your-endpoint-suffix>;IngestionEndpoint=<your-ingestion-endpoint>;AADAudience=<your-aad-audience>;ApplicationId=<your-application-id>"
-   ApplicationInsightsAgent_EXTENSION_VERSION="~3"
-   APPLICATIONINSIGHTSAGENT_EXTENSION_ENABLED="true"
-   XDT_MicrosoftApplicationInsights_Mode="default"
-   
-   # Azure OpenAI
-   AZURE_OPENAI_API_TYPE="azure"
-   AZURE_OPENAI_KEY="<your-openai-api-key>"
-   AZURE_OPENAI_ENDPOINT="<your-openai-endpoint>"
-   AZURE_OPENAI_API_VERSION="2024-02-15-preview"
-   AZURE_OPENAI_LLM_MODEL="gpt-4o"
-   AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-ada-002"
-   
-   # Azure Cosmos DB
-   AZURE_COSMOS_ENDPOINT="<your-cosmosdb-endpoint>"
-   AZURE_COSMOS_KEY="<your-cosmosdb-key>"
-   AZURE_COSMOS_DB_NAME="SimpleChat"
-   AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME="documents"
-   AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME="conversations"
-   
-   # Azure AI Search
-   AZURE_AI_SEARCH_ENDPOINT="<your-ai-search-endpoint>"
-   AZURE_AI_SEARCH_KEY="<your-ai-search-key>"
-   AZURE_AI_SEARCH_USER_INDEX="simplechat-user-index"
-   AZURE_AI_SEARCH_GROUP_INDEX="simplechat-group-index"
-   
-   # Azure Document Intelligence
-   AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT="<your-document-intelligence-endpoint>"
-   AZURE_DOCUMENT_INTELLIGENCE_KEY="<your-document-intelligence-key>"
-   
-   # Azure AD Authentication
-   WEBSITE_AUTH_AAD_ALLOWED_TENANTS="<your-allowed-tenant-id>"
-   MICROSOFT_PROVIDER_AUTHENTICATION_SECRET="<your-authentication-secret>"
-   CLIENT_ID="<your-client-id>"
-   TENANT_ID="<your-tenant-id>"
-   ```
+2. **Upload `.env` to Azure App Service**  
+   - In VS Code, use **"Azure App Service: Upload Local Settings"** or manually copy the env keys into **App Service → Configuration**.
 
-3. Save your changes.
+> **Note**: Keep secrets out of source control. Use Azure Key Vault or the App Service Settings blade to store any credentials for production scenarios.
 
-### Upload the `.env` File to Azure App Service
-
-To upload the `.env` file to your Azure App Service, follow these instructions:
-
-1. **Open Command Palette in VS Code**:
-   - Press `Ctrl + Shift + P` (or `Cmd + Shift + P` on macOS) to open the Command Palette.
-
-2. **Search for Upload Command**:
-   - Type **Azure App Service: Upload Local Settings** and select it.
-
-3. **Select the `.env` File**:
-   - Browse and select the `.env` file you modified in the previous step.
-
-4. **Choose Your Azure Subscription**:
-   - If prompted, select the Azure subscription associated with your App Service.
-
-5. **Select Your App Service**:
-   - Choose the App Service where your application is deployed. This will upload the `.env` file and automatically set the environment variables.
-
-### Alternate Method: Upload Environment Variables Using JSON Configuration
+#### Alternate Method: Upload Environment Variables Using JSON Configuration
 
 If you prefer, you can update your environment variables directly in the Azure Portal using the **Advanced Edit** feature. This method allows you to paste a JSON configuration, which can be especially useful for bulk updates or when setting up a new environment.
 
@@ -274,35 +240,39 @@ If you prefer, you can update your environment variables directly in the Azure P
 
 ```json
 [
-    { "name": "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", "value": "", "slotSetting": true },
-    { "name": "WEBSITE_AUTH_AAD_ALLOWED_TENANTS", "value": "", "slotSetting": false },
+    { "name": "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", "value": "<your-authentication-secret>", "slotSetting": true },
+    { "name": "WEBSITE_AUTH_AAD_ALLOWED_TENANTS", "value": "<your-allowed-tenant-id>", "slotSetting": false },
     { "name": "SCM_DO_BUILD_DURING_DEPLOYMENT", "value": "true", "slotSetting": false },
     { "name": "WEBSITE_HTTPLOGGING_RETENTION_DAYS", "value": "7", "slotSetting": false },
-    { "name": "FLASK_KEY", "value": "", "slotSetting": false },
-    { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "InstrumentationKey=;EndpointSuffix=;IngestionEndpoint=;AADAudience=;ApplicationId=", "slotSetting": false },
+    { "name": "APPINSIGHTS_INSTRUMENTATIONKEY", "value": "<your-instrumentation-key>", "slotSetting": false },
+    { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "InstrumentationKey=<your-instrumentation-key>;IngestionEndpoint=<your-ingestion-endpoint>;LiveEndpoint=<your-live-endpoint>;ApplicationId=<your-application-id>", "slotSetting": false },
     { "name": "ApplicationInsightsAgent_EXTENSION_VERSION", "value": "~3", "slotSetting": false },
     { "name": "APPLICATIONINSIGHTSAGENT_EXTENSION_ENABLED", "value": "true", "slotSetting": false },
     { "name": "XDT_MicrosoftApplicationInsights_Mode", "value": "default", "slotSetting": false },
-    { "name": "AZURE_OPENAI_API_TYPE", "value": "azure", "slotSetting": false },
-    { "name": "AZURE_OPENAI_KEY", "value": "", "slotSetting": false },
-    { "name": "AZURE_OPENAI_ENDPOINT", "value": "", "slotSetting": false },
-    { "name": "AZURE_OPENAI_API_VERSION", "value": "2024-02-15-preview", "slotSetting": false },
-    { "name": "AZURE_OPENAI_LLM_MODEL", "value": "gpt-4o", "slotSetting": false },
-    { "name": "AZURE_OPENAI_EMBEDDING_MODEL", "value": "text-embedding-ada-002", "slotSetting": false },
-    { "name": "AZURE_COSMOS_ENDPOINT", "value": "", "slotSetting": false },
-    { "name": "AZURE_COSMOS_KEY", "value": "", "slotSetting": false },
+    { "name": "APPINSIGHTS_PROFILERFEATURE_VERSION", "value": "1.0.0", "slotSetting": false },
+    { "name": "APPINSIGHTS_SNAPSHOTFEATURE_VERSION", "value": "1.0.0", "slotSetting": false },
+    { "name": "SnapshotDebugger_EXTENSION_VERSION", "value": "disabled", "slotSetting": false },
+    { "name": "InstrumentationEngine_EXTENSION_VERSION", "value": "disabled", "slotSetting": false },
+    { "name": "XDT_MicrosoftApplicationInsights_BaseExtensions", "value": "disabled", "slotSetting": false },
+    { "name": "XDT_MicrosoftApplicationInsights_PreemptSdk", "value": "disabled", "slotSetting": false },
+    { "name": "AZURE_COSMOS_ENDPOINT", "value": "<your-cosmosdb-endpoint>", "slotSetting": false },
+    { "name": "AZURE_COSMOS_KEY", "value": "<your-cosmosdb-key>", "slotSetting": false },
     { "name": "AZURE_COSMOS_DB_NAME", "value": "SimpleChat", "slotSetting": false },
     { "name": "AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME", "value": "documents", "slotSetting": false },
     { "name": "AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME", "value": "conversations", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_ENDPOINT", "value": "", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_KEY", "value": "", "slotSetting": false },
+    { "name": "AZURE_COSMOS_LOGS_CONTAINER_NAME", "value": "logs", "slotSetting": false },
+    { "name": "AZURE_AI_SEARCH_ENDPOINT", "value": "<your-ai-search-endpoint>", "slotSetting": false },
+    { "name": "AZURE_AI_SEARCH_KEY", "value": "<your-ai-search-key>", "slotSetting": false },
     { "name": "AZURE_AI_SEARCH_USER_INDEX", "value": "simplechat-user-index", "slotSetting": false },
     { "name": "AZURE_AI_SEARCH_GROUP_INDEX", "value": "simplechat-group-index", "slotSetting": false },
-    { "name": "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "value": "", "slotSetting": false },
-    { "name": "AZURE_DOCUMENT_INTELLIGENCE_KEY", "value": "", "slotSetting": false },
-    { "name": "CLIENT_ID", "value": "", "slotSetting": false },
-    { "name": "TENANT_ID", "value": "", "slotSetting": false }
+    { "name": "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "value": "<your-document-intelligence-endpoint>", "slotSetting": false },
+    { "name": "AZURE_DOCUMENT_INTELLIGENCE_KEY", "value": "<your-document-intelligence-key>", "slotSetting": false },
+    { "name": "BING_SEARCH_ENDPOINT", "value": "https://api.bing.microsoft.com/", "slotSetting": false },
+    { "name": "CLIENT_ID", "value": "<your-client-id>", "slotSetting": false },
+    { "name": "TENANT_ID", "value": "<your-tenant-id>", "slotSetting": false },
+    { "name": "SECRET_KEY", "value": "<your-32-character-secret>", "slotSetting": false }
 ]
+
 ```
 
 #### Notes:
@@ -313,119 +283,112 @@ By using the **Advanced Edit** function and pasting this JSON, you can easily ma
 
 ![Advanced Edit](./images/advanced_edit_env.png)
 
+### Installing and Deploying
 
-### Step 3: Verify the Environment Variables in Azure Portal
-
-1. Navigate to the **Azure Portal** and open your **App Service**.
-2. Go to **Settings** > **Configuration**.
-3. Under **Application settings**, verify that the environment variables from your `.env` file have been added correctly.
-4. Click **Save** to apply any changes.
-
-### Explanation of Placeholders:
-
-- Replace `<your-flask-secret-key>`, `<your-instrumentation-key>`, `<your-endpoint-suffix>`, etc., with the appropriate values for your environment.
-- **Azure Government** and **Azure Commercial** will require different values for `AZURE_OPENAI_ENDPOINT`, `AZURE_COSMOS_ENDPOINT`, `AZURE_AI_SEARCH_ENDPOINT`, and other endpoints, depending on the region (e.g., `*.azure.us` for Azure Government and `*.azure.com` for Azure Commercial).
-- **Azure AD Tenant Settings** should also be adjusted based on the tenants allowed in your specific application.
-
-This generalization allows you to switch between environments by simply updating the placeholders.
-
-### Tips
-
-- If you update the `.env` file, you will need to re-upload it to Azure App Service.
-- Ensure sensitive information (e.g., API keys, client secrets) is stored securely and not shared publicly.
-- Use different `.env` files for different environments (e.g., development, staging, production) to manage configuration settings effectively.
-
-By following these steps, your environment variables will be configured correctly, ensuring the application functions as expected in your Azure App Service environment.
-
-### Installation
-
-1. Clone the repository to your local environment:
+1. **Clone the Repo**  
+   
    ```bash
    git clone https://github.com/your-repo/SimpleChat.git
    cd SimpleChat
-   ```
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. **Install Dependencies**
 
-3. Deploy the application to **Azure App Service** using your preferred method (Azure CLI, Visual Studio Code, etc.). Ensure that the environment variables are properly configured in the Azure environment.
+```bash
+pip install -r requirements.txt
+```
+
+3. **Deploy to Azure App Service**
+    You can use **Azure CLI** or **VS Code** deployment.
+
+#### Deploying via VS Code
+
+1. Install the **Azure Tools** VS Code Extension.
+2. Sign in to your Azure account in VS Code.
+3. Right-click your project folder → **Deploy to Web App**.
+4. Select or create an **Azure App Service**.
+5. Wait for deployment to complete.
+6. Upload your `.env` or configure application settings in the Azure Portal.
 
 ### Running the Application
 
-- **Locally**: You can run the application locally for testing:
-   ```bash
-   flask run
-   ```
+- **Locally** (for testing):
 
-- **On Azure**: After deployment, navigate to the **Azure App Service** URL to interact with the application.
+  ```bash
+  flask run
+  ```
+
+  Then open [http://localhost:5000](http://localhost:5000/) in your browser.
+
+- **Azure**: Once deployed, open your `https://<app_name>.azurewebsites.net`.
+
+### Admin Settings Configuration
+
+After deployment and login (with a role of Admin or Owner), navigate to `Admin Settings` in the navigation bar:
+
+1. **General**: Set application title, toggle show/hide logo, customize the landing page text.
+2. **GPT**: Provide the Azure OpenAI GPT endpoint, choose between “Key” or “Managed Identity,” and select your model deployment.
+3. **Embeddings**: Provide the Azure OpenAI Embedding endpoint and select the embedding model deployment.
+4. **Image Generation** (optional): Enable to add an “Image” button in chat for AI image generation.
+5. **Web Search** (Bing): Toggle to enable or disable web-based augmentation with Bing Search.
+6. **External APIs** (optional): If you have custom chunking or embedding endpoints, set them here.
+7. **Other**: Additional limits (max file size, conversation history limit, default system prompt, etc.).
+
+Changes are stored in your Azure Cosmos DB’s configuration container. Once saved, the new settings are applied almost immediately, without editing `.env`.
 
 ### Azure Government Configuration
 
-For deployments in **Azure Government**, ensure that the endpoints for **Azure OpenAI**, **Azure Cosmos DB**, **Azure Cognitive Search**, and **Azure Document Intelligence** are set to the correct `.azure.us` suffix.
+For deployments in **Azure Government**, ensure that the endpoints for **Azure Cosmos DB**, **Azure Cognitive Search**, **Azure Document Intelligence**, etc., use the `.azure.us` suffix (or region-specific endpoints).
 
 ## Usage
 
 1. **Login**: Users must log in via Azure Active Directory.
+
 2. **Chat**: Start a conversation with the AI or retrieve previous conversations.
-3. **Upload Documents**: Upload documents in various formats and use hybrid search to enhance the AI's responses with custom data.
-4. **Manage Documents**: View, delete, and upload new versions of documents.
-5. **Profile**: View user profile details obtained from AAD.
+
+3. Upload Documents
+
+    (Personal or Group):
+
+   - Personal documents are indexed in `simplechat-user-index`.
+   - Group documents are indexed in `simplechat-group-index` and only visible to group members.
+
+4. **Toggle Hybrid Search**: Optionally switch on the “Search Documents” button to retrieve context from your docs.
+
+5. **Upload Ephemeral Documents**: Files that live for one conversation only (not in Cognitive Search).
+
+6. **Bing Web Search** (optional): Toggle “Search the Web” for external augmentation.
+
+7. **Image Generation** (optional): Enable “Image” mode to generate images via Azure OpenAI.
+
+8. Groups
+
+   :
+
+   - Create or join existing groups; each group has an owner and optional admins.
+   - Switch to the “active group” to see that group’s documents.
 
 ### User Workflow
 
-The **Simple Chat Application** provides a streamlined user experience for interacting with an AI-powered chat system, enhanced by document retrieval through Azure AI Search. Below is an overview of the typical workflow a user will follow when interacting with the application.
-
-#### 1. **Logging into the Application**
-
-To access the application's features, users must log in using their Azure Active Directory (Azure AD) credentials.
-
-- **Login Page**: Users are directed to a login page, where they authenticate using their Azure AD account.
-- **Authentication via Azure AD**: Once users sign in, their session is established, allowing access to the application’s functionality. The session is managed securely using Azure AD tokens.
-- **User Profile**: After login, users can view their profile information (name, email, etc.) by navigating to the profile page.
-
-#### 2. **Starting a Chat**
-
-After logging in, users can start a conversation with the AI directly from the chat interface.
-
-- **Navigating to the Chat Page**: Users can click on "Start New Chat" in the navigation bar. This leads to a clean interface for interacting with the AI.
-- **Typing Messages**: Users enter text into the message box and submit it by clicking the "Send" button.
-- **AI Response**: The AI responds to the user’s messages in real-time, utilizing the Azure OpenAI GPT model to generate conversational responses.
-- **Hybrid Search**: Users can enable the "Hybrid Search" option, allowing the AI to retrieve relevant information from previously uploaded documents to enrich its responses.
-
-#### 3. **Uploading a Document**
-
-To enhance AI responses or perform document-specific searches, users can upload their own documents into the system.
-
-- **Navigate to the Document Page**: By selecting the "Your Documents" option in the navigation bar, users are taken to the document management page.
-- **Document Upload**: Users can upload a variety of document formats (e.g., PDF, Word, Excel, images) by selecting a file and clicking the "Upload Document" button.
-- **Document Processing**: Once uploaded, the document is processed using Azure Document Intelligence, which extracts text and relevant information from the file.
-- **Document Storage**: The extracted text is chunked into smaller parts, embedded, and indexed in Azure AI Search for future retrieval.
-
-#### 4. **Using Hybrid Search in a Chat**
-
-With documents uploaded, users can enhance the AI's responses by utilizing the hybrid search functionality.
-
-- **Enable Hybrid Search**: While chatting, users can check the "Enable hybrid search on my documents" option.
-- **AI Augmented Responses**: The AI will retrieve relevant content from the user's documents and cite the information within its responses. For instance, if a user asks a question related to a document, the AI will include excerpts and reference the document by file name and page number.
-
-#### 5. **Viewing and Managing Documents**
-
-Users can view and manage their uploaded documents through the document management interface.
-
-- **Document List**: On the "Your Documents" page, users can view a list of all uploaded documents, including details such as the file name, upload date, and version.
-- **Delete Documents**: Users can delete individual documents, which removes them from both Azure Cosmos DB (document metadata) and Azure AI Search (document index).
-- **Document Versions**: Each document is stored with version control, allowing users to track and manage multiple versions of the same file.
-
-#### 6. **Managing Conversations**
-
-All user conversations are stored in Azure Cosmos DB, allowing users to revisit previous chats.
-
-- **View Past Conversations**: Users can click on "Your Conversations" in the navigation bar to view a list of all previous conversations.
-- **Resuming a Conversation**: By selecting a conversation, users can review previous exchanges and continue chatting from where they left off.
-- **Conversation History**: The application maintains a limited history of the last 10 messages within each conversation for context.
+1. **Login** via Azure AD → The user is assigned a role.
+2. **Choose Group**: If applicable, pick or set an active group.
+3. **Chat**: Compose messages in the chat UI.
+4. **Attach Docs**: Upload personal or group docs to store or ephemeral docs for a single conversation.
+5. **Hybrid Search**: Enable searching your personal or group docs for context.
+6. **Review Past Chats**: The user can revisit conversation history stored in Azure Cosmos DB.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://chatgpt.com/c/LICENSE) file for details.
+
+------
+
+```
+### Key Updates at a Glance
+
+1. **Azure OpenAI & Bing**: No longer configured in `.env`; use the **Admin Settings** page to set endpoints, authentication types, and keys.  
+2. **Groups**: Manage group membership, set active group, control group documents.  
+3. **Ephemeral Documents**: Files can be uploaded “just in time” for a single conversation without indexing in Azure Cognitive Search.  
+4. **Optional Feature Toggles**: Web Search (Bing), Image Generation, and more are managed in the Admin Settings UI.  
+
+This consolidated `README.md` reflects all known features and the new configuration approach. Make sure to keep your environment variables for other Azure services (Cosmos DB, Cognitive Search, etc.) in `.env` or in Azure Portal → Configuration, but **not** your Azure OpenAI or Bing keys anymore—those belong in the in-app Admin Settings.
+```
