@@ -135,6 +135,11 @@ def register_route_frontend_admin_settings(app):
             embedding_model_json = request.form.get('embedding_model_json', '')
             image_gen_model_json = request.form.get('image_gen_model_json', '')
 
+            #APIM
+            enable_gpt_apim = request.form.get('enable_gpt_apim') == 'on'
+            azure_apim_gpt_endpoint = request.form.get('azure_apim_gpt_endpoint', '')
+            azure_apim_gpt_subscription_key = request.form.get('azure_apim_gpt_subscription_key', '')
+
             try:
                 gpt_model_obj = json.loads(gpt_model_json) if gpt_model_json else {'selected': [], 'all': []}
             except:
@@ -205,7 +210,11 @@ def register_route_frontend_admin_settings(app):
                 'azure_openai_embedding_resource_group': azure_openai_embedding_resource_group,
 
                 'azure_openai_image_gen_subscription_id': azure_openai_image_gen_subscription_id,
-                'azure_openai_image_gen_resource_group': azure_openai_image_gen_resource_group
+                'azure_openai_image_gen_resource_group': azure_openai_image_gen_resource_group,
+
+                'enable_gpt_apim': enable_gpt_apim,
+                'azure_apim_gpt_endpoint': azure_apim_gpt_endpoint,
+                'azure_apim_gpt_subscription_key': azure_apim_gpt_subscription_key
             }
 
             update_settings(new_settings)

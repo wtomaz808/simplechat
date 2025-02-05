@@ -183,6 +183,32 @@
                     </div>
                 </div>
 
+                <div class="form-group form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="enable_gpt_apim" name="enable_gpt_apim"
+                           {% if settings.enable_gpt_apim %}checked{% endif %}>
+                    <label class="form-check-label ms-2" for="enable_gpt_apim">
+                        Enable APIM
+                    </label>
+                </div>
+
+                <div id="apim_settings" class="card p-3 mb-3" {% if not settings.enable_gpt_apim %}style="display: none;"{% endif %} >                    
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_endpoint" class="form-label">Azure APIM Endpoint</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_endpoint"
+                               name="azure_apim_gpt_endpoint"
+                               value="{{ settings.azure_apim_gpt_endpoint or '' }}">
+                    </div>                    
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_apim_gpt_subscription_key"
+                                   name="azure_apim_gpt_subscription_key"
+                                   value="{{ settings.azure_apim_gpt_subscription_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_gpt_subscription_key">Show</button>
+                        </div>
+                    </div>                   
+                </div>
+
                 <!-- Test GPT Button -->
                 <button type="button" class="btn btn-secondary" id="test_gpt_button">
                     Test GPT Connection
@@ -769,6 +795,13 @@
                 this.checked ? 'block' : 'none';
         });
 
+    // Enable/disable Image Gen
+    document.getElementById('enable_gpt_apim')
+        .addEventListener('change', function () {
+            document.getElementById('apim_settings').style.display =
+                this.checked ? 'block' : 'none';
+        }); 
+        
     // External APIs
     document.getElementById('use_external_apis')
         .addEventListener('change', function () {
