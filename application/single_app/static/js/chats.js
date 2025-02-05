@@ -249,6 +249,11 @@ function highlightSelectedConversation(conversationId) {
 
 // ===================== APPEND MESSAGE (supports citations) =====================
 // CHANGE 1: Add a third parameter, modelName (default null)
+function scrollChatToBottom() {
+  const chatbox = document.getElementById("chatbox");
+  chatbox.scrollTop = chatbox.scrollHeight;
+}
+
 function appendMessage(sender, messageContent, modelName = null) {
   const messageDiv = document.createElement("div");
   messageDiv.classList.add("mb-2");
@@ -267,7 +272,7 @@ function appendMessage(sender, messageContent, modelName = null) {
   if (sender === "image") {
     // An AI-style message but it's an <img> tag
     messageClass = "ai-message";
-    senderLabel = "AI";
+    senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
     avatarImg = "/static/images/ai-avatar.png";
 
     // Create an image at 25% size
@@ -276,8 +281,9 @@ function appendMessage(sender, messageContent, modelName = null) {
         src="${messageContent}" 
         alt="Generated Image" 
         class="generated-image" 
-        style="width: 25%; cursor: pointer;" 
+        style="width: 25%; cursor: pointer;"
         data-image-src="${messageContent}"
+        onload="scrollChatToBottom()"
       />
     `;
     messageContentHtml = imageHtml;
@@ -373,7 +379,7 @@ function loadMessages(conversationId) {
           appendMessage("File", msg);
         } else if (msg.role === "image") {
           // If images also have a model name, you can pass it as well
-          appendMessage("image", msg.content);
+          appendMessage("image", msg.content, msg.model_deployment_name);
         }
       });
     })
@@ -391,21 +397,24 @@ function parseCitations(message) {
   const citationRegex =
     /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
 
-  return message.replace(citationRegex, (whole, filename, pages, bracketSection) => {
-    const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
-    if (!idMatches) return whole;
+  return message.replace(
+    citationRegex,
+    (whole, filename, pages, bracketSection) => {
+      const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
+      if (!idMatches) return whole;
 
-    // Build clickable links for each bracket
-    const citationLinks = idMatches
-      .map((m) => {
-        const rawId = m.slice(2, -1); 
-        const pageNumber = rawId.split("_").pop();
-        return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
-      })
-      .join(" ");
+      // Build clickable links for each bracket
+      const citationLinks = idMatches
+        .map((m) => {
+          const rawId = m.slice(2, -1);
+          const pageNumber = rawId.split("_").pop();
+          return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
+        })
+        .join(" ");
 
-    return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
-  });
+      return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
+    }
+  );
 }
 
 // ===================== DELETE A CONVERSATION =====================
@@ -629,7 +638,13 @@ function sendMessage() {
     .then((data) => {
       hideLoadingIndicatorInChatbox();
       if (data.reply) {
-        appendMessage("AI", data.reply, data.model_deployment_name); 
+        appendMessage("AI", data.reply, data.model_deployment_name);
+      }
+      if (data.image_url) {
+        appendMessage("image", data.image_url);
+        setTimeout(() => {
+          loadMessages(currentConversationId);
+        }, 500);
       }
       if (data.conversation_id) {
         currentConversationId = data.conversation_id;

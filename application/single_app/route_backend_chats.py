@@ -212,7 +212,8 @@ def register_route_backend_chats(app):
                     'reply': f"Here's your generated image: {generated_image_url}",
                     'image_url': generated_image_url,
                     'conversation_id': conversation_id,
-                    'conversation_title': conversation_item['title']
+                    'conversation_title': conversation_item['title'],
+                    'model_deployment_name': image_gen_model
                 }), 200
 
             except Exception as e:
