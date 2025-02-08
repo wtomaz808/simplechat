@@ -41,11 +41,11 @@ def register_route_backend_chats(app):
                 api_key=settings.get('azure_openai_gpt_key')
             )
 
-        gpt_model_obj = settings.get('gpt_model', {})
-        if gpt_model_obj and gpt_model_obj.get('selected'):
-            # Typically you’d just take the first selected item
-            selected_gpt_model = gpt_model_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
-            gpt_model = selected_gpt_model['deploymentName']  # or modelName
+            gpt_model_obj = settings.get('gpt_model', {})
+            if gpt_model_obj and gpt_model_obj.get('selected'):
+                # Typically you’d just take the first selected item
+                selected_gpt_model = gpt_model_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
+                gpt_model = selected_gpt_model['deploymentName']  # or modelName
 
         if settings.get('enable_image_gen_apim', False):
             image_gen_model = settings.get('azure_apim_image_gen_deployment')
@@ -59,11 +59,11 @@ def register_route_backend_chats(app):
                 azure_endpoint = settings.get('azure_apim_image_gen_endpoint'),
                 api_key=settings.get('azure_apim_image_gen_subscription_key'))
 
-        image_gen_obj = settings.get('image_gen_model', {})
-        if image_gen_obj and image_gen_obj.get('selected'):
-            # Typically you’d just take the first selected item
-            selected_image_gen_model = image_gen_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
-            image_gen_model = selected_image_gen_model['deploymentName']  # or modelName
+            image_gen_obj = settings.get('image_gen_model', {})
+            if image_gen_obj and image_gen_obj.get('selected'):
+                # Typically you’d just take the first selected item
+                selected_image_gen_model = image_gen_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
+                image_gen_model = selected_image_gen_model['deploymentName']  # or modelName
 
         # Convert hybrid_search_enabled to boolean if necessary
         if isinstance(hybrid_search_enabled, str):
