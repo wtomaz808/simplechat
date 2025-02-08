@@ -39,6 +39,9 @@ from azure.identity import ClientSecretCredential
 
 app = Flask(__name__)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['VERSION'] = '0.190.3'

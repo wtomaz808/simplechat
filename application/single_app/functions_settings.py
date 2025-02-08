@@ -57,7 +57,23 @@ def get_settings():
             },
             'enable_web_search': False,
             'bing_search_key': '',
-            'landing_page_text': 'Click the button below to start chatting with the AI assistant.'
+            'landing_page_text': 'Click the button below to start chatting with the AI assistant.',
+            'enable_gpt_apim': False,
+            'azure_apim_gpt_endpoint': '',
+            'azure_apim_gpt_subscription_key': '',
+            'azure_apim_gpt_deployment': '',
+            'azure_apim_gpt_api_version': '',
+            'azure_apim_embedding_endpoint': '',
+            'azure_apim_embedding_subscription_key': '',
+            'azure_apim_embedding_deployment': '',
+            'azure_apim_embedding_api_version': '',
+            'azure_apim_image_gen_endpoint': '',
+            'azure_apim_image_gen_subscription_key': '',
+            'azure_apim_image_gen_deployment': '',
+            'azure_apim_image_gen_api_version': '',            
+            'enable_gpt_apim': '',
+            'enable_image_gen_apim': '',
+            'enable_embedding_apim': ''
         }
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")
