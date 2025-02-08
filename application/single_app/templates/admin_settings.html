@@ -100,88 +100,132 @@
                 <p class="text-muted">
                     Configure your GPT model settings. These are used for generating AI text responses.
                 </p>
-                <div class="card p-3 mb-3">
-                    <div class="mb-3">
-                        <label for="azure_openai_gpt_endpoint" class="form-label">
-                            Azure OpenAI GPT Endpoint
-                        </label>
-                        <input type="text" class="form-control" id="azure_openai_gpt_endpoint"
-                               name="azure_openai_gpt_endpoint"
-                               value="{{ settings.azure_openai_gpt_endpoint or '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_gpt_authentication_type" class="form-label">
-                            Authentication Type
-                        </label>
-                        <select class="form-select" id="azure_openai_gpt_authentication_type"
-                                name="azure_openai_gpt_authentication_type">
-                            <option value="key" 
-                                {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>
-                                Key
-                            </option>
-                            <option value="managed_identity"
-                                {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>
-                                Managed Identity
-                            </option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_gpt_subscription_id" class="form-label">Subscription ID</label>
-                        <input type="text" class="form-control" id="azure_openai_gpt_subscription_id"
-                               name="azure_openai_gpt_subscription_id"
-                               value="{{ settings.azure_openai_gpt_subscription_id or '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_gpt_resource_group" class="form-label">Resource Group</label>
-                        <input type="text" class="form-control" id="azure_openai_gpt_resource_group"
-                               name="azure_openai_gpt_resource_group"
-                               value="{{ settings.azure_openai_gpt_resource_group or '' }}">
-                    </div>
-                    <div class="mb-3" id="gpt_key_container"
-                         {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                        <label for="azure_openai_gpt_key" class="form-label">Azure OpenAI GPT Key</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="azure_openai_gpt_key"
-                                   name="azure_openai_gpt_key"
-                                   value="{{ settings.azure_openai_gpt_key or '' }}">
-                            <button type="button" class="btn btn-outline-secondary" id="toggle_gpt_key">Show</button>
+
+                <!-- CHANGE: Enable APIM switch at the top of the GPT tab -->
+                <div class="form-group form-check form-switch mb-3 d-flex align-items-center">
+                    <input type="checkbox" class="form-check-input me-2" id="enable_gpt_apim" name="enable_gpt_apim"
+                           {% if settings.enable_gpt_apim %}checked{% endif %}>
+                    <label class="form-check-label" for="enable_gpt_apim">Enable APIM</label>
+                </div>
+                <!-- /CHANGE -->
+
+                <!-- CHANGE: Wrap the original GPT Azure OpenAI fields in a container that hides when APIM is enabled -->
+                <div id="non_apim_gpt_settings" {% if settings.enable_gpt_apim %}style="display: none;"{% endif %}>
+                    <div class="card p-3 mb-3">
+                        <div class="mb-3">
+                            <label for="azure_openai_gpt_endpoint" class="form-label">
+                                Azure OpenAI GPT Endpoint
+                            </label>
+                            <input type="text" class="form-control" id="azure_openai_gpt_endpoint"
+                                   name="azure_openai_gpt_endpoint"
+                                   value="{{ settings.azure_openai_gpt_endpoint or '' }}">
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <div id="gpt_models_list" class="mt-2 mb-3">
-                            <!-- Dynamically show the "all" models returned from /api/models/gpt -->
+                        <div class="mb-3">
+                            <label for="azure_openai_gpt_authentication_type" class="form-label">
+                                Authentication Type
+                            </label>
+                            <select class="form-select" id="azure_openai_gpt_authentication_type"
+                                    name="azure_openai_gpt_authentication_type">
+                                <option value="key" 
+                                    {% if settings.azure_openai_gpt_authentication_type=='key' %}selected{% endif %}>
+                                    Key
+                                </option>
+                                <option value="managed_identity"
+                                    {% if settings.azure_openai_gpt_authentication_type=='managed_identity' %}selected{% endif %}>
+                                    Managed Identity
+                                </option>
+                            </select>
                         </div>
-                        <!-- Hidden input that will store the final "selected" GPT JSON -->
-                        <input type="hidden" name="gpt_model_json" id="gpt_model_json" />
+                        <div class="mb-3">
+                            <label for="azure_openai_gpt_subscription_id" class="form-label">Subscription ID</label>
+                            <input type="text" class="form-control" id="azure_openai_gpt_subscription_id"
+                                   name="azure_openai_gpt_subscription_id"
+                                   value="{{ settings.azure_openai_gpt_subscription_id or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_gpt_resource_group" class="form-label">Resource Group</label>
+                            <input type="text" class="form-control" id="azure_openai_gpt_resource_group"
+                                   name="azure_openai_gpt_resource_group"
+                                   value="{{ settings.azure_openai_gpt_resource_group or '' }}">
+                        </div>
+                        <div class="mb-3" id="gpt_key_container"
+                             {% if settings.azure_openai_gpt_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                            <label for="azure_openai_gpt_key" class="form-label">Azure OpenAI GPT Key</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="azure_openai_gpt_key"
+                                       name="azure_openai_gpt_key"
+                                       value="{{ settings.azure_openai_gpt_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_gpt_key">Show</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div id="gpt_models_list" class="mt-2 mb-3">
+                                <!-- Dynamically show the "all" models returned from /api/models/gpt -->
+                            </div>
+                            <!-- Hidden input that will store the final "selected" GPT JSON -->
+                            <input type="hidden" name="gpt_model_json" id="gpt_model_json" />
 
-                        <!-- Also hidden input for the actual selected deployment name,
-                             so the test code can read: document.getElementById('gpt_model').value -->
-                        <input type="hidden" id="gpt_model" value="" />
+                            <!-- Also hidden input for the actual selected deployment name -->
+                            <input type="hidden" id="gpt_model" value="" />
 
-                        <!-- FETCH GPT MODELS Button -->
-                        <button type="button" class="btn btn-secondary" id="fetch_gpt_models_btn">
-                            Fetch GPT Models
-                        </button>
-                    </div>
-
-                    <!-- SHOW ADVANCED for GPT (API Version, etc.) -->
-                    <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
-                       data-bs-target="#advancedGptFields" aria-expanded="false" aria-controls="advancedGptFields">
-                       Show Advanced
-                    </a>
-                    <div class="collapse" id="advancedGptFields">
-                        <div class="card card-body mt-2">
-                            <div class="mb-3">
-                                <label for="azure_openai_gpt_api_version" class="form-label">
-                                    Azure OpenAI GPT API Version
-                                </label>
-                                <input type="text" class="form-control" id="azure_openai_gpt_api_version"
-                                       name="azure_openai_gpt_api_version"
-                                       value="{{ settings.azure_openai_gpt_api_version or '' }}">
+                            <!-- FETCH GPT MODELS Button -->
+                            <button type="button" class="btn btn-secondary" id="fetch_gpt_models_btn">
+                                Fetch GPT Models
+                            </button>
+                        </div>
+                        <!-- SHOW ADVANCED for GPT (API Version, etc.) -->
+                        <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
+                           data-bs-target="#advancedGptFields" aria-expanded="false" aria-controls="advancedGptFields">
+                           Show Advanced
+                        </a>
+                        <div class="collapse" id="advancedGptFields">
+                            <div class="card card-body mt-2">
+                                <div class="mb-3">
+                                    <label for="azure_openai_gpt_api_version" class="form-label">
+                                        Azure OpenAI GPT API Version
+                                    </label>
+                                    <input type="text" class="form-control" id="azure_openai_gpt_api_version"
+                                           name="azure_openai_gpt_api_version"
+                                           value="{{ settings.azure_openai_gpt_api_version or '' }}">
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <!-- /CHANGE -->
+
+                <!-- CHANGE: APIM-specific fields are shown ONLY if APIM is enabled -->
+                <div id="apim_gpt_settings" class="card p-3 mb-3"
+                     {% if not settings.enable_gpt_apim %}style="display: none;"{% endif %}>
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_endpoint" class="form-label">Azure APIM Endpoint</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_endpoint"
+                               name="azure_apim_gpt_endpoint"
+                               value="{{ settings.azure_apim_gpt_endpoint or '' }}">
+                    </div>   
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_api_version" class="form-label">Azure APIM API Version</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_api_version"
+                               name="azure_apim_gpt_api_version"
+                               value="{{ settings.azure_apim_gpt_api_version or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_deployment" class="form-label">Azure APIM Deployment</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_deployment"
+                               name="azure_apim_gpt_deployment"
+                               value="{{ settings.azure_apim_gpt_deployment or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_apim_gpt_subscription_key"
+                                   name="azure_apim_gpt_subscription_key"
+                                   value="{{ settings.azure_apim_gpt_subscription_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_gpt_subscription_key">Show</button>
+                        </div>
+                    </div>                   
+                </div>
+                <!-- /CHANGE -->
 
                 <!-- Test GPT Button -->
                 <button type="button" class="btn btn-secondary" id="test_gpt_button">
@@ -195,87 +239,133 @@
                 <p class="text-muted">
                     Configure your embeddings settings. These are used for semantic search, knowledge-base lookups, etc.
                 </p>
-                <div class="card p-3 mb-3">
-                    <div class="mb-3">
-                        <label for="azure_openai_embedding_endpoint" class="form-label">
-                            Azure OpenAI Embedding Endpoint
-                        </label>
-                        <input type="text" class="form-control" id="azure_openai_embedding_endpoint"
-                               name="azure_openai_embedding_endpoint"
-                               value="{{ settings.azure_openai_embedding_endpoint or '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_embedding_authentication_type" class="form-label">
-                            Authentication Type
-                        </label>
-                        <select class="form-select" id="azure_openai_embedding_authentication_type"
-                                name="azure_openai_embedding_authentication_type">
-                            <option value="key"
-                                {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>
-                                Key
-                            </option>
-                            <option value="managed_identity"
-                                {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
-                                Managed Identity
-                            </option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_embedding_subscription_id" class="form-label">Subscription ID</label>
-                        <input type="text" class="form-control" id="azure_openai_embedding_subscription_id"
-                               name="azure_openai_embedding_subscription_id"
-                               value="{{ settings.azure_openai_embedding_subscription_id or '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="azure_openai_embedding_resource_group" class="form-label">Resource Group</label>
-                        <input type="text" class="form-control" id="azure_openai_embedding_resource_group"
-                               name="azure_openai_embedding_resource_group"
-                               value="{{ settings.azure_openai_embedding_resource_group or '' }}">
-                    </div>                    
-                    <div class="mb-3" id="embedding_key_container"
-                         {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
-                        <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="azure_openai_embedding_key"
-                                   name="azure_openai_embedding_key"
-                                   value="{{ settings.azure_openai_embedding_key or '' }}">
-                            <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <div id="embedding_models_list" class="mt-2 mb-3">
-                            <!-- Dynamically show the "all" models returned from /api/models/embedding -->
-                        </div>
-                        <!-- Hidden input that will store the final "selected" Embedding JSON -->
-                        <input type="hidden" name="embedding_model_json" id="embedding_model_json" />
 
-                        <!-- Also hidden input for the actual selected deployment name -->
-                        <input type="hidden" id="embedding_model" value="" />
+                <!-- CHANGE: Enable APIM switch at the top of the Embeddings tab -->
+                <div class="form-group form-check form-switch mb-3 d-flex align-items-center">
+                    <input type="checkbox" class="form-check-input me-2" id="enable_embedding_apim" name="enable_embedding_apim"
+                           {% if settings.enable_embedding_apim %}checked{% endif %}>
+                    <label class="form-check-label" for="enable_embedding_apim">Enable APIM</label>
+                </div>
+                <!-- /CHANGE -->
 
-                        <!-- FETCH Embedding MODELS Button -->
-                        <button type="button" class="btn btn-secondary" id="fetch_embedding_models_btn">
-                            Fetch Embedding Models
-                        </button>
-                    </div>
-                    <!-- SHOW ADVANCED for Embeddings (API version, etc.) -->
-                    <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
-                       data-bs-target="#advancedEmbeddingsFields" aria-expanded="false"
-                       aria-controls="advancedEmbeddingsFields">
-                       Show Advanced
-                    </a>
-                    <div class="collapse" id="advancedEmbeddingsFields">
-                        <div class="card card-body mt-2">
-                            <div class="mb-3">
-                                <label for="azure_openai_embedding_api_version" class="form-label">
-                                    Azure OpenAI Embedding API Version
-                                </label>
-                                <input type="text" class="form-control" id="azure_openai_embedding_api_version"
-                                       name="azure_openai_embedding_api_version"
-                                       value="{{ settings.azure_openai_embedding_api_version or '' }}">
+                <!-- CHANGE: Wrap non-APIM fields for Embeddings -->
+                <div id="non_apim_embedding_settings" {% if settings.enable_embedding_apim %}style="display: none;"{% endif %}>
+                    <div class="card p-3 mb-3">
+                        <div class="mb-3">
+                            <label for="azure_openai_embedding_endpoint" class="form-label">
+                                Azure OpenAI Embedding Endpoint
+                            </label>
+                            <input type="text" class="form-control" id="azure_openai_embedding_endpoint"
+                                   name="azure_openai_embedding_endpoint"
+                                   value="{{ settings.azure_openai_embedding_endpoint or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_embedding_authentication_type" class="form-label">
+                                Authentication Type
+                            </label>
+                            <select class="form-select" id="azure_openai_embedding_authentication_type"
+                                    name="azure_openai_embedding_authentication_type">
+                                <option value="key"
+                                    {% if settings.azure_openai_embedding_authentication_type=='key' %}selected{% endif %}>
+                                    Key
+                                </option>
+                                <option value="managed_identity"
+                                    {% if settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
+                                    Managed Identity
+                                </option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_embedding_subscription_id" class="form-label">Subscription ID</label>
+                            <input type="text" class="form-control" id="azure_openai_embedding_subscription_id"
+                                   name="azure_openai_embedding_subscription_id"
+                                   value="{{ settings.azure_openai_embedding_subscription_id or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_openai_embedding_resource_group" class="form-label">Resource Group</label>
+                            <input type="text" class="form-control" id="azure_openai_embedding_resource_group"
+                                   name="azure_openai_embedding_resource_group"
+                                   value="{{ settings.azure_openai_embedding_resource_group or '' }}">
+                        </div>
+                        <div class="mb-3" id="embedding_key_container"
+                             {% if settings.azure_openai_embedding_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                            <label for="azure_openai_embedding_key" class="form-label">Azure OpenAI Embedding Key</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="azure_openai_embedding_key"
+                                       name="azure_openai_embedding_key"
+                                       value="{{ settings.azure_openai_embedding_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div id="embedding_models_list" class="mt-2 mb-3">
+                                <!-- Dynamically show the "all" models returned from /api/models/embedding -->
+                            </div>
+                            <!-- Hidden input that will store the final "selected" Embedding JSON -->
+                            <input type="hidden" name="embedding_model_json" id="embedding_model_json" />
+
+                            <!-- Also hidden input for the actual selected deployment name -->
+                            <input type="hidden" id="embedding_model" value="" />
+
+                            <!-- FETCH Embedding MODELS Button -->
+                            <button type="button" class="btn btn-secondary" id="fetch_embedding_models_btn">
+                                Fetch Embedding Models
+                            </button>
+                        </div>
+                        <!-- SHOW ADVANCED for Embeddings -->
+                        <a href="#" class="fw-bold text-decoration-none mb-2" data-bs-toggle="collapse"
+                           data-bs-target="#advancedEmbeddingsFields" aria-expanded="false"
+                           aria-controls="advancedEmbeddingsFields">
+                           Show Advanced
+                        </a>
+                        <div class="collapse" id="advancedEmbeddingsFields">
+                            <div class="card card-body mt-2">
+                                <div class="mb-3">
+                                    <label for="azure_openai_embedding_api_version" class="form-label">
+                                        Azure OpenAI Embedding API Version
+                                    </label>
+                                    <input type="text" class="form-control" id="azure_openai_embedding_api_version"
+                                           name="azure_openai_embedding_api_version"
+                                           value="{{ settings.azure_openai_embedding_api_version or '' }}">
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <!-- /CHANGE -->
+
+                <!-- CHANGE: APIM Embeddings fields -->
+                <div id="apim_embedding_settings" class="card p-3 mb-3"
+                     {% if not settings.enable_embedding_apim %}style="display: none;"{% endif %}>
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_endpoint" class="form-label">Azure APIM Endpoint</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_endpoint"
+                               name="azure_apim_embedding_endpoint"
+                               value="{{ settings.azure_apim_embedding_endpoint or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_api_version" class="form-label">Azure APIM API Version</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_api_version"
+                               name="azure_apim_embedding_api_version"
+                               value="{{ settings.azure_apim_embedding_api_version or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_deployment" class="form-label">Azure APIM Deployment</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_deployment"
+                               name="azure_apim_embedding_deployment"
+                               value="{{ settings.azure_apim_embedding_deployment or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_apim_embedding_subscription_key"
+                                   name="azure_apim_embedding_subscription_key"
+                                   value="{{ settings.azure_apim_embedding_subscription_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_embedding_subscription_key">Show</button>
+                        </div>
+                    </div>                   
+                </div>
+                <!-- /CHANGE -->
 
                 <!-- Test Embeddings Button -->
                 <button type="button" class="btn btn-secondary" id="test_embedding_button">
@@ -289,17 +379,29 @@
                 <p class="text-muted">
                     Configure image generation settings. Enable/disable, set endpoints, and choose a model.
                 </p>
-                <div class="card p-3">
-                    <div class="form-group form-check form-switch mb-3">
-                        <input type="checkbox" class="form-check-input" id="enable_image_generation"
-                               name="enable_image_generation" 
-                               {% if settings.enable_image_generation %}checked{% endif %}>
-                        <label class="form-check-label ms-2" for="enable_image_generation">
-                            Enable Image Generation
-                        </label>
+
+                <!-- Existing "Enable Image Generation" toggle -->
+                <div class="form-group form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="enable_image_generation"
+                           name="enable_image_generation" 
+                           {% if settings.enable_image_generation %}checked{% endif %}>
+                    <label class="form-check-label ms-2" for="enable_image_generation">
+                        Enable Image Generation
+                    </label>
+                </div>
+                <div id="image_gen_settings" 
+                     {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
+                     
+                    <!-- CHANGE: Move "Enable APIM" to top of the image generation tab content -->
+                    <div class="form-group form-check form-switch mb-3 d-flex align-items-center">
+                        <input type="checkbox" class="form-check-input me-2" id="enable_image_gen_apim" name="enable_image_gen_apim"
+                               {% if settings.enable_image_gen_apim %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_image_gen_apim">Enable APIM</label>
                     </div>
-                    <div id="image_gen_settings" 
-                         {% if not settings.enable_image_generation %}style="display: none;"{% endif %}>
+                    <!-- /CHANGE -->
+
+                    <!-- CHANGE: Wrap non-APIM image generation fields -->
+                    <div id="non_apim_image_gen_settings" {% if settings.enable_image_gen_apim %}style="display: none;"{% endif %}>
                         <div class="mb-3">
                             <label for="azure_openai_image_gen_endpoint" class="form-label">
                                 Azure OpenAI Image Generation Endpoint
@@ -335,22 +437,22 @@
                             <input type="text" class="form-control" id="azure_openai_image_gen_resource_group"
                                    name="azure_openai_image_gen_resource_group"
                                    value="{{ settings.azure_openai_image_gen_resource_group or '' }}">
-                        </div>                        
+                        </div>
                         <div class="mb-3" id="image_gen_key_container"
-                            {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
+                             {% if settings.azure_openai_image_gen_authentication_type != 'key' %}style="display: none;"{% endif %}>
                             <label for="azure_openai_image_gen_key" class="form-label">Azure OpenAI Image Generation Key</label>
                             <div class="input-group">
                                 <input type="password" class="form-control" id="azure_openai_image_gen_key"
-                                    name="azure_openai_image_gen_key"
-                                    value="{{ settings.azure_openai_image_gen_key or '' }}">
-                                <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
+                                       name="azure_openai_image_gen_key"
+                                       value="{{ settings.azure_openai_image_gen_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div id="image_models_list" class="mt-2 mb-3">
                                 <!-- Dynamically show the "all" models returned from /api/models/embedding -->
                             </div>
-                            <!-- Hidden input that will store the final "selected" Embedding JSON -->
+                            <!-- Hidden input that will store the final "selected" model JSON -->
                             <input type="hidden" name="image_gen_model_json" id="image_gen_model_json" />
 
                             <!-- Also hidden input for the actual selected deployment name -->
@@ -380,6 +482,40 @@
                             </div>
                         </div>
                     </div>
+                    <!-- /CHANGE -->
+
+                    <!-- CHANGE: APIM fields for Image Generation -->
+                    <div id="apim_image_gen_settings" class="card p-3 mb-3"
+                         {% if not settings.enable_image_gen_apim %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label for="azure_apim_image_gen_endpoint" class="form-label">Azure APIM Endpoint</label>
+                            <input type="text" class="form-control" id="azure_apim_image_gen_endpoint"
+                                   name="azure_apim_image_gen_endpoint"
+                                   value="{{ settings.azure_apim_image_gen_endpoint or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_apim_image_gen_api_version" class="form-label">Azure APIM API Version</label>
+                            <input type="text" class="form-control" id="azure_apim_image_gen_api_version"
+                                   name="azure_apim_image_gen_api_version"
+                                   value="{{ settings.azure_apim_image_gen_api_version or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_apim_image_gen_deployment" class="form-label">Azure APIM Deployment</label>
+                            <input type="text" class="form-control" id="azure_apim_image_gen_deployment"
+                                   name="azure_apim_image_gen_deployment"
+                                   value="{{ settings.azure_apim_image_gen_deployment or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="azure_apim_image_gen_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="azure_apim_image_gen_subscription_key"
+                                       name="azure_apim_image_gen_subscription_key"
+                                       value="{{ settings.azure_apim_image_gen_subscription_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_image_gen_subscription_key">Show</button>
+                            </div>
+                        </div>                   
+                    </div>
+                    <!-- /CHANGE -->
                 </div>
 
                 <!-- Test Image Connection Button -->
@@ -490,607 +626,17 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Render whatever is in memory on page load
-        renderGPTModels();
-        renderEmbeddingModels();
-        renderImageModels();
-    });
-
-    function renderGPTModels() {
-        const listDiv = document.getElementById('gpt_models_list');
-        
-        if (!gptAll || gptAll.length === 0) {
-            listDiv.innerHTML = '<p class="text-warning">No GPT models found. Click "Fetch GPT Models" to populate.</p>';
-            return;
-        }
-
-        let html = '<ul class="list-group">';
-        gptAll.forEach(m => {
-            // Check if this item is currently in the selected array
-            const isSelected = gptSelected.some(sel =>
-                sel.deploymentName === m.deploymentName && 
-                sel.modelName === m.modelName
-            );
-
-            // If it’s selected, you can highlight or disable the button
-            const buttonLabel = isSelected ? 'Selected' : 'Select';
-            const buttonDisabled = isSelected ? 'disabled' : '';
-
-            html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
-                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
-                        onclick="selectGptModel('${m.deploymentName}', '${m.modelName}')">
-                        ${buttonLabel}
-                    </button>
-                </li>
-            `;
-        });
-        html += '</ul>';
-
-        listDiv.innerHTML = html;
-    }
-
-    function renderEmbeddingModels() {
-        const listDiv = document.getElementById('embedding_models_list');
-        
-        if (!embeddingAll || embeddingAll.length === 0) {
-            listDiv.innerHTML = '<p class="text-warning">No embedding models found. Click "Fetch Embedding Models" to populate.</p>';
-            return;
-        }
-
-        let html = '<ul class="list-group">';
-        embeddingAll.forEach(m => {
-            const isSelected = embeddingSelected.some(sel => 
-                sel.deploymentName === m.deploymentName && 
-                sel.modelName === m.modelName
-            );
-
-            const buttonLabel = isSelected ? 'Selected' : 'Select';
-            const buttonDisabled = isSelected ? 'disabled' : '';
-
-            html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
-                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
-                        onclick="selectEmbeddingModel('${m.deploymentName}', '${m.modelName}')">
-                        ${buttonLabel}
-                    </button>
-                </li>
-            `;
-        });
-        html += '</ul>';
-
-        listDiv.innerHTML = html;
-    }
-
-    function renderImageModels() {
-        const listDiv = document.getElementById('image_models_list');
-        
-        if (!imageAll || imageAll.length === 0) {
-            listDiv.innerHTML = '<p class="text-warning">No image models found. Click "Fetch Image Models" to populate.</p>';
-            return;
-        }
-
-        let html = '<ul class="list-group">';
-        imageAll.forEach(m => {
-            const isSelected = imageSelected.some(sel =>
-                sel.deploymentName === m.deploymentName && 
-                sel.modelName === m.modelName
-            );
-
-            const buttonLabel = isSelected ? 'Selected' : 'Select';
-            const buttonDisabled = isSelected ? 'disabled' : '';
-
-            html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${m.deploymentName} (Model: ${m.modelName})</span>
-                    <button class="btn btn-sm btn-primary" ${buttonDisabled}
-                        onclick="selectImageModel('${m.deploymentName}', '${m.modelName}')">
-                        ${buttonLabel}
-                    </button>
-                </li>
-            `;
-        });
-        html += '</ul>';
-
-        listDiv.innerHTML = html;
-    }
-    ///////////////////////////////////////////////////////////////////////////
-    //  GPT: FETCH AND SELECT
-    ///////////////////////////////////////////////////////////////////////////
-    document.getElementById('fetch_gpt_models_btn').addEventListener('click', async () => {
-        const listDiv = document.getElementById('gpt_models_list');
-        listDiv.innerHTML = 'Fetching...';
-
-        try {
-            const resp = await fetch('/api/models/gpt');
-            const data = await resp.json();
-
-            if (resp.ok) {
-                if (data.models && data.models.length > 0) {
-                    gptAll = data.models;
-                    renderGPTModels();
-                    updateGptHiddenInput();
-
-                } else {
-                    listDiv.innerHTML = '<p class="text-warning">No GPT models found</p>';
-                }
-            } else {
-                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
-            }
-        } catch (err) {
-            listDiv.innerHTML = `<p class="text-danger">Error fetching GPT models: ${err.message}</p>`;
-        }
-    });
-
-    let gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}');
-    let gptAll = JSON.parse('{{ settings.gpt_model.all|tojson()|safe }}');
-
-    window.selectGptModel = (deploymentName, modelName) => {
-        gptSelected = [{ deploymentName, modelName }];
-        document.getElementById('gpt_model').value = deploymentName;
-        renderGPTModels();
-        updateGptHiddenInput();
-        alert(`Selected GPT model: ${deploymentName}`);
-    };
-
-    function updateGptHiddenInput() {
-        const payload = {
-            selected: gptSelected,
-            all: gptAll
-        };
-        document.getElementById('gpt_model_json').value = JSON.stringify(payload);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    //  EMBEDDINGS: FETCH AND SELECT
-    ///////////////////////////////////////////////////////////////////////////
-    document.getElementById('fetch_embedding_models_btn').addEventListener('click', async () => {
-        const listDiv = document.getElementById('embedding_models_list');
-        listDiv.innerHTML = 'Fetching...';
-
-        try {
-            const resp = await fetch('/api/models/embedding');
-            const data = await resp.json();
-
-            if (resp.ok) {
-                if (data.models && data.models.length > 0) {
-                    embeddingAll = data.models;
-                    renderEmbeddingModels();
-                    updateEmbeddingHiddenInput();
-
-                } else {
-                    listDiv.innerHTML = '<p class="text-warning">No embedding models found</p>';
-                }
-            } else {
-                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
-            }
-        } catch (err) {
-            listDiv.innerHTML = `<p class="text-danger">Error fetching embedding models: ${err.message}</p>`;
-        }
-    });
-
-
-    let embeddingSelected = JSON.parse('{{ settings.embedding_model.selected|tojson()|safe }}');
-    let embeddingAll = JSON.parse('{{ settings.embedding_model.all|tojson()|safe }}');
-
-    window.selectEmbeddingModel = (deploymentName, modelName) => {
-        embeddingSelected = [{ deploymentName, modelName }];
-        document.getElementById('embedding_model').value = deploymentName;
-        renderEmbeddingModels();
-        updateEmbeddingHiddenInput();
-        alert(`Selected embedding model: ${deploymentName}`);
-    };
-
-    function updateEmbeddingHiddenInput() {
-        const payload = {
-            selected: embeddingSelected,
-            all: embeddingAll
-        };
-        document.getElementById('embedding_model_json').value = JSON.stringify(payload);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    //  IMAGE: FETCH AND SELECT
-    ///////////////////////////////////////////////////////////////////////////
-    document.getElementById('fetch_image_models_btn').addEventListener('click', async () => {
-        const listDiv = document.getElementById('image_models_list');
-        listDiv.innerHTML = 'Fetching...';
-
-        try {
-            const resp = await fetch('/api/models/image');
-            const data = await resp.json();
-
-            if (resp.ok) {
-                if (data.models && data.models.length > 0) {
-                    imageAll = data.models;
-                    renderImageModels();
-                    updateImageHiddenInput();
-
-                } else {
-                    listDiv.innerHTML = '<p class="text-warning">No image models found</p>';
-                }
-            } else {
-                listDiv.innerHTML = `<p class="text-danger">Error: ${data.error || 'Unknown error'}</p>`;
-            }
-        } catch (err) {
-            listDiv.innerHTML = `<p class="text-danger">Error fetching Image models: ${err.message}</p>`;
-        }
-    });
-
-    let imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}');
-    let imageAll = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}');
-
-    window.selectImageModel = (deploymentName, modelName) => {
-        imageSelected = [{ deploymentName, modelName }];
-        document.getElementById('image_gen_model').value = deploymentName;
-        renderImageModels();
-        updateImageHiddenInput();
-        alert(`Selected image model: ${deploymentName}`);
-    };
-
-    function updateImageHiddenInput() {
-        const payload = { 
-            selected: imageSelected, 
-            all: imageAll };
-        document.getElementById('image_gen_model_json').value = JSON.stringify(payload);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    //  TOGGLES & COLLAPSING FIELDS
-    ///////////////////////////////////////////////////////////////////////////
-    // GPT Auth Type
-    document.getElementById('azure_openai_gpt_authentication_type')
-        .addEventListener('change', function () {
-            document.getElementById('gpt_key_container').style.display =
-                (this.value === 'key') ? 'block' : 'none';
-        });
-
-    // Embeddings Auth Type
-    document.getElementById('azure_openai_embedding_authentication_type')
-        .addEventListener('change', function () {
-            document.getElementById('embedding_key_container').style.display =
-                (this.value === 'key') ? 'block' : 'none';
-        });
-
-    // Image Auth Type
-    document.getElementById('azure_openai_image_gen_authentication_type')
-        .addEventListener('change', function () {
-            document.getElementById('image_gen_key_container').style.display =
-                (this.value === 'key') ? 'block' : 'none';
-        });
-
-    // Enable/disable Image Gen
-    document.getElementById('enable_image_generation')
-        .addEventListener('change', function () {
-            document.getElementById('image_gen_settings').style.display =
-                this.checked ? 'block' : 'none';
-        });
-
-    // External APIs
-    document.getElementById('use_external_apis')
-        .addEventListener('change', function () {
-            document.getElementById('external_apis_settings').style.display =
-                this.checked ? 'block' : 'none';
-        });
-
-    // Web Search
-    document.getElementById('enable_web_search')
-        .addEventListener('change', function () {
-            document.getElementById('web_search_settings').style.display =
-                this.checked ? 'block' : 'none';
-        });
-
-    ///////////////////////////////////////////////////////////////////////////
-    //  SHOW/HIDE KEY FIELDS
-    ///////////////////////////////////////////////////////////////////////////
-    document.getElementById('toggle_gpt_key').addEventListener('click', function () {
-        const inp = document.getElementById('azure_openai_gpt_key');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            this.textContent = 'Hide';
-        } else {
-            inp.type = 'password';
-            this.textContent = 'Show';
-        }
-    });
-    document.getElementById('toggle_embedding_key').addEventListener('click', function () {
-        const inp = document.getElementById('azure_openai_embedding_key');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            this.textContent = 'Hide';
-        } else {
-            inp.type = 'password';
-            this.textContent = 'Show';
-        }
-    });
-    document.getElementById('toggle_image_gen_key').addEventListener('click', function () {
-        const inp = document.getElementById('azure_openai_image_gen_key');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            this.textContent = 'Hide';
-        } else {
-            inp.type = 'password';
-            this.textContent = 'Show';
-        }
-    });
-
-    document.getElementById('toggle_bing_search_key').addEventListener('click', function () {
-        const inp = document.getElementById('bing_search_key');
-        if (inp.type === 'password') {
-            inp.type = 'text';
-            this.textContent = 'Hide';
-        } else {
-            inp.type = 'password';
-            this.textContent = 'Show';
-        }
-    });
-
-
-    // ------------------------------------------------------------------------
-    //  Test GPT Connection
-    // ------------------------------------------------------------------------
-    document.getElementById('test_gpt_button').addEventListener('click', async function () {
-        const resultDiv = document.getElementById('test_gpt_result');
-        resultDiv.innerHTML = 'Testing GPT...';
-
-        // Get endpoint, API version, authentication type, and key from their input fields.
-        let endpoint = document.getElementById('azure_openai_gpt_endpoint').value.trim();
-        if (endpoint.endsWith('/')) {
-            endpoint = endpoint.slice(0, -1);
-        }
-        const apiVersion = document.getElementById('azure_openai_gpt_api_version').value.trim();
-        const authType = document.getElementById('azure_openai_gpt_authentication_type').value;
-        const gptKey = document.getElementById('azure_openai_gpt_key').value.trim();
-
-        if (!endpoint) {
-            resultDiv.innerHTML = 'Please provide a GPT Endpoint.';
-            return;
-        }
-
-        // Get the selected GPT model from the Cosmos settings structure.
-        const selectedModel = (gptSelected && gptSelected.length > 0) ? gptSelected[0] : null;
-        if (!selectedModel) {
-            resultDiv.innerHTML = 'Please select a GPT model first.';
-            return;
-        }
-        const deploymentName = selectedModel.deploymentName;
-        const modelName = selectedModel.modelName;
-
-        // Determine if this is a "chat" model
-        const isChatModel = (
-            modelName.toLowerCase().includes("gpt") ||
-            modelName.toLowerCase().includes("o1") ||
-            modelName.toLowerCase().includes("o3")
-        );
-
-        // Construct the URL based on model type.
-        let testUrl;
-        if (isChatModel) {
-            testUrl = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
-        } else {
-            testUrl = `${endpoint}/openai/deployments/${deploymentName}/completions?api-version=${apiVersion}`;
-        }
-
-        // Build the test payload.
-        let testPayload;
-        if (isChatModel) {
-            testPayload = {
-                messages: [
-                    { role: "user", content: "Hello GPT!" }
-                ],
-                max_tokens: 50
-            };
-        } else {
-            testPayload = {
-                prompt: "Hello GPT!",
-                max_tokens: 50
-            };
-        }
-
-        try {
-            // Prepare headers. For key-based authentication, include the "api-key" header.
-            const headers = { "Content-Type": "application/json" };
-            if (authType === "key" && gptKey) {
-                headers["api-key"] = gptKey;
-            }
-
-            // Send the test request.
-            const response = await fetch(testUrl, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(testPayload)
-            });
-
-            if (response.ok) {
-                resultDiv.innerHTML = 'GPT endpoint test succeeded!';
-            } else {
-                const errorText = await response.text();
-                resultDiv.innerHTML = 
-                `GPT endpoint returned error (HTTP ${response.status}): ${errorText}`;
-            }
-
-        } catch (error) {
-            resultDiv.innerHTML = 'Failed to connect to GPT Endpoint: ' + error.message;
-        }
-    });
-
-
-
-    // ------------------------------------------------------------------------
-    //  Test Embeddings Connection
-    // ------------------------------------------------------------------------
-    document.getElementById('test_embedding_button').addEventListener('click', async function () {
-        const resultDiv = document.getElementById('test_embedding_result');
-        resultDiv.innerHTML = 'Testing Embeddings...';
-
-        // Get endpoint, API version, authentication type, and key from their input fields.
-        const endpoint = document.getElementById('azure_openai_embedding_endpoint').value.trim();
-        if (endpoint.endsWith('/')) {
-            endpoint = endpoint.slice(0, -1);
-        }
-        const apiVersion = document.getElementById('azure_openai_embedding_api_version').value.trim();
-        const authType = document.getElementById('azure_openai_embedding_authentication_type').value;
-        const embedKey = document.getElementById('azure_openai_embedding_key').value.trim();
-
-        if (!endpoint) {
-            resultDiv.innerHTML = 'Please provide an Embedding Endpoint.';
-            return;
-        }
-
-        // Get the selected Embedding model from the Cosmos settings structure.
-        const selectedEmbedding = (embeddingSelected && embeddingSelected.length > 0) ? embeddingSelected[0] : null;
-        if (!selectedEmbedding) {
-            resultDiv.innerHTML = 'Please select an Embedding model first.';
-            return;
-        }
-        const deploymentName = selectedEmbedding.deploymentName;
-        // The model name can be used to further adjust your test payload if needed.
-        // const modelName = selectedEmbedding.modelName;
-
-        // Construct the test URL.
-        // Format: <endpoint>/openai/deployments/<deploymentName>/embeddings?api-version=<apiVersion>
-        const testUrl = `${endpoint}/openai/deployments/${deploymentName}/embeddings?api-version=${apiVersion}`;
-
-        const testPayload = {
-            input: 'Hello world'
-        };
-
-        try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (authType === 'key' && embedKey) {
-                headers['api-key'] = embedKey;
-            }
-
-            const response = await fetch(testUrl, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(testPayload)
-            });
-
-            if (response.ok) {
-                resultDiv.innerHTML = 'Embedding endpoint test succeeded!';
-            } else {
-                const errorText = await response.text();
-                resultDiv.innerHTML = 
-                `Embedding endpoint returned error (HTTP ${response.status}): ${errorText}`;
-            }
-
-        } catch (error) {
-            resultDiv.innerHTML = 'Failed to connect to Embedding Endpoint: ' + error.message;
-        }
-    });
-
-    // ------------------------------------------------------------------------
-    //  Test Image Connection
-    // ------------------------------------------------------------------------
-    document.getElementById('test_image_button').addEventListener('click', async function () {
-        const resultDiv = document.getElementById('test_image_result');
-        resultDiv.innerHTML = 'Testing Image Generation...';
-
-        // Get the endpoint, API version, authentication type, and key from the corresponding fields.
-        const endpoint = document.getElementById('azure_openai_image_gen_endpoint').value.trim();
-        if (endpoint.endsWith('/')) {
-            endpoint = endpoint.slice(0, -1);
-        }
-        const apiVersion = document.getElementById('azure_openai_image_gen_api_version').value.trim();
-        const authType = document.getElementById('azure_openai_image_gen_authentication_type').value;
-        const imageKey = document.getElementById('azure_openai_image_gen_key').value.trim();
-
-        if (!endpoint) {
-            resultDiv.innerHTML = 'Please provide an Image Generation Endpoint.';
-            return;
-        }
-
-        // Get the selected image generation model from your Cosmos settings structure.
-        // (Assumes you are populating and tracking imageSelected from your Cosmos document.)
-        const selectedImage = (imageSelected && imageSelected.length > 0) ? imageSelected[0] : null;
-        if (!selectedImage) {
-            resultDiv.innerHTML = 'Please select an Image Generation model first.';
-            return;
-        }
-        const deploymentName = selectedImage.deploymentName;
-        // Optionally, you can use modelName for additional logic:
-        // const modelName = selectedImage.modelName;
-
-        // Construct the test URL.
-        // For Azure OpenAI image generation, the endpoint might look like:
-        // <endpoint>/openai/deployments/<deploymentName>/images/generations?api-version=<apiVersion>
-        const testUrl = `${endpoint}/openai/deployments/${deploymentName}/images/generations?api-version=${apiVersion}`;
-
-        // Construct a test payload.
-        // This payload is an example—you may need to adjust parameters to match your API's requirements.
-        const testPayload = {
-            prompt: "Generate an image of a sunset over the mountains.",
-            n: 1,             // Number of images to generate
-            size: "1024x1024" // Image size
-        };
-
-        try {
-            // Prepare headers. For key-based authentication, include the "api-key" header.
-            const headers = { "Content-Type": "application/json" };
-            if (authType === "key" && imageKey) {
-                headers["api-key"] = imageKey;
-            }
-
-            // Send the test request.
-            const response = await fetch(testUrl, {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify(testPayload)
-            });
-
-            if (response.ok) {
-                resultDiv.innerHTML = "Image generation endpoint test succeeded!";
-            } else {
-                const errorText = await response.text();
-                resultDiv.innerHTML = `Image generation endpoint returned error (HTTP ${response.status}): ${errorText}`;
-            }
-        } catch (error) {
-            resultDiv.innerHTML = "Failed to connect to Image Generation Endpoint: " + error.message;
-        }
-    });
-
-
-
-    // ------------------------------------------------------------------------
-    //  Test External APIs Connection
-    // ------------------------------------------------------------------------
-    document.getElementById('test_connection_button').addEventListener('click', function () {
-        var chunkingApiUrl = document.getElementById('external_chunking_api').value.trim();
-        var embeddingApiUrl = document.getElementById('external_embedding_api').value.trim();
-        var resultDiv = document.getElementById('test_connection_result');
-        resultDiv.innerHTML = 'Testing connections...';
-
-        // 1) Check Chunking API
-        if (chunkingApiUrl) {
-            fetch(chunkingApiUrl + '/api/version')
-                .then(response => response.json())
-                .then(data => {
-                    resultDiv.innerHTML = 'Chunking API Connected: ' + data.version;
-                })
-                .catch(error => {
-                    resultDiv.innerHTML = 'Chunking API Connection Failed: ' + error.message;
-                });
-        } else {
-            resultDiv.innerHTML = 'No Chunking API URL provided.<br/>';
-        }
-
-        // 2) Check Embedding API
-        if (embeddingApiUrl) {
-            fetch(embeddingApiUrl + '/api/version')
-                .then(response => response.json())
-                .then(data => {
-                    resultDiv.innerHTML += '<br>Embedding API Connected: ' + data.version;
-                })
-                .catch(error => {
-                    resultDiv.innerHTML += '<br>Embedding API Connection Failed: ' + error.message;
-                });
-        } else {
-            resultDiv.innerHTML += '<br>No Embedding API URL provided.';
-        }
-    });
+  // Put Jinja variables in a global or window variable
+  window.gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}');
+  window.gptAll = JSON.parse('{{ settings.gpt_model.all|tojson()|safe }}');
+
+  window.embeddingSelected = JSON.parse('{{ settings.embedding_model.selected|tojson()|safe }}');
+  window.embeddingAll = JSON.parse('{{ settings.embedding_model.all|tojson()|safe }}');
+
+  window.imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}');
+  window.imageAll = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}');
 </script>
+
+<!-- Then load the external file, which can read from the window.* variables -->
+<script src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
 {% endblock %}

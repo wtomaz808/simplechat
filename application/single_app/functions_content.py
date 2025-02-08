@@ -99,17 +99,24 @@ def generate_embedding(
     retries = 0
     current_delay = initial_delay
 
-    embedding_client = AzureOpenAI(
-        api_version=settings.get('azure_openai_embedding_api_version'),
-        azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
-        api_key=settings.get('azure_openai_embedding_key')
-    )
+    enable_image_gen_apim = settings.get('enable_image_gen_apim', False)
 
-    embedding_model_obj = settings.get('embedding_model', {})
-    if embedding_model_obj and embedding_model_obj.get('selected'):
-        # Typically you’d just take the first selected item
-        selected_embedding_model = embedding_model_obj['selected'][0]  # { "deploymentName": "gpt-4o", "modelName": "gpt-4o" }
-        embedding_model = selected_embedding_model['deploymentName']  # or modelName
+    if enable_image_gen_apim:
+        embedding_model = settings.get('azure_apim_embedding_deployment')
+        embedding_client = AzureOpenAI(
+            api_version = settings.get('azure_apim_embedding_api_version'),
+            azure_endpoint = settings.get('azure_apim_embedding_endpoint'),
+            api_key=settings.get('azure_apim_embedding_subscription_key'))
+    else:
+        embedding_client = AzureOpenAI(
+            api_version=settings.get('azure_openai_embedding_api_version'),
+            azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
+            api_key=settings.get('azure_openai_embedding_key'))
+        
+        embedding_model_obj = settings.get('embedding_model', {})
+        if embedding_model_obj and embedding_model_obj.get('selected'):
+             selected_embedding_model = embedding_model_obj['selected'][0]
+             embedding_model = selected_embedding_model['deploymentName']
 
     while True:
         random_delay = random.uniform(0.5, 2.0)
