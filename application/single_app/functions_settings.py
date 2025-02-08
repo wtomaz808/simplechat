@@ -59,6 +59,8 @@ def get_settings():
             'bing_search_key': '',
             'landing_page_text': 'Click the button below to start chatting with the AI assistant.',
             'enable_gpt_apim': False,
+            'enable_image_gen_apim': False,
+            'enable_embedding_apim': False,
             'azure_apim_gpt_endpoint': '',
             'azure_apim_gpt_subscription_key': '',
             'azure_apim_gpt_deployment': '',
@@ -70,10 +72,8 @@ def get_settings():
             'azure_apim_image_gen_endpoint': '',
             'azure_apim_image_gen_subscription_key': '',
             'azure_apim_image_gen_deployment': '',
-            'azure_apim_image_gen_api_version': '',            
-            'enable_gpt_apim': '',
-            'enable_image_gen_apim': '',
-            'enable_embedding_apim': ''
+            'azure_apim_image_gen_api_version': ''          
+            
         }
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")
