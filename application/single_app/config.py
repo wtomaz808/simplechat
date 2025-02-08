@@ -41,7 +41,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.190.3'
+app.config['VERSION'] = '0.191.0'
 Session(app)
 
 ALLOWED_EXTENSIONS = {
