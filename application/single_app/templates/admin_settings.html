@@ -183,6 +183,47 @@
                     </div>
                 </div>
 
+                <div class="form-group form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="enable_gpt_apim" name="enable_gpt_apim"
+                           {% if settings.enable_gpt_apim %}checked{% endif %}>
+                    <label class="form-check-label ms-2" for="enable_gpt_apim">
+                        Enable APIM
+                    </label>
+                </div>
+
+                <div id="apim_gpt_settings" class="card p-3 mb-3" {% if not settings.enable_gpt_apim %}style="display: none;"{% endif %} >                    
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_endpoint" class="form-label">Azure APIM Endpoint</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_endpoint"
+                               name="azure_apim_gpt_endpoint"
+                               value="{{ settings.azure_apim_gpt_endpoint or '' }}">
+                    </div>   
+                    
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_api_version" class="form-label">Azure APIM API Version</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_api_version"
+                               name="azure_apim_gpt_api_version"
+                               value="{{ settings.azure_apim_gpt_api_version or '' }}">
+                    </div>   
+
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_deployment" class="form-label">Azure APIM Deployment</label>
+                        <input type="text" class="form-control" id="azure_apim_gpt_deployment"
+                               name="azure_apim_gpt_deployment"
+                               value="{{ settings.azure_apim_gpt_deployment or '' }}">
+                    </div>   
+
+                    <div class="mb-3">
+                        <label for="azure_apim_gpt_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                        <div class="input-group">                       
+                            <input type="password" class="form-control" id="azure_apim_gpt_subscription_key"
+                                   name="azure_apim_gpt_subscription_key"
+                                   value="{{ settings.azure_apim_gpt_subscription_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_gpt_subscription_key">Show</button>
+                        </div>
+                    </div>                   
+                </div>
+
                 <!-- Test GPT Button -->
                 <button type="button" class="btn btn-secondary" id="test_gpt_button">
                     Test GPT Connection
@@ -277,6 +318,48 @@
                     </div>
                 </div>
 
+                <div class="form-group form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="enable_embedding_apim" name="enable_embedding_apim"
+                           {% if settings.enable_embedding_apim %}checked{% endif %}>
+                    <label class="form-check-label ms-2" for="enable_embedding_apim">
+                        Enable APIM
+                    </label>
+                </div>
+
+                <div id="apim_embedding_settings" class="card p-3 mb-3" {% if not settings.enable_embedding_apim %}style="display: none;"{% endif %} >                    
+                    
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_endpoint" class="form-label">Azure APIM Endpoint</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_endpoint"
+                               name="azure_apim_embedding_endpoint"
+                               value="{{ settings.azure_apim_embedding_endpoint or '' }}">
+                    </div>                     
+                    
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_api_version" class="form-label">Azure APIM API Version</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_api_version"
+                               name="azure_apim_embedding_api_version"
+                               value="{{ settings.azure_apim_embedding_api_version or '' }}">
+                    </div>   
+                    
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_deployment" class="form-label">Azure APIM Deployment</label>
+                        <input type="text" class="form-control" id="azure_apim_embedding_deployment"
+                               name="azure_apim_embedding_deployment"
+                               value="{{ settings.azure_apim_embedding_deployment or '' }}">
+                    </div>   
+
+                    <div class="mb-3">
+                        <label for="azure_apim_embedding_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_apim_embedding_subscription_key"
+                                   name="azure_apim_embedding_subscription_key"
+                                   value="{{ settings.azure_apim_embedding_subscription_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_embedding_subscription_key">Show</button>
+                        </div>
+                    </div>                   
+                </div>
+
                 <!-- Test Embeddings Button -->
                 <button type="button" class="btn btn-secondary" id="test_embedding_button">
                     Test Embeddings Connection
@@ -343,7 +426,7 @@
                                 <input type="password" class="form-control" id="azure_openai_image_gen_key"
                                     name="azure_openai_image_gen_key"
                                     value="{{ settings.azure_openai_image_gen_key or '' }}">
-                                <button type="button" class="btn btn-outline-secondary" id="toggle_embedding_key">Show</button>
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_image_gen_key">Show</button>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -379,8 +462,54 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                        
+                        <div class="form-group form-check form-switch mb-3">
+                            <input type="checkbox" class="form-check-input" id="enable_image_gen_apim" name="enable_image_gen_apim"
+                                   {% if settings.enable_image_gen_apim %}checked{% endif %}>
+                            <label class="form-check-label ms-2" for="enable_image_gen_apim">
+                                Enable APIM
+                            </label>
+                        </div>
+        
+                        <div id="apim_image_gen_settings" class="card p-3 mb-3" {% if not settings.enable_image_gen_apim %}style="display: none;"{% endif %} >                    
+                            <div class="mb-3">
+                                <label for="azure_apim_image_gen_endpoint" class="form-label">Azure APIM Endpoint</label>
+                                <input type="text" class="form-control" id="azure_apim_image_gen_endpoint"
+                                       name="azure_apim_image_gen_endpoint"
+                                       value="{{ settings.azure_apim_image_gen_endpoint or '' }}">
+                            </div>   
+                            
+                            <div class="mb-3">
+                                <label for="azure_apim_image_gen_api_version" class="form-label">Azure APIM API Version</label>
+                                <input type="text" class="form-control" id="azure_apim_image_gen_api_version"
+                                       name="azure_apim_image_gen_api_version"
+                                       value="{{ settings.azure_apim_image_gen_api_version or '' }}">
+                            </div>   
+        
+                            <div class="mb-3">
+                                <label for="azure_apim_image_gen_deployment" class="form-label">Azure APIM Deployment</label>
+                                <input type="text" class="form-control" id="azure_apim_image_gen_deployment"
+                                       name="azure_apim_image_gen_deployment"
+                                       value="{{ settings.azure_apim_image_gen_deployment or '' }}">
+                            </div>   
+
+                            <div class="mb-3">
+                                <label for="azure_apim_image_gen_subscription_key" class="form-label">Azure APIM Subscription Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="azure_apim_image_gen_subscription_key"
+                                           name="azure_apim_image_gen_subscription_key"
+                                           value="{{ settings.azure_apim_image_gen_subscription_key or '' }}">
+                                        <button type="button" class="btn btn-outline-secondary" id="toggle_azure_apim_image_gen_subscription_key">Show</button>
+                                </div>
+                            </div>                   
+                        </div>
+                    </div>                    
                 </div>
+
+
+                
+
+                
 
                 <!-- Test Image Connection Button -->
                 <button type="button" class="btn btn-secondary mt-3" id="test_image_button">
@@ -769,6 +898,27 @@
                 this.checked ? 'block' : 'none';
         });
 
+    // Enable/disable GPT APIM
+    document.getElementById('enable_gpt_apim')
+        .addEventListener('change', function () {
+            document.getElementById('apim_gpt_settings').style.display =
+                this.checked ? 'block' : 'none';
+        }); 
+
+    // Enable/disable Embeddings APIM
+    document.getElementById('enable_embedding_apim')
+        .addEventListener('change', function () {
+            document.getElementById('apim_embedding_settings').style.display =
+                this.checked ? 'block' : 'none';
+        }); 
+     
+    // Enable/disable Image APIM
+    document.getElementById('enable_image_gen_apim')
+        .addEventListener('change', function () {
+            document.getElementById('apim_image_gen_settings').style.display =
+                this.checked ? 'block' : 'none';
+        }); 
+        
     // External APIs
     document.getElementById('use_external_apis')
         .addEventListener('change', function () {
@@ -806,6 +956,7 @@
             this.textContent = 'Show';
         }
     });
+
     document.getElementById('toggle_image_gen_key').addEventListener('click', function () {
         const inp = document.getElementById('azure_openai_image_gen_key');
         if (inp.type === 'password') {
@@ -827,7 +978,39 @@
             this.textContent = 'Show';
         }
     });
+       
+    document.getElementById('toggle_azure_apim_gpt_subscription_key').addEventListener('click', function () {
+        const inp = document.getElementById('azure_apim_gpt_subscription_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            inp.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
 
+    document.getElementById('toggle_azure_apim_embedding_subscription_key').addEventListener('click', function () {
+        const inp = document.getElementById('azure_apim_embedding_subscription_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            inp.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
+
+    document.getElementById('toggle_azure_apim_image_gen_subscription_key').addEventListener('click', function () {
+        const inp = document.getElementById('azure_apim_image_gen_subscription_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            inp.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
 
     // ------------------------------------------------------------------------
     //  Test GPT Connection
