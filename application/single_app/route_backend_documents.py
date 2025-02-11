@@ -171,6 +171,7 @@ def register_route_backend_documents(app):
             return jsonify({"error": "Missing citation_id"}), 400
 
         try:
+            search_client_user = CLIENTS['search_client_user']
             chunk = search_client_user.get_document(key=citation_id)
             if chunk.get("user_id") != user_id:
                 return jsonify({"error": "Unauthorized access to citation"}), 403
@@ -185,6 +186,7 @@ def register_route_backend_documents(app):
             pass
 
         try:
+            search_client_group = CLIENTS['search_client_group']
             group_chunk = search_client_group.get_document(key=citation_id)
 
             return jsonify({

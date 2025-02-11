@@ -98,6 +98,7 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
         }
         chunk_documents.append(chunk_document)
 
+    search_client_user = CLIENTS["search_client_user"]
     search_client_user.upload_documents(documents=chunk_documents)
 
 def get_user_documents(user_id):
@@ -220,6 +221,7 @@ def delete_user_document(user_id, document_id):
 def delete_user_document_chunks(document_id):
     """Delete document chunks from Azure Cognitive Search index."""
     try:
+        search_client_user = CLIENTS["search_client_user"]
         results = search_client_user.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
@@ -255,6 +257,7 @@ def delete_user_document_version(user_id, document_id, version):
         documents_container.delete_item(doc['id'], partition_key=doc['user_id'])
 
 def delete_user_document_version_chunks(document_id, version):
+    search_client_user = CLIENTS["search_client_user"]
     search_client_user.delete_documents(
         actions=[
             {"@search.action": "delete", "id": chunk['id']} for chunk in 

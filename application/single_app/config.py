@@ -42,8 +42,11 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.193.0'
+app.config['VERSION'] = '0.194.5'
 Session(app)
+
+CLIENTS = {}
+CLIENTS_LOCK = threading.Lock()
 
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
@@ -58,19 +61,6 @@ TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
 SCOPE = ["User.Read"]  # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
-
-azure_fr_endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-azure_fr_key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-
-document_intelligence_client = DocumentAnalysisClient(
-    endpoint=azure_fr_endpoint,
-    credential=AzureKeyCredential(azure_fr_key)
-)
-
-AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
-AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
-AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
-AZURE_AI_SEARCH_GROUP_INDEX = os.getenv('AZURE_AI_SEARCH_GROUP_INDEX')
 
 BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
 
@@ -91,18 +81,6 @@ documents_container = database.create_container_if_not_exists(
     id=documents_container_name,
     partition_key=PartitionKey(path="/id"),
     offer_throughput=400
-)
-
-search_client_user = SearchClient(
-    endpoint=AZURE_AI_SEARCH_ENDPOINT,
-    index_name=AZURE_AI_SEARCH_USER_INDEX,
-    credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
-)
-
-search_client_group = SearchClient(
-    endpoint=AZURE_AI_SEARCH_ENDPOINT,
-    index_name=AZURE_AI_SEARCH_GROUP_INDEX,
-    credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
 )
 
 settings_container_name = "settings"
@@ -132,3 +110,40 @@ user_settings_container = database.create_container_if_not_exists(
     partition_key=PartitionKey(path="/id"),
     offer_throughput=400
 )
+
+
+def initialize_clients(settings):
+    """
+    Initialize/re-initialize all your clients based on the provided settings.
+    Store them in a global dictionary so they're accessible throughout the app.
+    """
+    with CLIENTS_LOCK:
+        form_recognizer_endpoint = settings.get("azure_document_intelligence_endpoint")
+        form_recognizer_key = settings.get("azure_document_intelligence_key")
+
+        azure_ai_search_endpoint = settings.get("azure_ai_search_endpoint")
+        azure_ai_search_key = settings.get("azure_ai_search_key")
+
+        document_intelligence_client = DocumentAnalysisClient(
+            endpoint=form_recognizer_endpoint,
+            credential=AzureKeyCredential(form_recognizer_key)
+        )
+
+        search_client_user = SearchClient(
+            endpoint=azure_ai_search_endpoint,
+            index_name="simplechat-user-index",
+            credential=AzureKeyCredential(azure_ai_search_key)
+        )
+
+        search_client_group = SearchClient(
+            endpoint=azure_ai_search_endpoint,
+            index_name="simplechat-group-index",
+            credential=AzureKeyCredential(azure_ai_search_key)
+        )
+
+        CLIENTS["document_intelligence_client"] = document_intelligence_client
+        CLIENTS["search_client_user"] = search_client_user
+        CLIENTS["search_client_group"] = search_client_group
+
+        print("Initialized all clients with current admin settings.")
+        print("After initialize_clients, CLIENTS keys:", CLIENTS.keys())

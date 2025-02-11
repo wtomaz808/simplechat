@@ -14,6 +14,7 @@ def extract_markdown_file(file_path):
 def extract_content_with_azure_di(file_path):
     try:
         with open(file_path, "rb") as f:
+            document_intelligence_client = CLIENTS['document_intelligence_client']
             poller = document_intelligence_client.begin_analyze_document(
                 model_id="prebuilt-read",
                 document=f

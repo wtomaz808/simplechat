@@ -222,6 +222,7 @@ def process_group_document_upload(file, group_id, user_id):
         })
 
     try:
+        search_client_group = CLIENTS['search_client_group']
         search_client_group.upload_documents(documents=chunk_docs)
     except AzureError as ex:
         print("Error uploading group doc chunks to search index:", ex)
@@ -260,6 +261,7 @@ def delete_group_document_chunks(document_id):
     Remove from Azure Search index all chunks whose 'document_id' == document_id
     """
     try:
+        search_client_group = CLIENTS['search_client_group']
         results = search_client_group.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
@@ -302,6 +304,7 @@ def delete_group_document_version_chunks(document_id, version):
     document_id eq {document_id} AND version eq {version}.
     """
     try:
+        search_client_group = CLIENTS['search_client_group']
         search_results = search_client_group.search(
             search_text="*",
             filter=f"document_id eq '{document_id}' and version eq {version}",

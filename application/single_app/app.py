@@ -26,6 +26,11 @@ from route_backend_group_documents import *
 from route_backend_models import *
 
 # =================== Helper Functions ===================
+@app.before_first_request
+def before_first_request():
+    settings = get_settings()
+    initialize_clients(settings)
+
 @app.context_processor
 def inject_settings():
     settings = get_settings()
@@ -128,4 +133,6 @@ register_route_backend_group_documents(app)
 register_route_backend_models(app)
 
 if __name__ == '__main__':
+    settings = get_settings()
+    initialize_clients(settings)
     app.run(debug=True)

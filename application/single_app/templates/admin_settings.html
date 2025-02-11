@@ -43,9 +43,9 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="web-search-tab" data-bs-toggle="tab" data-bs-target="#web-search"
-                    type="button" role="tab" aria-controls="web-search" aria-selected="false">
-                    Web Search
+                <button class="nav-link" id="search-extract-tab" data-bs-toggle="tab" data-bs-target="#search-extract"
+                    type="button" role="tab" aria-controls="search-extract" aria-selected="false">
+                    Search and Extract
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -547,28 +547,70 @@
             </div>
 
             <!-- WEB SEARCH TAB -->
-            <div class="tab-pane fade" id="web-search" role="tabpanel" aria-labelledby="web-search-tab">
+            <div class="tab-pane fade" id="search-extract" role="tabpanel" aria-labelledby="search-extract-tab">
                 <p class="text-muted">
-                    Configure Bing Web Search. Enable or disable web search capabilities and set the API key.
+                    Configure web search, Azure AI Search, and Azure Document Intelligence endpoints.
                 </p>
-                <div class="card p-3">
+                
+                <div class="card p-3 mb-3">
                     <div class="form-group form-check form-switch mb-3">
                         <input type="checkbox" class="form-check-input" id="enable_web_search" name="enable_web_search"
                             {% if settings.enable_web_search %}checked{% endif %}>
                         <label class="form-check-label ms-2" for="enable_web_search">
-                            Enable Web Search
+                            Enable Bing Web Search
                         </label>
                     </div>
-                    <div id="web_search_settings" {% if not settings.enable_web_search %}style="display: none;" {% endif
-                        %}>
+                    <div id="web_search_settings" {% if not settings.enable_web_search %}style="display: none;"{% endif %}>
                         <div class="mb-3">
                             <label for="bing_search_key" class="form-label">Bing Search Key</label>
                             <div class="input-group">
                                 <input type="password" class="form-control" id="bing_search_key" name="bing_search_key"
                                     value="{{ settings.bing_search_key or '' }}">
-                                <button type="button" class="btn btn-outline-secondary"
-                                    id="toggle_bing_search_key">Show</button>
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_bing_search_key">Show</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-3 mb-3">
+                    <h5>Azure AI Search</h5>
+                    <div class="mb-3">
+                        <label for="azure_ai_search_endpoint" class="form-label">Search Endpoint</label>
+                        <input type="text" class="form-control" id="azure_ai_search_endpoint" 
+                               name="azure_ai_search_endpoint"
+                               value="{{ settings.azure_ai_search_endpoint or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_ai_search_key" class="form-label">Search Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_ai_search_key" 
+                                   name="azure_ai_search_key"
+                                   value="{{ settings.azure_ai_search_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_search_key">Show</button>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="card p-3 mb-3">
+                    <h5>Document Intelligence</h5>
+                    <div class="mb-3">
+                        <label for="azure_document_intelligence_endpoint" class="form-label">
+                            Document Intelligence Endpoint
+                        </label>
+                        <input type="text" class="form-control" id="azure_document_intelligence_endpoint"
+                               name="azure_document_intelligence_endpoint"
+                               value="{{ settings.azure_document_intelligence_endpoint or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="azure_document_intelligence_key" class="form-label">
+                            Document Intelligence Key
+                        </label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="azure_document_intelligence_key" 
+                                   name="azure_document_intelligence_key"
+                                   value="{{ settings.azure_document_intelligence_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary" id="toggle_docintel_key">Show</button>
                         </div>
                     </div>
                 </div>

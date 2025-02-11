@@ -415,6 +415,28 @@ document.getElementById('toggle_bing_search_key').addEventListener('click', func
     }
 });
 
+document.getElementById('toggle_search_key').addEventListener('click', function () {
+    const inp = document.getElementById('azure_ai_search_key');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        this.textContent = 'Hide';
+    } else {
+        inp.type = 'password';
+        this.textContent = 'Show';
+    }
+});
+
+document.getElementById('toggle_docintel_key').addEventListener('click', function () {
+    const inp = document.getElementById('azure_document_intelligence_key');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        this.textContent = 'Hide';
+    } else {
+        inp.type = 'password';
+        this.textContent = 'Show';
+    }
+});
+
 // APIM subscription key toggles:
 document.getElementById('toggle_azure_apim_gpt_subscription_key').addEventListener('click', function () {
     const inp = document.getElementById('azure_apim_gpt_subscription_key');

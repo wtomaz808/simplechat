@@ -97,6 +97,10 @@ def register_route_frontend_admin_settings(app):
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_documents = request.form.get('enable_user_documents') == 'on'
             enable_group_documents = request.form.get('enable_group_documents') == 'on'
+            azure_ai_search_endpoint = request.form.get('azure_ai_search_endpoint', '')
+            azure_ai_search_key = request.form.get('azure_ai_search_key', '')
+            azure_document_intelligence_endpoint = request.form.get('azure_document_intelligence_endpoint', '')
+            azure_document_intelligence_key = request.form.get('azure_document_intelligence_key', '')
 
             azure_openai_gpt_endpoint = request.form.get('azure_openai_gpt_endpoint', '')
             azure_openai_gpt_api_version = request.form.get('azure_openai_gpt_api_version', '')
@@ -186,6 +190,10 @@ def register_route_frontend_admin_settings(app):
                 'landing_page_text': landing_page_text,
                 'enable_user_documents': enable_user_documents,
                 'enable_group_documents': enable_group_documents,
+                'azure_ai_search_endpoint': azure_ai_search_endpoint.strip(),
+                'azure_ai_search_key': azure_ai_search_key.strip(),
+                'azure_document_intelligence_endpoint': azure_document_intelligence_endpoint.strip(),
+                'azure_document_intelligence_key': azure_document_intelligence_key.strip(),
 
                 'azure_openai_gpt_endpoint': azure_openai_gpt_endpoint,
                 'azure_openai_gpt_api_version': azure_openai_gpt_api_version,
@@ -236,6 +244,8 @@ def register_route_frontend_admin_settings(app):
 
             update_settings(new_settings)
             settings.update(new_settings)
+
+            initialize_clients(settings)
 
             print("Admin settings updated successfully.")
             return redirect(url_for('admin_settings'))

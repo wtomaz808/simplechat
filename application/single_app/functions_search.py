@@ -14,6 +14,9 @@ def hybrid_search(query, user_id, document_id=None, top_n=3):
     query_embedding = generate_embedding(query)
     if query_embedding is None:
         return None
+    
+    search_client_user = CLIENTS['search_client_user']
+    search_client_group = CLIENTS['search_client_group']
 
     vector_query = VectorizedQuery(
         vector=query_embedding,
