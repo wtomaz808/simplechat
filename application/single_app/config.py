@@ -1,4 +1,5 @@
 # config.py
+
 import os
 import requests
 import uuid
@@ -41,7 +42,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.191.0'
+app.config['VERSION'] = '0.193.0'
 Session(app)
 
 ALLOWED_EXTENSIONS = {
@@ -58,15 +59,6 @@ AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
 SCOPE = ["User.Read"]  # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
 
-# Azure Document Intelligence Configuration
-AZURE_DI_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-AZURE_DI_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-
-document_intelligence_client_old = DocumentIntelligenceClient(
-    endpoint=AZURE_DI_ENDPOINT,
-    credential=AzureKeyCredential(AZURE_DI_KEY)
-)
-
 azure_fr_endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
 azure_fr_key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
 
@@ -75,25 +67,12 @@ document_intelligence_client = DocumentAnalysisClient(
     credential=AzureKeyCredential(azure_fr_key)
 )
 
-# Configure Azure OpenAI
-openai.api_type = "azure"
-openai.api_key = os.getenv("AZURE_OPENAI_KEY")
-openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
-openai.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-llm_model = os.getenv("AZURE_OPENAI_LLM_MODEL")
-embedding_model = os.getenv("AZURE_OPENAI_EMBEDDING_MODEL")
-
-AZURE_OPENAI_GPT_KEY = os.getenv("AZURE_OPENAI_GPT_KEY")
-AZURE_OPENAI_EMBEDDING_KEY = os.getenv("AZURE_OPENAI_EMBEDDING_KEY")
-AZURE_OPENAI_IMAGE_GEN_KEY = os.getenv("AZURE_OPENAI_IMAGE_GEN_KEY")
-
 AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
 AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
 AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
 AZURE_AI_SEARCH_GROUP_INDEX = os.getenv('AZURE_AI_SEARCH_GROUP_INDEX')
 
 BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
-BING_SEARCH_KEY = os.getenv("BING_SEARCH_KEY")
 
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")

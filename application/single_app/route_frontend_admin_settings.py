@@ -10,11 +10,8 @@ def register_route_frontend_admin_settings(app):
     @login_required
     @admin_required
     def admin_settings():
-        # 1) Attempt to fetch the settings from Cosmos:
         settings = get_settings()
 
-        # 2) Make sure the doc has gpt_model, embedding_model, image_gen_model 
-        #    If they're missing or None, fix them so the template doesn't throw an error.
         if 'gpt_model' not in settings or not settings['gpt_model']:
             settings['gpt_model'] = {'selected': [], 'all': []}
         if 'embedding_model' not in settings or not settings['embedding_model']:
@@ -23,9 +20,6 @@ def register_route_frontend_admin_settings(app):
             settings['image_gen_model'] = {'selected': [], 'all': []}
 
         if request.method == 'GET':
-            # If you still want to fetch GPT/embedding/image deployments here, you can. 
-            # Otherwise, your front-end calls /api/models/gpt, etc. on demand. 
-            # Shown here just in case you want to display them on the server side:
             gpt_deployments = []
             embedding_deployments = []
             image_deployments = []
@@ -82,8 +76,6 @@ def register_route_frontend_admin_settings(app):
             except Exception as e:
                 print(f"Error retrieving Image deployments: {e}")
 
-            # If we updated the settings in memory above (to add missing keys),
-            # we can upsert them so it doesn't keep complaining on future loads:
             update_settings(settings)
 
             return render_template(
@@ -103,6 +95,8 @@ def register_route_frontend_admin_settings(app):
             external_chunking_api = request.form.get('external_chunking_api', '')
             external_embedding_api = request.form.get('external_embedding_api', '')
             show_logo = request.form.get('show_logo') == 'on'
+            enable_user_documents = request.form.get('enable_user_documents') == 'on'
+            enable_group_documents = request.form.get('enable_group_documents') == 'on'
 
             azure_openai_gpt_endpoint = request.form.get('azure_openai_gpt_endpoint', '')
             azure_openai_gpt_api_version = request.form.get('azure_openai_gpt_api_version', '')
@@ -130,12 +124,10 @@ def register_route_frontend_admin_settings(app):
             bing_search_key = request.form.get('bing_search_key', '')
             landing_page_text = request.form.get('landing_page_text', '')
 
-            # JSON for GPT, Embeddings, Image
             gpt_model_json = request.form.get('gpt_model_json', '')
             embedding_model_json = request.form.get('embedding_model_json', '')
             image_gen_model_json = request.form.get('image_gen_model_json', '')
 
-            #APIM
             enable_gpt_apim = request.form.get('enable_gpt_apim') == 'on'
             azure_apim_gpt_deployment = request.form.get('azure_apim_gpt_deployment', '')
             azure_apim_gpt_endpoint = request.form.get('azure_apim_gpt_endpoint', '')
@@ -169,7 +161,6 @@ def register_route_frontend_admin_settings(app):
             except:
                 image_gen_model_obj = {'selected': [], 'all': []}
 
-            # Logo upload
             logo_file = request.files.get('logo_file')
             if logo_file and allowed_file(logo_file.filename, allowed_extensions={'png','jpg','jpeg'}):
                 filename = secure_filename(logo_file.filename)
@@ -180,7 +171,6 @@ def register_route_frontend_admin_settings(app):
             else:
                 logo_path_relative = 'images/logo.svg'
 
-            # Build new dict
             new_settings = {
                 'app_title': app_title,
                 'max_file_size_mb': max_file_size_mb,
@@ -194,22 +184,21 @@ def register_route_frontend_admin_settings(app):
                 'enable_web_search': enable_web_search,
                 'bing_search_key': bing_search_key,
                 'landing_page_text': landing_page_text,
+                'enable_user_documents': enable_user_documents,
+                'enable_group_documents': enable_group_documents,
 
-                # GPT
                 'azure_openai_gpt_endpoint': azure_openai_gpt_endpoint,
                 'azure_openai_gpt_api_version': azure_openai_gpt_api_version,
                 'azure_openai_gpt_authentication_type': azure_openai_gpt_authentication_type,
                 'azure_openai_gpt_key': azure_openai_gpt_key,
                 'gpt_model': gpt_model_obj,
 
-                # Embeddings
                 'azure_openai_embedding_endpoint': azure_openai_embedding_endpoint,
                 'azure_openai_embedding_api_version': azure_openai_embedding_api_version,
                 'azure_openai_embedding_authentication_type': azure_openai_embedding_authentication_type,
                 'azure_openai_embedding_key': azure_openai_embedding_key,
                 'embedding_model': embedding_model_obj,
 
-                # Image
                 'enable_image_generation': enable_image_generation,
                 'azure_openai_image_gen_endpoint': azure_openai_image_gen_endpoint,
                 'azure_openai_image_gen_api_version': azure_openai_image_gen_api_version,
@@ -226,7 +215,6 @@ def register_route_frontend_admin_settings(app):
                 'azure_openai_image_gen_subscription_id': azure_openai_image_gen_subscription_id,
                 'azure_openai_image_gen_resource_group': azure_openai_image_gen_resource_group,
 
-                #APIM
                 'enable_gpt_apim': enable_gpt_apim,
                 'azure_apim_gpt_endpoint': azure_apim_gpt_endpoint,
                 'azure_apim_gpt_subscription_key': azure_apim_gpt_subscription_key,

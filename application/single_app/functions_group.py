@@ -1,4 +1,5 @@
 # functions_group.py
+
 from config import *
 from functions_authentication import *
 from functions_settings import *
@@ -59,7 +60,6 @@ def search_groups(search_query, user_id):
         { "name": "@user_id", "value": user_id }
     ]
     if search_query:
-        # You can refine this to also match group name or description
         query += " AND CONTAINS(c.name, @search) "
         params.append({"name": "@search", "value": search_query})
 
@@ -162,7 +162,6 @@ def is_user_in_group(group_doc, user_id):
     if group_doc.get("owner", {}).get("id") == user_id:
         return True
 
-    # Or if userId appears in the 'users' array
     for u in group_doc.get("users", []):
         if u["userId"] == user_id:
             return True

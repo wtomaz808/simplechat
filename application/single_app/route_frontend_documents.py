@@ -2,6 +2,7 @@
 
 from config import *
 from functions_authentication import *
+from functions_settings import *
 
 def register_route_frontend_documents(app):
     @app.route('/documents', methods=['GET'])
@@ -9,7 +10,12 @@ def register_route_frontend_documents(app):
     @user_required
     def documents():
         user_id = get_current_user_id()
+        
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
+        
+        if not get_settings().get('enable_user_documents', True):
+            return "User Documents feature is disabled by the admin.", 403
+        
         return render_template('documents.html')

@@ -3,7 +3,6 @@
 {% block title %}Chats - AI Chat Application{% endblock %}
 
 {% block head %}
-    <!-- Include any additional CSS or styles -->
     <link rel="stylesheet" href="/static/css/chats.css">
 {% endblock %}
 
@@ -45,6 +44,7 @@
                         <span class="search-btn-text">Image</span>
                     </button>
                     {% endif %}
+                    {% if settings.enable_user_documents or settings.enable_group_documents %}
                     <!-- Search Documents Button -->
                     <button
                         id="search-documents-btn"
@@ -56,6 +56,7 @@
                         <i class="bi bi-file-earmark-text"></i>
                         <span class="search-btn-text">Search Documents</span>
                     </button>
+                    {% endif %}
                     <!-- Search Web Button -->
                     {% if settings.enable_web_search  %}
                     <button
@@ -122,6 +123,5 @@
 {% endblock %}
 
 {% block scripts %}
-    <!-- Include your external JavaScript file -->
-    <script src="/static/js/chats.js"></script>
+<script src="{{ url_for('static', filename='js/chats.js') }}"></script>
 {% endblock %}

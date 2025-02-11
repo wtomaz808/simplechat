@@ -1,4 +1,5 @@
 # functions_group_documents.py
+
 from config import *
 from functions_content import *
 from functions_content import *
@@ -55,7 +56,7 @@ def get_group_document(group_id, document_id):
             query=query, parameters=params, enable_cross_partition_query=True
         ))
         if not results:
-            return None  # not found
+            return None
         return results[0]
     except Exception as ex:
         print(f"Error in get_group_document: {ex}")
@@ -142,7 +143,6 @@ def process_group_document_upload(file, group_id, user_id):
     if file_ext.replace('.', '') not in ALLOWED_EXTENSIONS:
         raise Exception("Unsupported file extension")
 
-    # Check file size
     file.seek(0, os.SEEK_END)
     file_length = file.tell()
     max_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
@@ -150,12 +150,10 @@ def process_group_document_upload(file, group_id, user_id):
         raise Exception("File size exceeds maximum allowed size")
     file.seek(0)
 
-    # Save to temp
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
         file.save(tmp_file.name)
         temp_file_path = tmp_file.name
 
-    # Extract text
     try:
         if file_ext in ['.pdf', '.docx', '.xlsx', '.pptx', '.html',
                         '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif']:
@@ -172,10 +170,8 @@ def process_group_document_upload(file, group_id, user_id):
     finally:
         os.remove(temp_file_path)
 
-    # Chunk & embed
     chunks = chunk_text(extracted)
 
-    # Check existing doc version
     existing_query = """
         SELECT c.version
         FROM c
@@ -192,7 +188,6 @@ def process_group_document_upload(file, group_id, user_id):
     ))
     version = max(d['version'] for d in existing_docs) + 1 if existing_docs else 1
 
-    # Insert metadata doc
     document_id = str(uuid4())
     now_utc = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -208,10 +203,9 @@ def process_group_document_upload(file, group_id, user_id):
     }
     group_documents_container.upsert_item(doc_metadata)
 
-    # Build chunk docs for Azure Search
     chunk_docs = []
     for idx, text_chunk in enumerate(chunks):
-        embedding = generate_embedding(text_chunk)  # from your OpenAI / Azure AI code
+        embedding = generate_embedding(text_chunk)
         chunk_id = f"{document_id}_{idx}"
 
         chunk_docs.append({
@@ -227,12 +221,10 @@ def process_group_document_upload(file, group_id, user_id):
             "version": version
         })
 
-    # Upload chunk docs to Azure Search
     try:
         search_client_group.upload_documents(documents=chunk_docs)
     except AzureError as ex:
         print("Error uploading group doc chunks to search index:", ex)
-        # handle or raise
 
     return True
 
@@ -244,16 +236,12 @@ def delete_group_document(group_id, document_id):
     
     If you only want to delete the *latest version*, use delete_group_document_version instead.
     """
-    # 1) Verify the doc_id belongs to this group
     doc_item = get_group_document(group_id, document_id)
     if not doc_item:
         raise Exception("Document not found or group mismatch")
 
-    # 2) Gather *all versions* of the doc from Cosmos
-    #    then delete them
     doc_versions = get_group_document_versions(group_id, document_id)
     for ver_doc in doc_versions:
-        # Remove each version doc
         try:
             group_documents_container.delete_item(
                 item=ver_doc['id'],
@@ -262,7 +250,6 @@ def delete_group_document(group_id, document_id):
         except exceptions.CosmosResourceNotFoundError:
             pass
 
-    # 3) Delete the chunk docs from search index
     delete_group_document_chunks(document_id)
 
     return True
@@ -273,7 +260,6 @@ def delete_group_document_chunks(document_id):
     Remove from Azure Search index all chunks whose 'document_id' == document_id
     """
     try:
-        # Query the search index for chunk docs with matching doc_id
         results = search_client_group.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
@@ -284,7 +270,6 @@ def delete_group_document_chunks(document_id):
         if not chunk_ids:
             return
 
-        # Build the delete batch
         docs_to_delete = [{"id": cid} for cid in chunk_ids]
         batch = IndexDocumentsBatch()
         batch.add_delete_actions(docs_to_delete)
@@ -299,18 +284,15 @@ def delete_group_document_version(group_id, document_id, version):
     Deletes exactly one version from Cosmos, plus those chunk docs from search index.
     Does not remove older/newer versions.
     """
-    # 1) find that version doc
     version_doc = get_group_document_version(group_id, document_id, version)
     if not version_doc:
         raise Exception("Document version not found or group mismatch")
 
-    # 2) delete it in cosmos
     group_documents_container.delete_item(
         item=version_doc['id'],
         partition_key=version_doc['id']
     )
 
-    # 3) delete chunk docs for that version from search
     delete_group_document_version_chunks(document_id, version)
 
 

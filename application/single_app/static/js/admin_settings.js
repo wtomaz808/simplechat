@@ -1,3 +1,5 @@
+// js/admin_settings.js
+
 // Use the already-defined window.* vars (if they exist) or default to empty arrays
 let gptSelected = window.gptSelected || [];
 let gptAll      = window.gptAll || [];

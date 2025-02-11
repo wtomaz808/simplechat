@@ -12,7 +12,6 @@ def get_settings():
         print("Successfully retrieved settings.")
         return settings_item
     except CosmosResourceNotFoundError:
-        # Default settings with new structure for models
         default_settings = {
             'id': 'app_settings',
             'app_title': 'AI Chat Application',
@@ -24,6 +23,8 @@ def get_settings():
             'use_external_apis': False,
             'external_chunking_api': '',
             'external_embedding_api': '',
+            'enable_user_documents': True,
+            'enable_group_documents': True,
             'azure_openai_gpt_endpoint': '',
             'azure_openai_gpt_api_version': '',
             'azure_openai_gpt_authentication_type': 'key',
@@ -114,7 +115,6 @@ def get_user_settings(user_id):
     try:
         return user_settings_container.read_item(item=doc_id, partition_key=doc_id)
     except exceptions.CosmosResourceNotFoundError:
-        # Return default user settings if not found
         return {
             "id": user_id,
             "settings": {
@@ -126,13 +126,10 @@ def get_user_settings(user_id):
 def update_user_settings(user_id, new_settings):
     doc_id = str(user_id)
     try:
-        # Try to fetch the existing document
         doc = user_settings_container.read_item(item=doc_id, partition_key=doc_id)
-        # Update the settings document
         doc.update(new_settings)
         user_settings_container.upsert_item(doc)
     except exceptions.CosmosResourceNotFoundError:
-        # If the document doesn't exist, create a new one
         doc = {
             "id": doc_id,
             **new_settings

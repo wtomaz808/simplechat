@@ -5,26 +5,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}{{ app_settings.app_title }}{% endblock %}</title>
-    <!-- Bootstrap CSS -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     />
-    <!-- Bootstrap Icons -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.3/font/bootstrap-icons.min.css"
     />
 
-    <!-- Custom CSS -->
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/styles.css') }}"
     />
     <style>
       body {
-        padding-top: 56px; /* Adjust for navbar height */
-        overflow-x: hidden; /* Prevent horizontal scroll */
+        padding-top: 56px;
+        overflow-x: hidden;
         height: 100%;
       }
       .main-content {
@@ -101,7 +98,6 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
       <div class="container-fluid">
 
-        <!-- Logo or Title -->
         {% if app_settings.show_logo %}
         <a class="navbar-brand" href="{{ url_for('index') }}">
           <img
@@ -130,7 +126,6 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto">
-            <!-- Home or Title link (if no logo) -->
             {% if not app_settings.show_logo %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('index') }}">Home</a>
@@ -145,16 +140,20 @@
             #}
             {% if session.get('user') and session['user'].get('roles') 
                   and ('Admin' in session['user']['roles'] or 'User' in session['user']['roles']) %}
+              {% if app_settings.enable_user_documents %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('documents') }}">
                   Your Documents
                 </a>
               </li>
+              {% endif %}
+              {% if app_settings.enable_group_documents %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('group_documents') }}">
                   Group Documents
                 </a>
               </li>
+              {% endif %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('chats') }}">
                   Chat
@@ -179,11 +178,13 @@
             #}
             {% if session.get('user') and session['user'].get('roles') 
                   and ('Admin' in session['user']['roles'] or 'User' in session['user']['roles']) %}
+              {% if app_settings.enable_group_documents %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('my_groups') }}">
                   My Groups
                 </a>
               </li>
+              {% endif %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('profile') }}">
                   <i class="bi bi-person-circle"></i>
@@ -213,17 +214,11 @@
       {% endblock %}
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js"></script>
-    <!-- DataTables Responsive JS -->
     <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
-    <!-- marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- DOMPurify for sanitizing HTML -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.6/purify.min.js"></script>
 
     {% block scripts %}{% endblock %}

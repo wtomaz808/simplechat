@@ -15,7 +15,6 @@ def register_route_backend_chats(app):
         data = request.get_json()
         user_id = get_current_user_id()
         if not user_id:
-            #print("User not authenticated.")
             return jsonify({'error': 'User not authenticated'}), 401
 
         user_message = data['message']
@@ -64,17 +63,13 @@ def register_route_backend_chats(app):
                 selected_image_gen_model = image_gen_obj['selected'][0]
                 image_gen_model = selected_image_gen_model['deploymentName']
 
-        # Convert hybrid_search_enabled to boolean if necessary
         if isinstance(hybrid_search_enabled, str):
             hybrid_search_enabled = hybrid_search_enabled.lower() == 'true'
 
-        # Convert bing_search_enabled to boolean if necessary
         if isinstance(bing_search_enabled, str):
             bing_search_enabled = bing_search_enabled.lower() == 'true'
 
-        # Retrieve or create the conversation
         if not conversation_id:
-            # Generate a new conversation ID
             conversation_id = str(uuid.uuid4())
             conversation_item = {
                 'id': conversation_id,
@@ -83,17 +78,13 @@ def register_route_backend_chats(app):
                 'last_updated': datetime.utcnow().isoformat(),
                 'title': 'New Conversation'
             }
-            #print(f"Started new conversation {conversation_id}.")
         else:
-            # Retrieve existing conversation
             try:
                 conversation_item = container.read_item(
                     item=conversation_id,
                     partition_key=conversation_id
                 )
-                #print(f"Retrieved conversation {conversation_id}.")
             except CosmosResourceNotFoundError:
-                # Start a new conversation if not found
                 conversation_id = str(uuid.uuid4())
                 conversation_item = {
                     'id': conversation_id,
@@ -102,24 +93,19 @@ def register_route_backend_chats(app):
                     'last_updated': datetime.utcnow().isoformat(),
                     'title': 'New Conversation'
                 }
-                #print(f"Conversation {conversation_id} not found. Started new conversation.")
             except Exception as e:
-                #print(f"Error retrieving conversation {conversation_id}: {str(e)}", exc_info=True)
                 return jsonify({'error': 'An error occurred'}), 500
 
-        # Append the new user message
         conversation_item['messages'].append({
             'role': 'user', 
             'content': user_message,
             'model_deployment_name': None
             })
 
-        # If first user message, set conversation title
         if conversation_item.get('title', 'New Conversation') == 'New Conversation':
             new_title = (user_message[:30] + '...') if len(user_message) > 30 else user_message
             conversation_item['title'] = new_title
 
-        # Optionally, if we want a default system prompt at the start
         if len(conversation_item['messages']) == 1 and settings.get('default_system_prompt'):
             conversation_item['messages'].insert(
                 0, {
@@ -129,7 +115,6 @@ def register_route_backend_chats(app):
                 }
             )
 
-        # If hybrid search is enabled, perform it and include the results
         if hybrid_search_enabled:
             if selected_document_id:
                 search_results = hybrid_search(user_message, user_id, document_id=selected_document_id, top_n=10)
@@ -164,11 +149,9 @@ def register_route_backend_chats(app):
                     'content': system_prompt,
                     'model_deployment_name': None
                 })
-                #print("System prompt with hybrid search results added to conversation.")
 
                 container.upsert_item(body=conversation_item)
 
-        # If Bing search is enabled, perform it and include the results
         if bing_search_enabled:
             bing_results = process_query_with_bing_and_llm(user_message)
 
@@ -207,9 +190,8 @@ def register_route_backend_chats(app):
                 )
                 generated_image_url = json.loads(image_response.model_dump_json())['data'][0]['url']
 
-                # Append a special "image" message to the conversation
                 conversation_item['messages'].append({
-                    'role': 'image',  # Custom role
+                    'role': 'image',
                     'content': generated_image_url,
                     'prompt': user_message,
                     'created_at': datetime.utcnow().isoformat(),
@@ -239,10 +221,8 @@ def register_route_backend_chats(app):
             if msg['role'] in allowed_roles:
                 conversation_history_for_api.append(msg)
             elif msg['role'] == 'file':
-                # Modify 'file' messages to be 'system' messages
                 file_content = msg.get('file_content', '')
                 filename = msg.get('filename', 'uploaded_file')
-                # Optionally limit the length of file content to avoid exceeding token limits
                 max_file_content_length = 50000
                 if len(file_content) > max_file_content_length:
                     file_content = file_content[:max_file_content_length] + '...'
@@ -275,11 +255,6 @@ def register_route_backend_chats(app):
 
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
         container.upsert_item(body=conversation_item)
-        #print("AI response generated and conversation updated.")
-
-        # for msg in conversation_item['messages']:
-        #     if 'model_deployment_name' not in msg:
-        #         msg['model_deployment_name'] = None
 
         return jsonify({
             'reply': ai_message,

@@ -1,3 +1,5 @@
+<!-- BEGIN README.MD BLOCK -->
+
 # Simple Chat Application
 
 ## Overview
@@ -50,35 +52,8 @@ https://github.com/user-attachments/assets/a1045817-e2e4-4336-8a18-d4f83a6a02af
    - **Performance Tweaks**: Reduced initial load time for the Admin Settings page when large model lists are returned from the OpenAI endpoints.  
    - **Logging & Error Handling**: More descriptive error messages and client-side alerts for failed fetches (e.g., if the user tries to fetch GPT models but hasn’t set the endpoint properly).
 
-### (v0.190.1)
-
-1. **Admin Settings UI**  
-   - Configure Azure OpenAI GPT, Embeddings, Image Generation, and Bing Search settings directly through an in-app interface (rather than `.env`).  
-   - Choose between **key-based** or **managed identity** authentication for GPT, Embeddings, and Image Generation.  
-   - Dynamically switch models/deployments without redeploying the app.
-
-2. **Multiple Roles & Group Permissions**  
-   - Roles include `Owner`, `Admin`, `DocumentManager`, and `User`.  
-   - Group Owners/Admins can invite or remove members, manage documents, and set “active workspace” for group-based search.
-
-3. **One-Click Switching of Active Group**  
-   - Users in multiple groups can quickly switch their active group to see group-specific documents and chat references.
-
-4. **Ephemeral Document Upload**  
-   - Upload a file for a single conversation. The file is not saved in Azure Cognitive Search; instead, it is only used for the session’s RAG context.
-
-5. **Inline File Previews in Chat**  
-   - Files attached to a conversation can be previewed directly from the chat, with text or data displayed in a pop-up.
-
-6. **Optional Bing Web Search**  
-   - Administrators can enable or disable web search. When enabled, the user can toggle “Search the Web” while chatting to incorporate Bing results.
-
-7. **Optional Image Generation**  
-   - Users can toggle an “Image” button to create images via Azure OpenAI (e.g., DALL·E) when configured in Admin Settings.
-
-8. **App Roles & Enterprise Application**  
-   - Provides a robust way to control user access at scale.  
-   - Admins can assign roles to new users or entire Azure AD groups.
+## Release Notes
+For a detailed list of features released by version, please refer to the [Release Notes](./RELEASE_NOTES.md).
 
 ## Technology Stack
 

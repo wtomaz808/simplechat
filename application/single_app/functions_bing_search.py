@@ -6,7 +6,6 @@ from functions_settings import *
 def get_suggestions(query):
     settings = get_settings()
     if not settings.get('enable_web_search'):
-        # Return empty if web search is disabled
         return []
 
     bing_key = settings.get('bing_search_key', '')
