@@ -1,17 +1,20 @@
-// chats.js
+// js/chats.js
 
-// Global variables
 let personalDocs = [];
 let groupDocs = [];
 let activeGroupName = "";
 let currentConversationId = null;
 
-// ===================== LOAD / DISPLAY CONVERSATIONS =====================
+/*************************************************
+ *  LOAD / DISPLAY CONVERSATIONS
+ *************************************************/
 function loadConversations() {
   fetch("/api/get_conversations")
     .then((response) => response.json())
     .then((data) => {
       const conversationsList = document.getElementById("conversations-list");
+      if (!conversationsList) return; // Guard in case template is missing
+
       conversationsList.innerHTML = ""; // Clear existing list
       data.conversations.forEach((convo) => {
         const convoItem = document.createElement("div");
@@ -26,9 +29,10 @@ function loadConversations() {
               <span>${convo.title}</span><br>
               <small>${date.toLocaleString()}</small>
             </div>
-            <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
-              convo.id
-            }">
+            <button
+              class="btn btn-danger btn-sm delete-btn"
+              data-conversation-id="${convo.id}"
+            >
               <i class="bi bi-trash"></i>
             </button>
           </div>
@@ -41,9 +45,15 @@ function loadConversations() {
     });
 }
 
+/*************************************************
+ *  DOC SCOPE & POPULATING SELECT
+ *************************************************/
 function populateDocumentSelectScope() {
   const scopeSel = document.getElementById("doc-scope-select");
   const docSel = document.getElementById("document-select");
+  // Guard in case these elements do not exist in the DOM
+  if (!scopeSel || !docSel) return;
+
   docSel.innerHTML = "";
 
   // Always add a "None" or "No Document Selected"
@@ -88,11 +98,14 @@ function populateDocumentSelectScope() {
 }
 
 // Listen for user selecting a different scope
-document
-  .getElementById("doc-scope-select")
-  .addEventListener("change", populateDocumentSelectScope);
+const docScopeSelect = document.getElementById("doc-scope-select");
+if (docScopeSelect) {
+  docScopeSelect.addEventListener("change", populateDocumentSelectScope);
+}
 
-// Loads personal documents from /api/documents
+/*************************************************
+ *  LOADING PERSONAL & GROUP DOCS
+ *************************************************/
 function loadPersonalDocs() {
   return fetch("/api/documents")
     .then((r) => r.json())
@@ -110,17 +123,13 @@ function loadPersonalDocs() {
     });
 }
 
-// Loads group documents from /api/group_documents,
-// but also calls /api/groups to find the active group name
 function loadGroupDocs() {
-  // 1) get user groups to find which is active
   return fetch("/api/groups")
     .then((r) => r.json())
     .then((groups) => {
       const activeGroup = groups.find((g) => g.isActive);
       if (activeGroup) {
         activeGroupName = activeGroup.name || "Active Group";
-        // 2) now fetch the actual docs for that active group
         return fetch("/api/group_documents")
           .then((r) => r.json())
           .then((data) => {
@@ -136,7 +145,7 @@ function loadGroupDocs() {
             groupDocs = [];
           });
       } else {
-        // If the user has no active group
+        // If user has no active group
         activeGroupName = "";
         groupDocs = [];
       }
@@ -147,24 +156,39 @@ function loadGroupDocs() {
     });
 }
 
-// Helper to load both personal & group docs in sequence
+// Load both personal & group docs in sequence
 function loadAllDocs() {
+  // If there's no place to show documents, or if doc features are disabled,
+  // you might not want to call these at all. But let's guard anyway:
+  const hasDocControls =
+    document.getElementById("search-documents-btn") ||
+    document.getElementById("doc-scope-select") ||
+    document.getElementById("document-select");
+
+  if (!hasDocControls) {
+    // If there's no doc UI, just skip
+    return Promise.resolve();
+  }
+
   return loadPersonalDocs().then(() => loadGroupDocs());
 }
 
-// Toggle the active class for "Search Documents"
-document
-  .getElementById("search-documents-btn")
-  .addEventListener("click", function () {
+/*************************************************
+ *  TOGGLE BUTTONS: SEARCH DOCUMENTS, WEB SEARCH, IMAGE GEN
+ *************************************************/
+const searchDocumentsBtn = document.getElementById("search-documents-btn");
+if (searchDocumentsBtn) {
+  searchDocumentsBtn.addEventListener("click", function () {
     this.classList.toggle("active");
+
     const docScopeSel = document.getElementById("doc-scope-select");
     const docSelectEl = document.getElementById("document-select");
+    if (!docScopeSel || !docSelectEl) return;
 
     if (this.classList.contains("active")) {
       docScopeSel.style.display = "inline-block";
       docSelectEl.style.display = "inline-block";
-      // Now that we know docs are loaded (via loadAllDocs in window.onload),
-      // we can populate:
+      // Now that we know docs are loaded, populate:
       populateDocumentSelectScope();
     } else {
       docScopeSel.style.display = "none";
@@ -172,8 +196,8 @@ document
       docSelectEl.innerHTML = "";
     }
   });
+}
 
-// Toggle the active class for "Search Web"
 const webSearchBtn = document.getElementById("search-web-btn");
 if (webSearchBtn) {
   webSearchBtn.addEventListener("click", function () {
@@ -181,44 +205,50 @@ if (webSearchBtn) {
   });
 }
 
-// Toggle the active class for "Image Generation"
 const imageGenBtn = document.getElementById("image-generate-btn");
-// Check if imageGenBtn exists before adding event listeners:
 if (imageGenBtn) {
   imageGenBtn.addEventListener("click", function () {
     // Toggle on/off
     this.classList.toggle("active");
 
-    // Check if Image Generation is active
     const isImageGenEnabled = this.classList.contains("active");
 
-    // Example code that disables other buttons, etc.
+    // Example: disable other buttons if image gen is on
     const docBtn = document.getElementById("search-documents-btn");
     const webBtn = document.getElementById("search-web-btn");
     const fileBtn = document.getElementById("choose-file-btn");
 
     if (isImageGenEnabled) {
-      // disable other options
-      docBtn.disabled = true;
-      webBtn.disabled = true;
-      fileBtn.disabled = true;
-      docBtn.classList.remove("active");
-      webBtn.classList.remove("active");
-      fileBtn.classList.remove("active");
+      if (docBtn) {
+        docBtn.disabled = true;
+        docBtn.classList.remove("active");
+      }
+      if (webBtn) {
+        webBtn.disabled = true;
+        webBtn.classList.remove("active");
+      }
+      if (fileBtn) {
+        fileBtn.disabled = true;
+        fileBtn.classList.remove("active");
+      }
     } else {
-      // re-enable them
-      docBtn.disabled = false;
-      webBtn.disabled = false;
-      fileBtn.disabled = false;
+      if (docBtn) docBtn.disabled = false;
+      if (webBtn) webBtn.disabled = false;
+      if (fileBtn) fileBtn.disabled = false;
     }
   });
 }
 
-// ===================== SELECTING A CONVERSATION =====================
+/*************************************************
+ *  SELECTING A CONVERSATION
+ *************************************************/
 function selectConversation(conversationId) {
   currentConversationId = conversationId;
-  document.getElementById("user-input").disabled = false;
-  document.getElementById("send-btn").disabled = false;
+
+  const userInputEl = document.getElementById("user-input");
+  const sendBtnEl = document.getElementById("send-btn");
+  if (userInputEl) userInputEl.disabled = false;
+  if (sendBtnEl) sendBtnEl.disabled = false;
 
   // Get the conversation title
   const convoItem = document.querySelector(
@@ -228,14 +258,15 @@ function selectConversation(conversationId) {
     ? convoItem.getAttribute("data-conversation-title")
     : "Conversation";
 
-  document.getElementById("current-conversation-title").textContent =
-    conversationTitle;
+  const currentTitleEl = document.getElementById("current-conversation-title");
+  if (currentTitleEl) {
+    currentTitleEl.textContent = conversationTitle;
+  }
 
   loadMessages(conversationId);
   highlightSelectedConversation(conversationId);
 }
 
-// Highlight the selected conversation in the list
 function highlightSelectedConversation(conversationId) {
   const items = document.querySelectorAll(".conversation-item");
   items.forEach((item) => {
@@ -247,14 +278,21 @@ function highlightSelectedConversation(conversationId) {
   });
 }
 
-// ===================== APPEND MESSAGE (supports citations) =====================
-// CHANGE 1: Add a third parameter, modelName (default null)
+/*************************************************
+ *  APPEND MESSAGE
+ *************************************************/
 function scrollChatToBottom() {
   const chatbox = document.getElementById("chatbox");
-  chatbox.scrollTop = chatbox.scrollHeight;
+  if (chatbox) {
+    chatbox.scrollTop = chatbox.scrollHeight;
+  }
 }
 
 function appendMessage(sender, messageContent, modelName = null) {
+  // If there's no chatbox at all, just bail out
+  const chatbox = document.getElementById("chatbox");
+  if (!chatbox) return;
+
   const messageDiv = document.createElement("div");
   messageDiv.classList.add("mb-2");
 
@@ -265,17 +303,27 @@ function appendMessage(sender, messageContent, modelName = null) {
   let messageContentHtml = "";
 
   if (sender === "System") {
-    // Skip rendering system messages
+    // skip system messages if you prefer
     return;
   }
 
+  if (sender === "safety") {
+    // Content Safety blocked it
+    messageClass = "ai-message";
+    senderLabel = "Content Safety";
+    avatarAltText = "Content Safety Avatar";
+    avatarImg = "/static/images/alert.png";
+
+    messageContentHtml = DOMPurify.sanitize(marked.parse(messageContent));
+  }
+
   if (sender === "image") {
-    // An AI-style message but it's an <img> tag
+    // AI image
     messageClass = "ai-message";
     senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
     avatarImg = "/static/images/ai-avatar.png";
 
-    // Create an image at 25% size
+    // Render an image
     const imageHtml = `
       <img 
         src="${messageContent}" 
@@ -288,13 +336,12 @@ function appendMessage(sender, messageContent, modelName = null) {
     `;
     messageContentHtml = imageHtml;
   } else if (sender === "You") {
-    // user's own message
+    // user message
     messageClass = "user-message";
     senderLabel = "You";
     avatarAltText = "User Avatar";
     avatarImg = "/static/images/user-avatar.png";
 
-    // If you want to parse user content as markdown, or not:
     const sanitizedContent = DOMPurify.sanitize(marked.parse(messageContent));
     messageContentHtml = sanitizedContent;
   } else if (sender === "AI") {
@@ -303,51 +350,43 @@ function appendMessage(sender, messageContent, modelName = null) {
     avatarAltText = "AI Avatar";
     avatarImg = "/static/images/ai-avatar.png";
 
-    // If modelName is present, show it in parentheses
     if (modelName) {
-      // Subtle text with smaller font
       senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
     } else {
       senderLabel = "AI";
     }
 
-    // Clean up
     let cleaned = messageContent.trim().replace(/\n{3,}/g, "\n\n");
-
-    // 1) Parse citations => clickable links
     const withCitations = parseCitations(cleaned);
-
-    // 2) Convert to Markdown + sanitize
     const htmlContent = DOMPurify.sanitize(marked.parse(withCitations));
     messageContentHtml = htmlContent;
   } else if (sender === "File") {
-    // If it's a file message
+    // file message
     messageClass = "file-message";
     senderLabel = "File Added";
 
-    // messageContent is the object
     const filename = messageContent.filename;
     const fileId = messageContent.file_id;
     messageContentHtml = `
-      <a href="#" 
-         class="file-link" 
-         data-conversation-id="${currentConversationId}" 
-         data-file-id="${fileId}"
-      >${filename}</a>
+      <a 
+        href="#"
+        class="file-link"
+        data-conversation-id="${currentConversationId}"
+        data-file-id="${fileId}"
+      >
+        ${filename}
+      </a>
     `;
   }
 
-  // Build the message bubble
   messageDiv.classList.add("message", messageClass);
   messageDiv.innerHTML = `
-    <div class="message-content ${
-      sender === "You" || sender === "File" ? "flex-row-reverse" : ""
+    <div class="message-content ${sender === "You" || sender === "File" ? "flex-row-reverse" : ""
     }">
-      ${
-        sender !== "File"
-          ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
-          : ""
-      }
+      ${sender !== "File"
+      ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
+      : ""
+    }
       <div class="message-bubble">
         <div class="message-sender">${senderLabel}</div>
         <div class="message-text">${messageContentHtml}</div>
@@ -355,31 +394,32 @@ function appendMessage(sender, messageContent, modelName = null) {
     </div>
   `;
 
-  document.getElementById("chatbox").appendChild(messageDiv);
-
-  // Scroll to bottom
-  document.getElementById("chatbox").scrollTop =
-    document.getElementById("chatbox").scrollHeight;
+  chatbox.appendChild(messageDiv);
+  scrollChatToBottom();
 }
 
-// ===================== LOADING MESSAGES FOR CONVERSATION =====================
+/*************************************************
+ *  LOADING MESSAGES FOR CONVERSATION
+ *************************************************/
 function loadMessages(conversationId) {
   fetch(`/conversation/${conversationId}/messages`)
     .then((response) => response.json())
     .then((data) => {
       const chatbox = document.getElementById("chatbox");
+      if (!chatbox) return; // no chatbox, bail
+
       chatbox.innerHTML = ""; // Clear existing messages
       data.messages.forEach((msg) => {
         if (msg.role === "user") {
           appendMessage("You", msg.content);
         } else if (msg.role === "assistant") {
-          // CHANGE 2: Pass msg.model_deployment_name to appendMessage
           appendMessage("AI", msg.content, msg.model_deployment_name);
         } else if (msg.role === "file") {
           appendMessage("File", msg);
         } else if (msg.role === "image") {
-          // If images also have a model name, you can pass it as well
           appendMessage("image", msg.content, msg.model_deployment_name);
+        } else if (msg.role === "safety") {
+          appendMessage("safety", msg.content);
         }
       });
     })
@@ -388,11 +428,13 @@ function loadMessages(conversationId) {
     });
 }
 
-// ===================== CITATION PARSING =====================
+/*************************************************
+ *  CITATION PARSING
+ *************************************************/
 function parseCitations(message) {
   /*
-    This regex will match patterns like:
-      (Source: FILENAME, Page(s): PAGE) [#doc_1] [#doc_2] ...
+    Matches patterns like:
+    (Source: FILENAME, Page(s): X) [#doc_1] [#doc_2]
   */
   const citationRegex =
     /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
@@ -417,14 +459,17 @@ function parseCitations(message) {
   );
 }
 
-// ===================== DELETE A CONVERSATION =====================
-document
-  .getElementById("conversations-list")
-  .addEventListener("click", (event) => {
-    const deleteBtn = event.target.closest(".delete-btn");
-    if (deleteBtn) {
+/*************************************************
+ *  DELETE A CONVERSATION
+ *************************************************/
+// We'll attach the event to the conversation list container if it exists
+const conversationsList = document.getElementById("conversations-list");
+if (conversationsList) {
+  conversationsList.addEventListener("click", (event) => {
+    const delBtn = event.target.closest(".delete-btn");
+    if (delBtn) {
       event.stopPropagation();
-      const conversationId = deleteBtn.getAttribute("data-conversation-id");
+      const conversationId = delBtn.getAttribute("data-conversation-id");
       deleteConversation(conversationId);
     } else {
       const convoItem = event.target.closest(".conversation-item");
@@ -434,6 +479,7 @@ document
       }
     }
   });
+}
 
 function deleteConversation(conversationId) {
   if (confirm("Are you sure you want to delete this conversation?")) {
@@ -450,14 +496,24 @@ function deleteConversation(conversationId) {
           if (convoItem) {
             convoItem.remove();
           }
-          // If it was the selected conversation, clear UI
+          // If it was the currently selected conversation, clear the UI
           if (currentConversationId === conversationId) {
             currentConversationId = null;
-            document.getElementById("user-input").disabled = true;
-            document.getElementById("send-btn").disabled = true;
-            document.getElementById("current-conversation-title").textContent =
-              "Select a conversation";
-            document.getElementById("chatbox").innerHTML = "";
+            const userInput = document.getElementById("user-input");
+            const sendBtn = document.getElementById("send-btn");
+            if (userInput) userInput.disabled = true;
+            if (sendBtn) sendBtn.disabled = true;
+
+            const currentTitleEl = document.getElementById(
+              "current-conversation-title"
+            );
+            if (currentTitleEl) {
+              currentTitleEl.textContent = "Select a conversation";
+            }
+            const chatbox = document.getElementById("chatbox");
+            if (chatbox) {
+              chatbox.innerHTML = "";
+            }
           }
         } else {
           alert("Failed to delete the conversation.");
@@ -470,7 +526,9 @@ function deleteConversation(conversationId) {
   }
 }
 
-// ===================== CITED TEXT FUNCTIONS =====================
+/*************************************************
+ *  CITED TEXT FUNCTIONS
+ *************************************************/
 function fetchCitedText(citationId) {
   showLoadingIndicator();
   fetch("/api/get_citation", {
@@ -522,17 +580,23 @@ function showCitedTextPopup(citedText, fileName, pageNumber) {
     document.body.appendChild(modalContainer);
   } else {
     const modalTitle = modalContainer.querySelector(".modal-title");
-    modalTitle.textContent = `Source: ${fileName}, Page: ${pageNumber}`;
+    if (modalTitle) {
+      modalTitle.textContent = `Source: ${fileName}, Page: ${pageNumber}`;
+    }
   }
 
   const citedTextContent = document.getElementById("cited-text-content");
-  citedTextContent.textContent = citedText;
+  if (citedTextContent) {
+    citedTextContent.textContent = citedText;
+  }
 
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
 
-// ===================== LOADING / HIDING INDICATORS =====================
+/*************************************************
+ *  LOADING / HIDING INDICATORS
+ *************************************************/
 function showLoadingIndicator() {
   let loadingSpinner = document.getElementById("loading-spinner");
   if (!loadingSpinner) {
@@ -561,6 +625,8 @@ function hideLoadingIndicator() {
 }
 function showLoadingIndicatorInChatbox() {
   const chatbox = document.getElementById("chatbox");
+  if (!chatbox) return;
+
   const loadingIndicator = document.createElement("div");
   loadingIndicator.classList.add("loading-indicator");
   loadingIndicator.id = "loading-indicator";
@@ -581,47 +647,49 @@ function hideLoadingIndicatorInChatbox() {
   }
 }
 
-// ===================== SENDING A MESSAGE =====================
+/*************************************************
+ *  SENDING A MESSAGE
+ *************************************************/
 function sendMessage() {
   const userInput = document.getElementById("user-input");
-  const textVal = userInput.value.trim();
-  if (textVal === "" || !currentConversationId) return;
+  if (!userInput || !currentConversationId) return;
 
+  const textVal = userInput.value.trim();
+  if (textVal === "") return;
+
+  // 1) Immediately show the user's message in the chat UI
   appendMessage("You", textVal);
   userInput.value = "";
-
-  // Show spinner in chatbox
   showLoadingIndicatorInChatbox();
 
-  // Hybrid search?
-  const hybridSearchEnabled = document
-    .getElementById("search-documents-btn")
-    .classList.contains("active");
+  // 2) Check toggles for doc search, selected doc, Bing search, image gen, etc.
+  let hybridSearchEnabled = false;
+  const sdbtn = document.getElementById("search-documents-btn");
+  if (sdbtn && sdbtn.classList.contains("active")) {
+    hybridSearchEnabled = true;
+  }
 
-  // If doc is selected
   let selectedDocumentId = null;
   if (hybridSearchEnabled) {
     const docSel = document.getElementById("document-select");
-    if (docSel.value !== "" && docSel.value !== "All Documents") {
+    if (docSel && docSel.value !== "" && docSel.value !== "All Documents") {
       selectedDocumentId = docSel.value;
     }
   }
 
-  // Bing search?
   let bingSearchEnabled = false;
-  const webSearchBtn = document.getElementById("search-web-btn");
-  if (webSearchBtn && webSearchBtn.classList.contains("active")) {
+  const wbbtn = document.getElementById("search-web-btn");
+  if (wbbtn && wbbtn.classList.contains("active")) {
     bingSearchEnabled = true;
   }
 
-  // Image gen?
   let imageGenEnabled = false;
-  const imageGenBtn = document.getElementById("image-generate-btn");
-  if (imageGenBtn && imageGenBtn.classList.contains("active")) {
+  const igbtn = document.getElementById("image-generate-btn");
+  if (igbtn && igbtn.classList.contains("active")) {
     imageGenEnabled = true;
   }
 
-  // Post to /api/chat
+  // 3) Send to /api/chat with all the relevant flags
   fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -634,45 +702,89 @@ function sendMessage() {
       image_generation: imageGenEnabled,
     }),
   })
-    .then((response) => response.json())
-    .then((data) => {
+    .then((response) => {
+      // We'll parse JSON from a cloned response
+      const cloned = response.clone();
+      return cloned.json().then((data) => ({
+        ok: response.ok,
+        status: response.status,
+        data,
+      }));
+    })
+    .then(({ ok, status, data }) => {
+      // 4) Always hide the loading indicator first
       hideLoadingIndicatorInChatbox();
-      if (data.reply) {
-        appendMessage("AI", data.reply, data.model_deployment_name);
-      }
-      if (data.image_url) {
-        appendMessage("image", data.image_url);
-        setTimeout(() => {
-          loadMessages(currentConversationId);
-        }, 500);
-      }
-      if (data.conversation_id) {
-        currentConversationId = data.conversation_id;
-      }
-      if (data.conversation_title) {
-        document.getElementById("current-conversation-title").textContent =
-          data.conversation_title;
-        // update the item in list
-        const convoItem = document.querySelector(
-          `.conversation-item[data-conversation-id="${currentConversationId}"]`
-        );
-        if (convoItem) {
-          const d = new Date();
-          convoItem.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <span>${data.conversation_title}</span><br>
-                <small>${d.toLocaleString()}</small>
-              </div>
-              <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${currentConversationId}">
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          `;
-          convoItem.setAttribute(
-            "data-conversation-title",
-            data.conversation_title
+
+      if (!ok) {
+        // If not ok, handle error or block
+        if (status === 403) {
+          // 5) Content Safety blocked it
+          const categories = (data.triggered_categories || [])
+            .map((catObj) => `${catObj.category} (severity=${catObj.severity})`)
+            .join(", ");
+          const reasonMsg = Array.isArray(data.reason)
+            ? data.reason.join(", ")
+            : data.reason;
+
+          // Show a system-style message
+          appendMessage(
+            "System",
+            `Your message was blocked by Content Safety.\n\n` +
+            `**Categories triggered**: ${categories}\n` +
+            `**Reason**: ${reasonMsg}`
           );
+        } else {
+          // Another error (500, 400, etc.)
+          appendMessage(
+            "System",
+            `An error occurred: ${data.error || "Unknown error"}.`
+          );
+        }
+      } else {
+        // 6) Normal successful response
+        if (data.reply) {
+          appendMessage("AI", data.reply, data.model_deployment_name);
+        }
+        if (data.image_url) {
+          appendMessage("image", data.image_url);
+          // Optionally reload messages after generating an image
+          setTimeout(() => {
+            loadMessages(currentConversationId);
+          }, 500);
+        }
+        if (data.conversation_id) {
+          currentConversationId = data.conversation_id;
+        }
+        if (data.conversation_title) {
+          const convTitleEl = document.getElementById("current-conversation-title");
+          if (convTitleEl) {
+            convTitleEl.textContent = data.conversation_title;
+          }
+          // Update the conversation list item if needed
+          const convoItem = document.querySelector(
+            `.conversation-item[data-conversation-id="${currentConversationId}"]`
+          );
+          if (convoItem) {
+            const d = new Date();
+            convoItem.innerHTML = `
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <span>${data.conversation_title}</span><br>
+                  <small>${d.toLocaleString()}</small>
+                </div>
+                <button
+                  class="btn btn-danger btn-sm delete-btn"
+                  data-conversation-id="${currentConversationId}"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            `;
+            convoItem.setAttribute(
+              "data-conversation-title",
+              data.conversation_title
+            );
+          }
         }
       }
     })
@@ -683,23 +795,33 @@ function sendMessage() {
     });
 }
 
-// --------------------- User Input Event Listeners ---------------------
-document.getElementById("send-btn").addEventListener("click", sendMessage);
+/*************************************************
+ *  USER INPUT EVENT LISTENERS
+ *************************************************/
+const sendBtn = document.getElementById("send-btn");
+if (sendBtn) {
+  sendBtn.addEventListener("click", sendMessage);
+}
 
-document
-  .getElementById("user-input")
-  .addEventListener("keypress", function (e) {
+const userInputEl = document.getElementById("user-input");
+if (userInputEl) {
+  userInputEl.addEventListener("keypress", function (e) {
     if (e.key === "Enter") {
       sendMessage();
     }
   });
+}
 
-// ===================== LOADING DOCUMENTS FOR DROPDOWN =====================
+/*************************************************
+ *  LOADING DOCUMENTS FOR DROPDOWN
+ *************************************************/
 function loadDocuments() {
   fetch("/api/documents")
     .then((response) => response.json())
     .then((data) => {
       const documentSelect = document.getElementById("document-select");
+      if (!documentSelect) return;
+
       documentSelect.innerHTML = "";
 
       // Add a "None" default
@@ -719,7 +841,10 @@ function loadDocuments() {
       const searchDocuments = getUrlParameter("search_documents") === "true";
       const documentId = getUrlParameter("document_id");
       if (searchDocuments && documentId) {
-        document.getElementById("search-documents-btn").classList.add("active");
+        const sdbtn = document.getElementById("search-documents-btn");
+        if (sdbtn) {
+          sdbtn.classList.add("active");
+        }
         documentSelect.style.display = "block";
         documentSelect.value = documentId;
       }
@@ -729,7 +854,7 @@ function loadDocuments() {
     });
 }
 
-// Get a URL parameter
+// Utility for reading URL params
 function getUrlParameter(name) {
   name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
   const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
@@ -739,10 +864,12 @@ function getUrlParameter(name) {
     : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
-// ===================== CREATE A NEW CONVERSATION =====================
-document
-  .getElementById("new-conversation-btn")
-  .addEventListener("click", () => {
+/*************************************************
+ *  CREATE A NEW CONVERSATION
+ *************************************************/
+const newConversationBtn = document.getElementById("new-conversation-btn");
+if (newConversationBtn) {
+  newConversationBtn.addEventListener("click", () => {
     fetch("/api/create_conversation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -761,9 +888,10 @@ document
           // automatically select
           selectConversation(data.conversation_id);
 
-          // Add it to top of conversation list
-          const conversationsList =
-            document.getElementById("conversations-list");
+          const conversationsList = document.getElementById("conversations-list");
+          if (!conversationsList) return;
+
+          // Add it to top of the conversation list
           const convoItem = document.createElement("div");
           convoItem.classList.add(
             "list-group-item",
@@ -779,9 +907,10 @@ document
                 <span>${data.conversation_id}</span><br>
                 <small>${date.toLocaleString()}</small>
               </div>
-              <button class="btn btn-danger btn-sm delete-btn" data-conversation-id="${
-                data.conversation_id
-              }">
+              <button
+                class="btn btn-danger btn-sm delete-btn"
+                data-conversation-id="${data.conversation_id}"
+              >
                 <i class="bi bi-trash"></i>
               </button>
             </div>
@@ -806,108 +935,135 @@ document
         alert(`Failed to create a new conversation: ${error.message}`);
       });
   });
-
-// ===================== FILE UPLOAD LOGIC =====================
-document
-  .getElementById("choose-file-btn")
-  .addEventListener("click", function () {
-    // Trigger the file input click
-    document.getElementById("file-input").click();
-  });
-
-document.getElementById("file-input").addEventListener("change", function () {
-  const fileInput = this;
-  const file = fileInput.files[0];
-  if (file) {
-    const fileName = file.name;
-    const fileBtn = document.getElementById("choose-file-btn");
-    fileBtn.classList.add("active");
-    fileBtn.querySelector(".file-btn-text").textContent = fileName;
-    // Show the upload button
-    document.getElementById("upload-btn").style.display = "block";
-  } else {
-    resetFileButton();
-  }
-});
-
-function resetFileButton() {
-  document.getElementById("file-input").value = "";
-  const fileBtn = document.getElementById("choose-file-btn");
-  fileBtn.classList.remove("active");
-  fileBtn.querySelector(".file-btn-text").textContent = "";
-  document.getElementById("upload-btn").style.display = "none";
 }
 
-document.getElementById("upload-btn").addEventListener("click", () => {
-  const fileInput = document.getElementById("file-input");
-  const file = fileInput.files[0];
-  if (!file) {
-    alert("Please select a file to upload.");
-    return;
-  }
-  if (!currentConversationId) {
-    alert("Please select or start a conversation before uploading a file.");
-    return;
-  }
+/*************************************************
+ *  FILE UPLOAD LOGIC
+ *************************************************/
+const chooseFileBtn = document.getElementById("choose-file-btn");
+if (chooseFileBtn) {
+  chooseFileBtn.addEventListener("click", function () {
+    const fileInput = document.getElementById("file-input");
+    if (fileInput) fileInput.click();
+  });
+}
 
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("conversation_id", currentConversationId);
+const fileInputEl = document.getElementById("file-input");
+if (fileInputEl) {
+  fileInputEl.addEventListener("change", function () {
+    const file = fileInputEl.files[0];
+    const fileBtn = document.getElementById("choose-file-btn");
+    const uploadBtn = document.getElementById("upload-btn");
+    if (!fileBtn || !uploadBtn) return;
 
-  fetch("/upload", {
-    method: "POST",
-    body: formData,
-  })
-    .then((response) => {
-      let clonedResponse = response.clone();
-      return response.json().then((data) => {
-        if (!response.ok) {
-          console.error("Upload failed:", data.error || "Unknown error");
-          alert("Error uploading file: " + (data.error || "Unknown error"));
-          throw new Error(data.error || "Upload failed");
+    if (file) {
+      fileBtn.classList.add("active");
+      fileBtn.querySelector(".file-btn-text").textContent = file.name;
+      uploadBtn.style.display = "block";
+    } else {
+      resetFileButton();
+    }
+  });
+}
+
+function resetFileButton() {
+  const fileInputEl = document.getElementById("file-input");
+  if (fileInputEl) {
+    fileInputEl.value = "";
+  }
+  const fileBtn = document.getElementById("choose-file-btn");
+  if (fileBtn) {
+    fileBtn.classList.remove("active");
+    fileBtn.querySelector(".file-btn-text").textContent = "";
+  }
+  const uploadBtn = document.getElementById("upload-btn");
+  if (uploadBtn) {
+    uploadBtn.style.display = "none";
+  }
+}
+
+const uploadBtn = document.getElementById("upload-btn");
+if (uploadBtn) {
+  uploadBtn.addEventListener("click", () => {
+    const fileInput = document.getElementById("file-input");
+    if (!fileInput) return;
+
+    const file = fileInput.files[0];
+    if (!file) {
+      alert("Please select a file to upload.");
+      return;
+    }
+    if (!currentConversationId) {
+      alert("Please select or start a conversation before uploading a file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("conversation_id", currentConversationId);
+
+    fetch("/upload", {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => {
+        // For debugging:
+        let clonedResponse = response.clone();
+        return response.json().then((data) => {
+          if (!response.ok) {
+            console.error("Upload failed:", data.error || "Unknown error");
+            alert("Error uploading file: " + (data.error || "Unknown error"));
+            throw new Error(data.error || "Upload failed");
+          }
+          return data;
+        });
+      })
+      .then((data) => {
+        console.log("Upload response data:", data);
+        if (data.conversation_id) {
+          currentConversationId = data.conversation_id;
+          loadMessages(currentConversationId);
+        } else {
+          console.error("No conversation_id returned from server.");
+          alert("Error: No conversation ID returned from server.");
         }
-        return data;
+        resetFileButton();
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        alert("Error uploading file: " + error.message);
+        resetFileButton();
       });
-    })
-    .then((data) => {
-      console.log("Upload response data:", data);
-      if (data.conversation_id) {
-        currentConversationId = data.conversation_id;
-        loadMessages(currentConversationId);
-      } else {
-        console.error("No conversation_id returned from server.");
-        alert("Error: No conversation ID returned from server.");
-      }
-      resetFileButton();
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      alert("Error uploading file: " + error.message);
-      resetFileButton();
-    });
-});
+  });
+}
 
-// ===================== CITATION LINKS & FILE LINKS =====================
-document.getElementById("chatbox").addEventListener("click", (event) => {
-  if (event.target && event.target.matches("a.citation-link")) {
-    event.preventDefault();
-    const citationId = event.target.getAttribute("data-citation-id");
-    fetchCitedText(citationId);
-  } else if (event.target && event.target.matches("a.file-link")) {
-    event.preventDefault();
-    const fileId = event.target.getAttribute("data-file-id");
-    const conversationId = event.target.getAttribute("data-conversation-id");
-    fetchFileContent(conversationId, fileId);
-  }
-});
+/*************************************************
+ *  CITATION LINKS & FILE LINKS
+ *************************************************/
+const chatboxEl = document.getElementById("chatbox");
+if (chatboxEl) {
+  // Catch clicks on citation/file links
+  chatboxEl.addEventListener("click", (event) => {
+    if (event.target && event.target.matches("a.citation-link")) {
+      event.preventDefault();
+      const citationId = event.target.getAttribute("data-citation-id");
+      fetchCitedText(citationId);
+    } else if (event.target && event.target.matches("a.file-link")) {
+      event.preventDefault();
+      const fileId = event.target.getAttribute("data-file-id");
+      const conversationId = event.target.getAttribute("data-conversation-id");
+      fetchFileContent(conversationId, fileId);
+    }
+  });
 
-// If user clicks on the generated image
-document.getElementById("chatbox").addEventListener("click", (event) => {
-  if (event.target.classList.contains("generated-image")) {
-    const imageSrc = event.target.getAttribute("data-image-src");
-    showImagePopup(imageSrc);
-  }
-});
+  // If user clicks on the generated image
+  chatboxEl.addEventListener("click", (event) => {
+    if (event.target.classList.contains("generated-image")) {
+      const imageSrc = event.target.getAttribute("data-image-src");
+      showImagePopup(imageSrc);
+    }
+  });
+}
 
 function showImagePopup(imageSrc) {
   let modalContainer = document.getElementById("image-modal");
@@ -922,7 +1078,12 @@ function showImagePopup(imageSrc) {
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-body text-center">
-            <img id="image-modal-img" src="" alt="Generated Image" class="img-fluid" />
+            <img
+              id="image-modal-img"
+              src=""
+              alt="Generated Image"
+              class="img-fluid"
+            />
           </div>
         </div>
       </div>
@@ -930,7 +1091,9 @@ function showImagePopup(imageSrc) {
     document.body.appendChild(modalContainer);
   }
   const modalImage = modalContainer.querySelector("#image-modal-img");
-  modalImage.src = imageSrc;
+  if (modalImage) {
+    modalImage.src = imageSrc;
+  }
   const modal = new bootstrap.Modal(modalContainer);
   modal.show();
 }
@@ -978,7 +1141,12 @@ function showFileContentPopup(fileContent, filename, isTable) {
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">Uploaded File: ${filename}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
           </div>
           <div class="modal-body">
             <div id="file-content"></div>
@@ -989,13 +1157,17 @@ function showFileContentPopup(fileContent, filename, isTable) {
     document.body.appendChild(modalContainer);
   } else {
     const modalTitle = modalContainer.querySelector(".modal-title");
-    modalTitle.textContent = `Uploaded File: ${filename}`;
+    if (modalTitle) {
+      modalTitle.textContent = `Uploaded File: ${filename}`;
+    }
   }
 
   const fileContentElement = document.getElementById("file-content");
+  if (!fileContentElement) return;
+
   if (isTable) {
     fileContentElement.innerHTML = `<div class="table-responsive">${fileContent}</div>`;
-    // Initialize DataTables if needed
+    // If using DataTables
     $(document).ready(function () {
       $("#file-content table").DataTable({
         responsive: true,
@@ -1010,48 +1182,56 @@ function showFileContentPopup(fileContent, filename, isTable) {
   modal.show();
 }
 
-// ===================== BOOTSTRAP TOOLTIPS =====================
+/*************************************************
+ *  BOOTSTRAP TOOLTIPS
+ *************************************************/
 document.addEventListener("DOMContentLoaded", function () {
-  var tooltipTriggerList = [].slice.call(
+  const tooltipTriggerList = [].slice.call(
     document.querySelectorAll('[data-bs-toggle="tooltip"]')
   );
-  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl);
   });
 });
 
-// ===================== ON PAGE LOAD =====================
+/*************************************************
+ *  ON PAGE LOAD
+ *************************************************/
 window.onload = function () {
+  // 1) Always load conversation list
   loadConversations();
-  loadAllDocs() // personal & group docs
-    .then(() => {
-      // Now read URL params:
-      const searchDocsParam = getUrlParameter("search_documents") === "true";
-      const docScopeParam = getUrlParameter("doc_scope") || ""; // "personal","group","all",""
-      const documentIdParam = getUrlParameter("document_id") || "";
 
-      if (searchDocsParam) {
-        // 1) Turn on "Search Documents"
-        document.getElementById("search-documents-btn").classList.add("active");
+  // 2) Conditionally load docs (only if doc UI is in DOM)
+  loadAllDocs().then(() => {
+    // Then read URL params:
+    const searchDocsParam = getUrlParameter("search_documents") === "true";
+    const docScopeParam = getUrlParameter("doc_scope") || ""; // e.g. "personal","group","all",""
+    const documentIdParam = getUrlParameter("document_id") || "";
 
-        // 2) Show doc scope & doc select
-        document.getElementById("doc-scope-select").style.display =
-          "inline-block";
-        document.getElementById("document-select").style.display =
-          "inline-block";
+    const searchDocsBtn = document.getElementById("search-documents-btn");
+    const docScopeSel = document.getElementById("doc-scope-select");
+    const docSelectEl = document.getElementById("document-select");
 
-        // 3) If doc_scope param is present, set it
-        if (docScopeParam) {
-          document.getElementById("doc-scope-select").value = docScopeParam;
-        }
+    if (searchDocsParam && searchDocsBtn && docScopeSel && docSelectEl) {
+      // 1) Turn on "Search Documents"
+      searchDocsBtn.classList.add("active");
 
-        // 4) Now populate the final doc list
-        populateDocumentSelectScope();
+      // 2) Show doc scope & doc select
+      docScopeSel.style.display = "inline-block";
+      docSelectEl.style.display = "inline-block";
 
-        // 5) If there's a doc ID, select it
-        if (documentIdParam) {
-          document.getElementById("document-select").value = documentIdParam;
-        }
+      // 3) If doc_scope param is present, set it
+      if (docScopeParam) {
+        docScopeSel.value = docScopeParam;
       }
-    });
+
+      // 4) Populate the final doc list
+      populateDocumentSelectScope();
+
+      // 5) If there's a doc ID, select it
+      if (documentIdParam) {
+        docSelectEl.value = documentIdParam;
+      }
+    }
+  });
 };

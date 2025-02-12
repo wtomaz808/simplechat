@@ -15,7 +15,7 @@ def register_route_frontend_authentication(app):
         print("Redirecting to Azure AD for authentication.")
         return redirect(auth_url)
 
-    @app.route('/getAToken')  # This path should match REDIRECT_PATH
+    @app.route('/getAToken')
     def authorized():
         msal_app = ConfidentialClientApplication(
             CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET

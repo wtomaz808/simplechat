@@ -1,4 +1,5 @@
 # config.py
+
 import os
 import requests
 import uuid
@@ -32,17 +33,22 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
-from azure.core.exceptions import AzureError, ResourceNotFoundError
+from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential
+from azure.ai.contentsafety import ContentSafetyClient
+from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.191.0'
+app.config['VERSION'] = '0.196.9'
 Session(app)
+
+CLIENTS = {}
+CLIENTS_LOCK = threading.Lock()
 
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
@@ -58,42 +64,7 @@ AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
 SCOPE = ["User.Read"]  # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
 
-# Azure Document Intelligence Configuration
-AZURE_DI_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-AZURE_DI_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-
-document_intelligence_client_old = DocumentIntelligenceClient(
-    endpoint=AZURE_DI_ENDPOINT,
-    credential=AzureKeyCredential(AZURE_DI_KEY)
-)
-
-azure_fr_endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-azure_fr_key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-
-document_intelligence_client = DocumentAnalysisClient(
-    endpoint=azure_fr_endpoint,
-    credential=AzureKeyCredential(azure_fr_key)
-)
-
-# Configure Azure OpenAI
-openai.api_type = "azure"
-openai.api_key = os.getenv("AZURE_OPENAI_KEY")
-openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
-openai.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-llm_model = os.getenv("AZURE_OPENAI_LLM_MODEL")
-embedding_model = os.getenv("AZURE_OPENAI_EMBEDDING_MODEL")
-
-AZURE_OPENAI_GPT_KEY = os.getenv("AZURE_OPENAI_GPT_KEY")
-AZURE_OPENAI_EMBEDDING_KEY = os.getenv("AZURE_OPENAI_EMBEDDING_KEY")
-AZURE_OPENAI_IMAGE_GEN_KEY = os.getenv("AZURE_OPENAI_IMAGE_GEN_KEY")
-
-AZURE_AI_SEARCH_ENDPOINT = os.getenv('AZURE_AI_SEARCH_ENDPOINT')
-AZURE_AI_SEARCH_KEY = os.getenv('AZURE_AI_SEARCH_KEY')
-AZURE_AI_SEARCH_USER_INDEX = os.getenv('AZURE_AI_SEARCH_USER_INDEX')
-AZURE_AI_SEARCH_GROUP_INDEX = os.getenv('AZURE_AI_SEARCH_GROUP_INDEX')
-
 BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
-BING_SEARCH_KEY = os.getenv("BING_SEARCH_KEY")
 
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
@@ -112,18 +83,6 @@ documents_container = database.create_container_if_not_exists(
     id=documents_container_name,
     partition_key=PartitionKey(path="/id"),
     offer_throughput=400
-)
-
-search_client_user = SearchClient(
-    endpoint=AZURE_AI_SEARCH_ENDPOINT,
-    index_name=AZURE_AI_SEARCH_USER_INDEX,
-    credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
-)
-
-search_client_group = SearchClient(
-    endpoint=AZURE_AI_SEARCH_ENDPOINT,
-    index_name=AZURE_AI_SEARCH_GROUP_INDEX,
-    credential=AzureKeyCredential(AZURE_AI_SEARCH_KEY)
 )
 
 settings_container_name = "settings"
@@ -153,3 +112,63 @@ user_settings_container = database.create_container_if_not_exists(
     partition_key=PartitionKey(path="/id"),
     offer_throughput=400
 )
+
+safety_container_name = "safety"
+safety_container = database.create_container_if_not_exists(
+    id=safety_container_name,
+    partition_key=PartitionKey(path="/id"),
+    offer_throughput=400
+)
+
+def initialize_clients(settings):
+    """
+    Initialize/re-initialize all your clients based on the provided settings.
+    Store them in a global dictionary so they're accessible throughout the app.
+    """
+    with CLIENTS_LOCK:
+        form_recognizer_endpoint = settings.get("azure_document_intelligence_endpoint")
+        form_recognizer_key = settings.get("azure_document_intelligence_key")
+
+        azure_ai_search_endpoint = settings.get("azure_ai_search_endpoint")
+        azure_ai_search_key = settings.get("azure_ai_search_key")
+
+        document_intelligence_client = DocumentAnalysisClient(
+            endpoint=form_recognizer_endpoint,
+            credential=AzureKeyCredential(form_recognizer_key)
+        )
+
+        search_client_user = SearchClient(
+            endpoint=azure_ai_search_endpoint,
+            index_name="simplechat-user-index",
+            credential=AzureKeyCredential(azure_ai_search_key)
+        )
+
+        search_client_group = SearchClient(
+            endpoint=azure_ai_search_endpoint,
+            index_name="simplechat-group-index",
+            credential=AzureKeyCredential(azure_ai_search_key)
+        )
+
+        # 2) Content Safety init if enabled
+        if settings.get("enable_content_safety"):
+            safety_endpoint = settings.get("content_safety_endpoint", "")
+            safety_key = settings.get("content_safety_key", "")
+
+            if safety_endpoint and safety_key:
+                try:
+                    content_safety_client = ContentSafetyClient(
+                        endpoint=safety_endpoint,
+                        credential=AzureKeyCredential(safety_key)
+                    )
+                    CLIENTS["content_safety_client"] = content_safety_client
+                except Exception as e:
+                    print(f"Failed to initialize Content Safety client: {e}")
+            else:
+                print("Content Safety enabled, but endpoint/key not provided.")
+        else:
+            if "content_safety_client" in CLIENTS:
+                del CLIENTS["content_safety_client"]
+
+        CLIENTS["document_intelligence_client"] = document_intelligence_client
+        CLIENTS["search_client_user"] = search_client_user
+        CLIENTS["search_client_group"] = search_client_group

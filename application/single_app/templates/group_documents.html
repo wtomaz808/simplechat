@@ -1,9 +1,9 @@
+<!-- templates/group_documents.html -->
 {% extends "base.html" %} {% block title %}Group Documents - AI Chat
 Application{% endblock %} {% block content %}
 <div class="container">
   <h2>Group Documents</h2>
   <h3 id="active-group-name" style="margin-bottom: 20px; display: none"></h3>
-  <!-- Loading Modal (for "Uploading your document, please wait..." overlay) -->
   <div
     class="modal fade"
     id="loadingModal"
@@ -71,7 +71,6 @@ Application{% endblock %} {% block content %}
   let activeGroupId = null;
   let userRoleInActiveGroup = null;
 
-  // Initialize the loading modal:
   const loadingModal = new bootstrap.Modal(
     document.getElementById("loadingModal")
   );
@@ -83,7 +82,6 @@ Application{% endblock %} {% block content %}
         userGroups = data;
         const sel = document.getElementById("group-select");
         sel.innerHTML = "";
-        // We might also create a variable for the <h3>:
         const activeGroupNameEl = document.getElementById("active-group-name");
 
         userGroups.forEach((g) => {
@@ -96,10 +94,8 @@ Application{% endblock %} {% block content %}
             activeGroupId = g.id;
             userRoleInActiveGroup = g.userRole;
 
-            // **Store** the active group name in a new variable:
-            window.activeGroupName = g.name; // or a local variable
+            window.activeGroupName = g.name;
 
-            // **Set** the <h3>'s text & show it:
             activeGroupNameEl.textContent = g.name;
             activeGroupNameEl.style.display = "block";
           }
@@ -107,7 +103,6 @@ Application{% endblock %} {% block content %}
           sel.appendChild(opt);
         });
 
-        // Now call updateRoleDisplay():
         updateRoleDisplay();
       })
       .catch((err) => console.error("Error fetching groups", err));
@@ -180,13 +175,12 @@ Application{% endblock %} {% block content %}
           throw new Error(data.error);
         }
         alert(data.message || "Document deleted");
-        fetchGroupDocuments(); // re-fetch the updated list
+        fetchGroupDocuments();
       })
       .catch((err) => console.error(err));
   }
 
   function onSearchInChat(docId) {
-    // doc_scope=group
     window.location.href = `/chats?search_documents=true&doc_scope=group&document_id=${docId}`;
   }
 
@@ -201,7 +195,6 @@ Application{% endblock %} {% block content %}
     let formData = new FormData();
     formData.append("file", file);
 
-    // Show loading modal
     loadingModal.show();
 
     fetch("/api/group_documents/upload", {
@@ -222,7 +215,6 @@ Application{% endblock %} {% block content %}
         console.error(err);
       })
       .finally(() => {
-        // Hide loading modal in both success or error
         loadingModal.hide();
       });
   }
@@ -242,7 +234,6 @@ Application{% endblock %} {% block content %}
 
   document.addEventListener("DOMContentLoaded", () => {
     fetchUserGroups().then(() => {
-      // Now that we have the current active group, fetch its docs
       fetchGroupDocuments();
     });
 
@@ -257,7 +248,6 @@ Application{% endblock %} {% block content %}
           .catch((err) => console.error(err));
       });
 
-    // handle upload button
     document
       .getElementById("upload-btn")
       .addEventListener("click", onUploadClick);

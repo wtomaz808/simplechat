@@ -14,51 +14,37 @@ def extract_markdown_file(file_path):
 def extract_content_with_azure_di(file_path):
     try:
         with open(file_path, "rb") as f:
+            document_intelligence_client = CLIENTS['document_intelligence_client']
             poller = document_intelligence_client.begin_analyze_document(
                 model_id="prebuilt-read",
                 document=f
             )
         
-        # Manual polling to check status periodically
-        max_wait_time = 600  # e.g., wait up to 10 minutes
+        max_wait_time = 600
         start_time = time.time()
 
-        #print ("Polling for document analysis status...")
         while True:
             status = poller.status()
-            #print(f"Current analysis status: {status}")
             if status in ["succeeded", "failed", "canceled"]:
-                #print(f"Analysis completed with status: {status}")
                 break
             if time.time() - start_time > max_wait_time:
-                #print("Timeout error: Document analysis took too long.")
                 raise TimeoutError("Document analysis took too long.")
             time.sleep(30)
 
-        # Once we exit the loop and status is 'succeeded', 'failed', or 'canceled'
-        result = poller.result()  # Get the actual result now
-        #print(f"Document analysis result: {result}")
-
+        result = poller.result()
         extracted_content = ""
 
         if result.content:
             extracted_content = result.content
-            #print(f"Content extracted successfully from {file_path}.")
-            #print(f"Extracted content: {extracted_content[:100]}...")
         else:
-            #print("No content extracted from document.")
             for page in result.pages:
-                #print(f"Page {page.page_number} has {len(page.lines)} lines.")
                 for line in page.lines:
                     extracted_content += line.content + "\n"
                 extracted_content += "\n"
-                #print(f"Extracted content: {extracted_content[:100]}...")
 
-        #print(f"Extracted content length: {len(extracted_content)}")
         return extracted_content
 
     except Exception as e:
-        #print(f"Error extracting content with Azure DI: {str(e)}")
         raise
 
 def extract_table_file(file_path, file_ext):
@@ -71,10 +57,8 @@ def extract_table_file(file_path, file_ext):
             raise ValueError("Unsupported file extension for table extraction.")
         
         table_html = df.to_html(index=False, classes='table table-striped table-bordered')
-        #print(f"Table extracted successfully from {file_path}.")
         return table_html
     except Exception as e:
-        #print(f"Error extracting table from file: {str(e)}")
         raise
 
 def chunk_text(text, chunk_size=2000, overlap=200):
@@ -83,17 +67,14 @@ def chunk_text(text, chunk_size=2000, overlap=200):
     for i in range(0, len(words), chunk_size - overlap):
         chunk = ' '.join(words[i:i + chunk_size])
         chunks.append(chunk)
-    #print(f"Text chunked into {len(chunks)} chunks.")
     return chunks
 
 def generate_embedding(
     text,
     max_retries=5,
-    initial_delay=1.0,  # initial delay in seconds for backoff
-    delay_multiplier=2.0  # multiplier to increase delay after each retry
+    initial_delay=1.0,
+    delay_multiplier=2.0
 ):
-    #print("Function generate_embedding called")
-    #print(f"Text input for embedding (truncated): {text[:100]}...")
     settings = get_settings()
 
     retries = 0
@@ -128,22 +109,17 @@ def generate_embedding(
                 input=text
             )
 
-            #print("OpenAI API call successful")
             embedding = response.data[0].embedding
-            #print(f"Embedding generated successfully: Length {len(embedding)}")
             return embedding
 
         except RateLimitError as e:
             retries += 1
             if retries > max_retries:
-                #print("Max retries reached due to RateLimitError. Returning None.")
                 return None
 
             wait_time = current_delay * random.uniform(1.0, 1.5)
-            #print(f"Rate limit reached. Retrying in {wait_time:.2f} seconds...")
             time.sleep(wait_time)
-            current_delay *= delay_multiplier  # Exponential backoff
+            current_delay *= delay_multiplier
 
         except Exception as e:
-            #print(f"Error in generating embedding: {str(e)}")
             return None

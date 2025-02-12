@@ -10,18 +10,13 @@ def register_route_backend_users(app):
     Microsoft Graph to find users by displayName, mail, userPrincipalName, etc.
     """
 
-    # route_backend_users.py
-from functions_authentication import *
-from config import *
-
-def register_route_backend_users(app):
     @app.route("/api/userSearch", methods=["GET"])
     @login_required
     @user_required
     def api_user_search():
         query = request.args.get("query", "").strip()
         if not query:
-            return jsonify([]), 200  # No query provided
+            return jsonify([]), 200
 
         token = session.get("access_token")
         if not token:
@@ -33,7 +28,6 @@ def register_route_backend_users(app):
             "Content-Type": "application/json"
         }
 
-        # Example filter using startsWith on displayName, mail, or userPrincipalName
         filter_str = (
             f"startswith(displayName, '{query}') "
             f"or startswith(mail, '{query}') "
@@ -41,7 +35,7 @@ def register_route_backend_users(app):
         )
         params = {
             "$filter": filter_str,
-            "$top": 10,  # up to 10 matches
+            "$top": 10,
             "$select": "id,displayName,mail,userPrincipalName"
         }
 
@@ -56,10 +50,9 @@ def register_route_backend_users(app):
         user_results = response.json().get("value", [])
         results = []
         for user in user_results:
-            # If the user doesn't have 'mail', fallback to userPrincipalName, etc.
             email = user.get("mail") or user.get("userPrincipalName") or ""
             results.append({
-                "id": user.get("id"),  # <-- This will be the real Azure AD Object ID (GUID)
+                "id": user.get("id"),
                 "displayName": user.get("displayName", "(no name)"),
                 "email": email
             })
@@ -73,10 +66,8 @@ def register_route_backend_users(app):
         user_id = get_current_user_id()
         
         if request.method == 'POST':
-            # Get settings from the form or request JSON
             active_group_oid = request.form.get('activeGroupOid', '') or request.json.get('activeGroupOid', '')
             
-            # Construct new settings dictionary
             new_settings = {
                 "settings": {
                     "activeGroupOid": active_group_oid
@@ -84,11 +75,9 @@ def register_route_backend_users(app):
                 "lastUpdated": datetime.utcnow().isoformat()
             }
             
-            # Update user settings in the database
             update_user_settings(user_id, new_settings)
             return jsonify({"message": "User settings updated successfully"}), 200
 
-        # If GET request, fetch the settings
         user_settings_data = get_user_settings(user_id)
         return jsonify(user_settings_data if user_settings_data else {})
 
