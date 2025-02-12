@@ -16,6 +16,7 @@ from route_frontend_chats import *
 from route_frontend_conversations import *
 from route_frontend_groups import *
 from route_frontend_group_documents import *
+from route_frontend_safety import *
 
 from route_backend_chats import *
 from route_backend_conversations import *
@@ -24,6 +25,7 @@ from route_backend_groups import *
 from route_backend_users import *
 from route_backend_group_documents import *
 from route_backend_models import *
+from route_backend_safety import *
 
 # =================== Helper Functions ===================
 @app.before_first_request
@@ -110,6 +112,9 @@ register_route_frontend_groups(app)
 # ------------------- Group Documents Routes -------------
 register_route_frontend_group_documents(app)
 
+# ------------------- Safety Routes ----------------------
+register_route_frontend_safety(app)
+
 # =================== Back End Routes ====================
 # ------------------- API Chat Routes --------------------
 register_route_backend_chats(app)
@@ -131,6 +136,9 @@ register_route_backend_group_documents(app)
 
 # ------------------- API Model Routes -------------------
 register_route_backend_models(app)
+
+# ------------------- API Safety Logs Routes -------------
+register_route_backend_safety(app)
 
 if __name__ == '__main__':
     settings = get_settings()

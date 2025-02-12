@@ -26,3 +26,4 @@ pandas==2.2.3
 markdown2==2.5.3
 azure-mgmt-cognitiveservices==13.6.0
 azure-identity==1.17.1
+azure-ai-contentsafety==1.0.0

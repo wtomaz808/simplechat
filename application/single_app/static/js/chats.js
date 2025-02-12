@@ -307,6 +307,16 @@ function appendMessage(sender, messageContent, modelName = null) {
     return;
   }
 
+  if (sender === "safety") {
+    // Content Safety blocked it
+    messageClass = "ai-message";
+    senderLabel = "Content Safety";
+    avatarAltText = "Content Safety Avatar";
+    avatarImg = "/static/images/alert.png";
+
+    messageContentHtml = DOMPurify.sanitize(marked.parse(messageContent));
+  }
+
   if (sender === "image") {
     // AI image
     messageClass = "ai-message";
@@ -371,14 +381,12 @@ function appendMessage(sender, messageContent, modelName = null) {
 
   messageDiv.classList.add("message", messageClass);
   messageDiv.innerHTML = `
-    <div class="message-content ${
-      sender === "You" || sender === "File" ? "flex-row-reverse" : ""
+    <div class="message-content ${sender === "You" || sender === "File" ? "flex-row-reverse" : ""
     }">
-      ${
-        sender !== "File"
-          ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
-          : ""
-      }
+      ${sender !== "File"
+      ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
+      : ""
+    }
       <div class="message-bubble">
         <div class="message-sender">${senderLabel}</div>
         <div class="message-text">${messageContentHtml}</div>
@@ -410,6 +418,8 @@ function loadMessages(conversationId) {
           appendMessage("File", msg);
         } else if (msg.role === "image") {
           appendMessage("image", msg.content, msg.model_deployment_name);
+        } else if (msg.role === "safety") {
+          appendMessage("safety", msg.content);
         }
       });
     })
@@ -647,18 +657,18 @@ function sendMessage() {
   const textVal = userInput.value.trim();
   if (textVal === "") return;
 
+  // 1) Immediately show the user's message in the chat UI
   appendMessage("You", textVal);
   userInput.value = "";
   showLoadingIndicatorInChatbox();
 
-  // Check doc search
+  // 2) Check toggles for doc search, selected doc, Bing search, image gen, etc.
   let hybridSearchEnabled = false;
   const sdbtn = document.getElementById("search-documents-btn");
   if (sdbtn && sdbtn.classList.contains("active")) {
     hybridSearchEnabled = true;
   }
 
-  // If doc is selected
   let selectedDocumentId = null;
   if (hybridSearchEnabled) {
     const docSel = document.getElementById("document-select");
@@ -667,20 +677,19 @@ function sendMessage() {
     }
   }
 
-  // Bing search?
   let bingSearchEnabled = false;
   const wbbtn = document.getElementById("search-web-btn");
   if (wbbtn && wbbtn.classList.contains("active")) {
     bingSearchEnabled = true;
   }
 
-  // Image gen?
   let imageGenEnabled = false;
   const igbtn = document.getElementById("image-generate-btn");
   if (igbtn && igbtn.classList.contains("active")) {
     imageGenEnabled = true;
   }
 
+  // 3) Send to /api/chat with all the relevant flags
   fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -693,51 +702,89 @@ function sendMessage() {
       image_generation: imageGenEnabled,
     }),
   })
-    .then((response) => response.json())
-    .then((data) => {
+    .then((response) => {
+      // We'll parse JSON from a cloned response
+      const cloned = response.clone();
+      return cloned.json().then((data) => ({
+        ok: response.ok,
+        status: response.status,
+        data,
+      }));
+    })
+    .then(({ ok, status, data }) => {
+      // 4) Always hide the loading indicator first
       hideLoadingIndicatorInChatbox();
-      if (data.reply) {
-        appendMessage("AI", data.reply, data.model_deployment_name);
-      }
-      if (data.image_url) {
-        appendMessage("image", data.image_url);
-        // Optionally reload messages after generating an image
-        setTimeout(() => {
-          loadMessages(currentConversationId);
-        }, 500);
-      }
-      if (data.conversation_id) {
-        currentConversationId = data.conversation_id;
-      }
-      if (data.conversation_title) {
-        const convTitleEl = document.getElementById("current-conversation-title");
-        if (convTitleEl) {
-          convTitleEl.textContent = data.conversation_title;
-        }
-        // Update the item in the list
-        const convoItem = document.querySelector(
-          `.conversation-item[data-conversation-id="${currentConversationId}"]`
-        );
-        if (convoItem) {
-          const d = new Date();
-          convoItem.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <span>${data.conversation_title}</span><br>
-                <small>${d.toLocaleString()}</small>
-              </div>
-              <button
-                class="btn btn-danger btn-sm delete-btn"
-                data-conversation-id="${currentConversationId}"
-              >
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          `;
-          convoItem.setAttribute(
-            "data-conversation-title",
-            data.conversation_title
+
+      if (!ok) {
+        // If not ok, handle error or block
+        if (status === 403) {
+          // 5) Content Safety blocked it
+          const categories = (data.triggered_categories || [])
+            .map((catObj) => `${catObj.category} (severity=${catObj.severity})`)
+            .join(", ");
+          const reasonMsg = Array.isArray(data.reason)
+            ? data.reason.join(", ")
+            : data.reason;
+
+          // Show a system-style message
+          appendMessage(
+            "System",
+            `Your message was blocked by Content Safety.\n\n` +
+            `**Categories triggered**: ${categories}\n` +
+            `**Reason**: ${reasonMsg}`
           );
+        } else {
+          // Another error (500, 400, etc.)
+          appendMessage(
+            "System",
+            `An error occurred: ${data.error || "Unknown error"}.`
+          );
+        }
+      } else {
+        // 6) Normal successful response
+        if (data.reply) {
+          appendMessage("AI", data.reply, data.model_deployment_name);
+        }
+        if (data.image_url) {
+          appendMessage("image", data.image_url);
+          // Optionally reload messages after generating an image
+          setTimeout(() => {
+            loadMessages(currentConversationId);
+          }, 500);
+        }
+        if (data.conversation_id) {
+          currentConversationId = data.conversation_id;
+        }
+        if (data.conversation_title) {
+          const convTitleEl = document.getElementById("current-conversation-title");
+          if (convTitleEl) {
+            convTitleEl.textContent = data.conversation_title;
+          }
+          // Update the conversation list item if needed
+          const convoItem = document.querySelector(
+            `.conversation-item[data-conversation-id="${currentConversationId}"]`
+          );
+          if (convoItem) {
+            const d = new Date();
+            convoItem.innerHTML = `
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <span>${data.conversation_title}</span><br>
+                  <small>${d.toLocaleString()}</small>
+                </div>
+                <button
+                  class="btn btn-danger btn-sm delete-btn"
+                  data-conversation-id="${currentConversationId}"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            `;
+            convoItem.setAttribute(
+              "data-conversation-title",
+              data.conversation_title
+            );
+          }
         }
       }
     })

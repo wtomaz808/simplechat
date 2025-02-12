@@ -97,6 +97,9 @@ def register_route_frontend_admin_settings(app):
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_documents = request.form.get('enable_user_documents') == 'on'
             enable_group_documents = request.form.get('enable_group_documents') == 'on'
+            enable_content_safety = request.form.get('enable_content_safety') == 'on'
+            content_safety_endpoint = request.form.get('content_safety_endpoint', '')
+            content_safety_key = request.form.get('content_safety_key', '')
             azure_ai_search_endpoint = request.form.get('azure_ai_search_endpoint', '')
             azure_ai_search_key = request.form.get('azure_ai_search_key', '')
             azure_document_intelligence_endpoint = request.form.get('azure_document_intelligence_endpoint', '')
@@ -194,6 +197,9 @@ def register_route_frontend_admin_settings(app):
                 'azure_ai_search_key': azure_ai_search_key.strip(),
                 'azure_document_intelligence_endpoint': azure_document_intelligence_endpoint.strip(),
                 'azure_document_intelligence_key': azure_document_intelligence_key.strip(),
+                'enable_content_safety': enable_content_safety,
+                'content_safety_endpoint': content_safety_endpoint.strip(),
+                'content_safety_key': content_safety_key.strip(),
 
                 'azure_openai_gpt_endpoint': azure_openai_gpt_endpoint,
                 'azure_openai_gpt_api_version': azure_openai_gpt_api_version,

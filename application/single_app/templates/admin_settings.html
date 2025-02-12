@@ -43,6 +43,12 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="safety-tab" data-bs-toggle="tab" data-bs-target="#safety"
+                    type="button" role="tab" aria-controls="safety" aria-selected="false">
+                    Safety
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="search-extract-tab" data-bs-toggle="tab" data-bs-target="#search-extract"
                     type="button" role="tab" aria-controls="search-extract" aria-selected="false">
                     Search and Extract
@@ -542,6 +548,42 @@
                         <label class="form-check-label ms-2" for="enable_group_documents">
                             Enable My Groups (includes Group Documents)
                         </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SAFETY TAB -->
+            <div class="tab-pane fade" id="safety" role="tabpanel" aria-labelledby="safety-tab">
+                <p class="text-muted">
+                    Configure content safety settings. If enabled, user messages will be sent to the safety endpoint for analysis.
+                </p>
+                <div class="card p-3">
+                    <div class="form-group form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input" id="enable_content_safety" name="enable_content_safety" 
+                            {% if settings.enable_content_safety %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_content_safety">
+                            Enable Content Safety
+                        </label>
+                    </div>
+                    <div id="content_safety_settings" {% if not settings.enable_content_safety %}style="display: none;"{% endif %}>
+                        
+                        <div class="mb-3">
+                            <label for="content_safety_endpoint" class="form-label">Content Safety Endpoint</label>
+                            <input type="text" class="form-control" id="content_safety_endpoint" name="content_safety_endpoint"
+                                value="{{ settings.content_safety_endpoint or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="content_safety_key" class="form-label">Content Safety Key</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="content_safety_key" name="content_safety_key"
+                                    value="{{ settings.content_safety_key or '' }}">
+                                <button type="button" class="btn btn-outline-secondary" id="toggle_content_safety_key">Show</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="test_safety_button">
+                            Test Safety Connection
+                        </button>
+                        <div id="test_safety_result" class="mt-2"></div>
                     </div>
                 </div>
             </div>

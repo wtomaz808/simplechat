@@ -232,42 +232,62 @@ function updateImageHiddenInput() {
 function setupToggles() {
     // GPT: APIM vs. non-APIM
     const enableGptApim = document.getElementById('enable_gpt_apim');
-    enableGptApim.addEventListener('change', function () {
-        document.getElementById('non_apim_gpt_settings').style.display = this.checked ? 'none' : 'block';
-        document.getElementById('apim_gpt_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if (enableGptApim) {
+        enableGptApim.addEventListener('change', function () {
+            document.getElementById('non_apim_gpt_settings').style.display = this.checked ? 'none' : 'block';
+            document.getElementById('apim_gpt_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // Embeddings: APIM vs. non-APIM
     const enableEmbeddingApim = document.getElementById('enable_embedding_apim');
-    enableEmbeddingApim.addEventListener('change', function () {
-        document.getElementById('non_apim_embedding_settings').style.display = this.checked ? 'none' : 'block';
-        document.getElementById('apim_embedding_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if (enableEmbeddingApim) {
+        enableEmbeddingApim.addEventListener('change', function () {
+            document.getElementById('non_apim_embedding_settings').style.display = this.checked ? 'none' : 'block';
+            document.getElementById('apim_embedding_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // Image Generation: main toggle
     const enableImageGen = document.getElementById('enable_image_generation');
-    enableImageGen.addEventListener('change', function () {
-        document.getElementById('image_gen_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if (enableImageGen) {
+        enableImageGen.addEventListener('change', function () {
+            document.getElementById('image_gen_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // Image Generation: APIM vs. non-APIM
     const enableImageGenApim = document.getElementById('enable_image_gen_apim');
-    enableImageGenApim.addEventListener('change', function () {
-        document.getElementById('non_apim_image_gen_settings').style.display = this.checked ? 'none' : 'block';
-        document.getElementById('apim_image_gen_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if(enableImageGenApim) {
+        enableImageGenApim.addEventListener('change', function () {
+            document.getElementById('non_apim_image_gen_settings').style.display = this.checked ? 'none' : 'block';
+            document.getElementById('apim_image_gen_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
+
+    const enableContentSafetyCheckbox = document.getElementById('enable_content_safety');
+    if(enableContentSafetyCheckbox) {
+        enableContentSafetyCheckbox.addEventListener('change', function() {
+            const safetySettings = document.getElementById('content_safety_settings');
+            safetySettings.style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // Web Search
     const enableWebSearch = document.getElementById('enable_web_search');
-    enableWebSearch.addEventListener('change', function () {
-        document.getElementById('web_search_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if (enableWebSearch) {
+        enableWebSearch.addEventListener('change', function () {
+            document.getElementById('web_search_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // External APIs
     const useExternalApis = document.getElementById('use_external_apis');
-    useExternalApis.addEventListener('change', function () {
-        document.getElementById('external_apis_settings').style.display = this.checked ? 'block' : 'none';
-    });
+    if (useExternalApis) {
+        useExternalApis.addEventListener('change', function () {
+            document.getElementById('external_apis_settings').style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
     // GPT Auth Type
     document.getElementById('azure_openai_gpt_authentication_type')
@@ -349,6 +369,26 @@ function setupTestButtons() {
         }
     });
 
+    // Content Safety
+    const testSafetyBtn = document.getElementById('test_safety_button');
+    if (testSafetyBtn) {
+        testSafetyBtn.addEventListener('click', async () => {
+            const resultDiv = document.getElementById('test_safety_result');
+            resultDiv.innerHTML = 'Testing Content Safety...';
+            try {
+                const resp = await fetch('/api/test/safety');
+                const data = await resp.json();
+                if (resp.ok) {
+                    resultDiv.innerHTML = `<span class="text-success">Success: ${data.message}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<span class="text-danger">Error: ${data.error || 'Unknown error'}</span>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="text-danger">Error: ${err.message}</span>`;
+            }
+        });
+    }
+
     // External APIs
     document.getElementById('test_connection_button').addEventListener('click', async () => {
         const resultDiv = document.getElementById('test_connection_result');
@@ -403,6 +443,20 @@ document.getElementById('toggle_image_gen_key').addEventListener('click', functi
         this.textContent = 'Show';
     }
 });
+
+const toggleContentSafetyKeyBtn = document.getElementById('toggle_content_safety_key');
+if(toggleContentSafetyKeyBtn) {
+    toggleContentSafetyKeyBtn.addEventListener('click', function(){
+        const inp = document.getElementById('content_safety_key');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            this.textContent = 'Hide';
+        } else {
+            inp.type = 'password';
+            this.textContent = 'Show';
+        }
+    });
+}
 
 document.getElementById('toggle_bing_search_key').addEventListener('click', function () {
     const inp = document.getElementById('bing_search_key');

@@ -33,16 +33,18 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
-from azure.core.exceptions import AzureError, ResourceNotFoundError
+from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential
+from azure.ai.contentsafety import ContentSafetyClient
+from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.194.5'
+app.config['VERSION'] = '0.196.9'
 Session(app)
 
 CLIENTS = {}
@@ -111,6 +113,12 @@ user_settings_container = database.create_container_if_not_exists(
     offer_throughput=400
 )
 
+safety_container_name = "safety"
+safety_container = database.create_container_if_not_exists(
+    id=safety_container_name,
+    partition_key=PartitionKey(path="/id"),
+    offer_throughput=400
+)
 
 def initialize_clients(settings):
     """
@@ -141,9 +149,26 @@ def initialize_clients(settings):
             credential=AzureKeyCredential(azure_ai_search_key)
         )
 
+        # 2) Content Safety init if enabled
+        if settings.get("enable_content_safety"):
+            safety_endpoint = settings.get("content_safety_endpoint", "")
+            safety_key = settings.get("content_safety_key", "")
+
+            if safety_endpoint and safety_key:
+                try:
+                    content_safety_client = ContentSafetyClient(
+                        endpoint=safety_endpoint,
+                        credential=AzureKeyCredential(safety_key)
+                    )
+                    CLIENTS["content_safety_client"] = content_safety_client
+                except Exception as e:
+                    print(f"Failed to initialize Content Safety client: {e}")
+            else:
+                print("Content Safety enabled, but endpoint/key not provided.")
+        else:
+            if "content_safety_client" in CLIENTS:
+                del CLIENTS["content_safety_client"]
+
         CLIENTS["document_intelligence_client"] = document_intelligence_client
         CLIENTS["search_client_user"] = search_client_user
         CLIENTS["search_client_group"] = search_client_group
-
-        print("Initialized all clients with current admin settings.")
-        print("After initialize_clients, CLIENTS keys:", CLIENTS.keys())
