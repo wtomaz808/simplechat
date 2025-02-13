@@ -1,5 +1,3 @@
-// js/chats.js
-
 let personalDocs = [];
 let groupDocs = [];
 let activeGroupName = "";
@@ -13,9 +11,9 @@ function loadConversations() {
     .then((response) => response.json())
     .then((data) => {
       const conversationsList = document.getElementById("conversations-list");
-      if (!conversationsList) return; // Guard in case template is missing
+      if (!conversationsList) return;
 
-      conversationsList.innerHTML = ""; // Clear existing list
+      conversationsList.innerHTML = "";
       data.conversations.forEach((convo) => {
         const convoItem = document.createElement("div");
         convoItem.classList.add("list-group-item", "conversation-item");
@@ -45,18 +43,46 @@ function loadConversations() {
     });
 }
 
+function addConversationToList(conversationId, title = null) {
+  const conversationsList = document.getElementById("conversations-list");
+  if (!conversationsList) return;
+
+  const items = document.querySelectorAll(".conversation-item");
+  items.forEach((i) => i.classList.remove("active"));
+
+  const convoItem = document.createElement("div");
+  convoItem.classList.add("list-group-item", "conversation-item", "active");
+  convoItem.setAttribute("data-conversation-id", conversationId);
+  convoItem.setAttribute("data-conversation-title", title || conversationId);
+
+  const d = new Date();
+  convoItem.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <span>${title || conversationId}</span><br>
+        <small>${d.toLocaleString()}</small>
+      </div>
+      <button
+        class="btn btn-danger btn-sm delete-btn"
+        data-conversation-id="${conversationId}"
+      >
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  `;
+  conversationsList.prepend(convoItem);
+}
+
 /*************************************************
  *  DOC SCOPE & POPULATING SELECT
  *************************************************/
 function populateDocumentSelectScope() {
   const scopeSel = document.getElementById("doc-scope-select");
   const docSel = document.getElementById("document-select");
-  // Guard in case these elements do not exist in the DOM
   if (!scopeSel || !docSel) return;
 
   docSel.innerHTML = "";
 
-  // Always add a "None" or "No Document Selected"
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
   noneOpt.textContent = "All Documents";
@@ -66,7 +92,6 @@ function populateDocumentSelectScope() {
 
   let finalDocs = [];
   if (scopeVal === "all") {
-    // Merge personal + group docs
     const pDocs = personalDocs.map((d) => ({
       id: d.id,
       label: `[Personal] ${d.file_name}`,
@@ -88,7 +113,6 @@ function populateDocumentSelectScope() {
     }));
   }
 
-  // Add them to "document-select"
   finalDocs.forEach((doc) => {
     const opt = document.createElement("option");
     opt.value = doc.id;
@@ -97,7 +121,6 @@ function populateDocumentSelectScope() {
   });
 }
 
-// Listen for user selecting a different scope
 const docScopeSelect = document.getElementById("doc-scope-select");
 if (docScopeSelect) {
   docScopeSelect.addEventListener("change", populateDocumentSelectScope);
@@ -145,7 +168,6 @@ function loadGroupDocs() {
             groupDocs = [];
           });
       } else {
-        // If user has no active group
         activeGroupName = "";
         groupDocs = [];
       }
@@ -156,17 +178,13 @@ function loadGroupDocs() {
     });
 }
 
-// Load both personal & group docs in sequence
 function loadAllDocs() {
-  // If there's no place to show documents, or if doc features are disabled,
-  // you might not want to call these at all. But let's guard anyway:
   const hasDocControls =
     document.getElementById("search-documents-btn") ||
     document.getElementById("doc-scope-select") ||
     document.getElementById("document-select");
 
   if (!hasDocControls) {
-    // If there's no doc UI, just skip
     return Promise.resolve();
   }
 
@@ -188,7 +206,6 @@ if (searchDocumentsBtn) {
     if (this.classList.contains("active")) {
       docScopeSel.style.display = "inline-block";
       docSelectEl.style.display = "inline-block";
-      // Now that we know docs are loaded, populate:
       populateDocumentSelectScope();
     } else {
       docScopeSel.style.display = "none";
@@ -208,12 +225,9 @@ if (webSearchBtn) {
 const imageGenBtn = document.getElementById("image-generate-btn");
 if (imageGenBtn) {
   imageGenBtn.addEventListener("click", function () {
-    // Toggle on/off
     this.classList.toggle("active");
 
     const isImageGenEnabled = this.classList.contains("active");
-
-    // Example: disable other buttons if image gen is on
     const docBtn = document.getElementById("search-documents-btn");
     const webBtn = document.getElementById("search-web-btn");
     const fileBtn = document.getElementById("choose-file-btn");
@@ -245,12 +259,6 @@ if (imageGenBtn) {
 function selectConversation(conversationId) {
   currentConversationId = conversationId;
 
-  const userInputEl = document.getElementById("user-input");
-  const sendBtnEl = document.getElementById("send-btn");
-  if (userInputEl) userInputEl.disabled = false;
-  if (sendBtnEl) sendBtnEl.disabled = false;
-
-  // Get the conversation title
   const convoItem = document.querySelector(
     `.conversation-item[data-conversation-id="${conversationId}"]`
   );
@@ -279,7 +287,7 @@ function highlightSelectedConversation(conversationId) {
 }
 
 /*************************************************
- *  APPEND MESSAGE
+ *  APPEND MESSAGE LOCALLY
  *************************************************/
 function scrollChatToBottom() {
   const chatbox = document.getElementById("chatbox");
@@ -289,7 +297,6 @@ function scrollChatToBottom() {
 }
 
 function appendMessage(sender, messageContent, modelName = null) {
-  // If there's no chatbox at all, just bail out
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
 
@@ -303,27 +310,22 @@ function appendMessage(sender, messageContent, modelName = null) {
   let messageContentHtml = "";
 
   if (sender === "System") {
-    // skip system messages if you prefer
     return;
   }
 
   if (sender === "safety") {
-    // Content Safety blocked it
     messageClass = "ai-message";
     senderLabel = "Content Safety";
     avatarAltText = "Content Safety Avatar";
     avatarImg = "/static/images/alert.png";
-
     messageContentHtml = DOMPurify.sanitize(marked.parse(messageContent));
-  }
-
-  if (sender === "image") {
-    // AI image
+  } else if (sender === "image") {
     messageClass = "ai-message";
-    senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
+    senderLabel = modelName
+      ? `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`
+      : "AI";
     avatarImg = "/static/images/ai-avatar.png";
 
-    // Render an image
     const imageHtml = `
       <img 
         src="${messageContent}" 
@@ -336,35 +338,27 @@ function appendMessage(sender, messageContent, modelName = null) {
     `;
     messageContentHtml = imageHtml;
   } else if (sender === "You") {
-    // user message
     messageClass = "user-message";
     senderLabel = "You";
     avatarAltText = "User Avatar";
     avatarImg = "/static/images/user-avatar.png";
-
-    const sanitizedContent = DOMPurify.sanitize(marked.parse(messageContent));
-    messageContentHtml = sanitizedContent;
+    messageContentHtml = DOMPurify.sanitize(marked.parse(messageContent));
   } else if (sender === "AI") {
-    // assistant message
     messageClass = "ai-message";
     avatarAltText = "AI Avatar";
     avatarImg = "/static/images/ai-avatar.png";
-
-    if (modelName) {
-      senderLabel = `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`;
-    } else {
-      senderLabel = "AI";
-    }
+    senderLabel = modelName
+      ? `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`
+      : "AI";
 
     let cleaned = messageContent.trim().replace(/\n{3,}/g, "\n\n");
+    cleaned = cleaned.replace(/(\bhttps?:\/\/\S+)(%5D|\])+/gi, (_, url) => url);
     const withCitations = parseCitations(cleaned);
     const htmlContent = DOMPurify.sanitize(marked.parse(withCitations));
     messageContentHtml = htmlContent;
   } else if (sender === "File") {
-    // file message
     messageClass = "file-message";
     senderLabel = "File Added";
-
     const filename = messageContent.filename;
     const fileId = messageContent.file_id;
     messageContentHtml = `
@@ -381,12 +375,14 @@ function appendMessage(sender, messageContent, modelName = null) {
 
   messageDiv.classList.add("message", messageClass);
   messageDiv.innerHTML = `
-    <div class="message-content ${sender === "You" || sender === "File" ? "flex-row-reverse" : ""
+    <div class="message-content ${
+      sender === "You" || sender === "File" ? "flex-row-reverse" : ""
     }">
-      ${sender !== "File"
-      ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
-      : ""
-    }
+      ${
+        sender !== "File"
+          ? `<img src="${avatarImg}" alt="${avatarAltText}" class="avatar">`
+          : ""
+      }
       <div class="message-bubble">
         <div class="message-sender">${senderLabel}</div>
         <div class="message-text">${messageContentHtml}</div>
@@ -406,9 +402,9 @@ function loadMessages(conversationId) {
     .then((response) => response.json())
     .then((data) => {
       const chatbox = document.getElementById("chatbox");
-      if (!chatbox) return; // no chatbox, bail
+      if (!chatbox) return;
 
-      chatbox.innerHTML = ""; // Clear existing messages
+      chatbox.innerHTML = "";
       data.messages.forEach((msg) => {
         if (msg.role === "user") {
           appendMessage("You", msg.content);
@@ -432,37 +428,42 @@ function loadMessages(conversationId) {
  *  CITATION PARSING
  *************************************************/
 function parseCitations(message) {
-  /*
-    Matches patterns like:
-    (Source: FILENAME, Page(s): X) [#doc_1] [#doc_2]
-  */
-  const citationRegex =
-    /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
-
-  return message.replace(
-    citationRegex,
-    (whole, filename, pages, bracketSection) => {
-      const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
-      if (!idMatches) return whole;
-
-      // Build clickable links for each bracket
-      const citationLinks = idMatches
-        .map((m) => {
-          const rawId = m.slice(2, -1);
-          const pageNumber = rawId.split("_").pop();
-          return `<a href="#" class="citation-link" data-citation-id="${rawId}">[Page ${pageNumber}]</a>`;
-        })
-        .join(" ");
-
-      return `(Source: ${filename}, Pages: ${pages}) ${citationLinks}`;
+  const citationRegex = /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
+  return message.replace(citationRegex, (whole, filename, pages, bracketSection) => {
+    let filenameHtml;
+    if (/^https?:\/\/.+/i.test(filename.trim())) {
+      filenameHtml = `<a href="${filename.trim()}" target="_blank" rel="noopener noreferrer">${filename.trim()}</a>`;
+    } else {
+      filenameHtml = filename.trim();
     }
-  );
+
+    const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
+    if (!idMatches) {
+      return `(Source: ${filenameHtml}, Pages: ${pages})`;
+    }
+
+    const citationLinks = idMatches
+      .map((m) => {
+        const rawId = m.slice(2, -1);
+        const pageNumber = rawId.split("_").pop();
+        return `
+          <a href="#"
+             class="citation-link"
+             data-citation-id="${rawId}"
+             target="_blank"
+             rel="noopener noreferrer"
+          >[Page ${pageNumber}]</a>
+        `;
+      })
+      .join(" ");
+
+    return `(Source: ${filenameHtml}, Pages: ${pages}) ${citationLinks}`;
+  });
 }
 
 /*************************************************
  *  DELETE A CONVERSATION
  *************************************************/
-// We'll attach the event to the conversation list container if it exists
 const conversationsList = document.getElementById("conversations-list");
 if (conversationsList) {
   conversationsList.addEventListener("click", (event) => {
@@ -489,26 +490,19 @@ function deleteConversation(conversationId) {
     })
       .then((response) => {
         if (response.ok) {
-          // remove from list
           const convoItem = document.querySelector(
             `.conversation-item[data-conversation-id="${conversationId}"]`
           );
           if (convoItem) {
             convoItem.remove();
           }
-          // If it was the currently selected conversation, clear the UI
+
           if (currentConversationId === conversationId) {
             currentConversationId = null;
-            const userInput = document.getElementById("user-input");
-            const sendBtn = document.getElementById("send-btn");
-            if (userInput) userInput.disabled = true;
-            if (sendBtn) sendBtn.disabled = true;
-
-            const currentTitleEl = document.getElementById(
-              "current-conversation-title"
-            );
-            if (currentTitleEl) {
-              currentTitleEl.textContent = "Select a conversation";
+            const titleEl = document.getElementById("current-conversation-title");
+            if (titleEl) {
+              titleEl.textContent =
+                "Start typing to create a new conversation or select one on the left";
             }
             const chatbox = document.getElementById("chatbox");
             if (chatbox) {
@@ -617,12 +611,14 @@ function showLoadingIndicator() {
     loadingSpinner.style.display = "block";
   }
 }
+
 function hideLoadingIndicator() {
   const loadingSpinner = document.getElementById("loading-spinner");
   if (loadingSpinner) {
     loadingSpinner.style.display = "none";
   }
 }
+
 function showLoadingIndicatorInChatbox() {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
@@ -630,7 +626,6 @@ function showLoadingIndicatorInChatbox() {
   const loadingIndicator = document.createElement("div");
   loadingIndicator.classList.add("loading-indicator");
   loadingIndicator.id = "loading-indicator";
-
   loadingIndicator.innerHTML = `
     <div class="spinner-border text-primary" role="status">
       <span class="visually-hidden">AI is typing...</span>
@@ -640,6 +635,7 @@ function showLoadingIndicatorInChatbox() {
   chatbox.appendChild(loadingIndicator);
   chatbox.scrollTop = chatbox.scrollHeight;
 }
+
 function hideLoadingIndicatorInChatbox() {
   const loadingIndicator = document.getElementById("loading-indicator");
   if (loadingIndicator) {
@@ -648,21 +644,76 @@ function hideLoadingIndicatorInChatbox() {
 }
 
 /*************************************************
+ *  CREATE A NEW CONVERSATION
+ *************************************************/
+function createNewConversation(callback) {
+  fetch("/api/create_conversation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+  })
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().then((errData) => {
+          throw new Error(errData.error || "Failed to create conversation");
+        });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data.conversation_id) {
+        throw new Error("No conversation_id returned from server.");
+      }
+
+      currentConversationId = data.conversation_id;
+      addConversationToList(data.conversation_id);
+      const currentTitleEl = document.getElementById("current-conversation-title");
+      if (currentTitleEl) {
+        currentTitleEl.textContent = data.conversation_id;
+      }
+
+      const chatbox = document.getElementById("chatbox");
+      if (chatbox) {
+        chatbox.innerHTML = "";
+      }
+
+      if (typeof callback === "function") {
+        callback();
+      } else {
+        loadMessages(data.conversation_id);
+      }
+    })
+    .catch((error) => {
+      console.error("Error creating conversation:", error);
+      alert(`Failed to create a new conversation: ${error.message}`);
+    });
+}
+
+/*************************************************
  *  SENDING A MESSAGE
  *************************************************/
 function sendMessage() {
   const userInput = document.getElementById("user-input");
-  if (!userInput || !currentConversationId) return;
+  if (!userInput) return;
 
   const textVal = userInput.value.trim();
   if (textVal === "") return;
 
-  // 1) Immediately show the user's message in the chat UI
+  if (!currentConversationId) {
+    createNewConversation(() => {
+      actuallySendMessage(textVal);
+    });
+  } else {
+    actuallySendMessage(textVal);
+  }
+}
+
+function actuallySendMessage(textVal) {
+  const userInput = document.getElementById("user-input");
   appendMessage("You", textVal);
   userInput.value = "";
   showLoadingIndicatorInChatbox();
 
-  // 2) Check toggles for doc search, selected doc, Bing search, image gen, etc.
   let hybridSearchEnabled = false;
   const sdbtn = document.getElementById("search-documents-btn");
   if (sdbtn && sdbtn.classList.contains("active")) {
@@ -689,7 +740,6 @@ function sendMessage() {
     imageGenEnabled = true;
   }
 
-  // 3) Send to /api/chat with all the relevant flags
   fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -703,7 +753,6 @@ function sendMessage() {
     }),
   })
     .then((response) => {
-      // We'll parse JSON from a cloned response
       const cloned = response.clone();
       return cloned.json().then((data) => ({
         ok: response.ok,
@@ -712,13 +761,10 @@ function sendMessage() {
       }));
     })
     .then(({ ok, status, data }) => {
-      // 4) Always hide the loading indicator first
       hideLoadingIndicatorInChatbox();
 
       if (!ok) {
-        // If not ok, handle error or block
         if (status === 403) {
-          // 5) Content Safety blocked it
           const categories = (data.triggered_categories || [])
             .map((catObj) => `${catObj.category} (severity=${catObj.severity})`)
             .join(", ");
@@ -726,32 +772,26 @@ function sendMessage() {
             ? data.reason.join(", ")
             : data.reason;
 
-          // Show a system-style message
           appendMessage(
             "System",
             `Your message was blocked by Content Safety.\n\n` +
-            `**Categories triggered**: ${categories}\n` +
-            `**Reason**: ${reasonMsg}`
+              `**Categories triggered**: ${categories}\n` +
+              `**Reason**: ${reasonMsg}`
           );
         } else {
-          // Another error (500, 400, etc.)
           appendMessage(
             "System",
             `An error occurred: ${data.error || "Unknown error"}.`
           );
         }
       } else {
-        // 6) Normal successful response
         if (data.reply) {
           appendMessage("AI", data.reply, data.model_deployment_name);
         }
         if (data.image_url) {
-          appendMessage("image", data.image_url);
-          // Optionally reload messages after generating an image
-          setTimeout(() => {
-            loadMessages(currentConversationId);
-          }, 500);
+          appendMessage("image", data.image_url, data.model_deployment_name);
         }
+
         if (data.conversation_id) {
           currentConversationId = data.conversation_id;
         }
@@ -760,7 +800,6 @@ function sendMessage() {
           if (convTitleEl) {
             convTitleEl.textContent = data.conversation_title;
           }
-          // Update the conversation list item if needed
           const convoItem = document.querySelector(
             `.conversation-item[data-conversation-id="${currentConversationId}"]`
           );
@@ -809,131 +848,6 @@ if (userInputEl) {
     if (e.key === "Enter") {
       sendMessage();
     }
-  });
-}
-
-/*************************************************
- *  LOADING DOCUMENTS FOR DROPDOWN
- *************************************************/
-function loadDocuments() {
-  fetch("/api/documents")
-    .then((response) => response.json())
-    .then((data) => {
-      const documentSelect = document.getElementById("document-select");
-      if (!documentSelect) return;
-
-      documentSelect.innerHTML = "";
-
-      // Add a "None" default
-      const defaultOption = document.createElement("option");
-      defaultOption.value = "";
-      defaultOption.textContent = "None";
-      documentSelect.appendChild(defaultOption);
-
-      data.documents.forEach((doc) => {
-        const option = document.createElement("option");
-        option.value = doc.id;
-        option.textContent = doc.file_name;
-        documentSelect.appendChild(option);
-      });
-
-      // Check URL params
-      const searchDocuments = getUrlParameter("search_documents") === "true";
-      const documentId = getUrlParameter("document_id");
-      if (searchDocuments && documentId) {
-        const sdbtn = document.getElementById("search-documents-btn");
-        if (sdbtn) {
-          sdbtn.classList.add("active");
-        }
-        documentSelect.style.display = "block";
-        documentSelect.value = documentId;
-      }
-    })
-    .catch((error) => {
-      console.error("Error loading documents:", error);
-    });
-}
-
-// Utility for reading URL params
-function getUrlParameter(name) {
-  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-  const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
-  const results = regex.exec(location.search);
-  return results === null
-    ? ""
-    : decodeURIComponent(results[1].replace(/\+/g, " "));
-}
-
-/*************************************************
- *  CREATE A NEW CONVERSATION
- *************************************************/
-const newConversationBtn = document.getElementById("new-conversation-btn");
-if (newConversationBtn) {
-  newConversationBtn.addEventListener("click", () => {
-    fetch("/api/create_conversation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-    })
-      .then((response) => {
-        if (!response.ok) {
-          return response.json().then((errData) => {
-            throw new Error(errData.error || "Failed to create conversation");
-          });
-        }
-        return response.json();
-      })
-      .then((data) => {
-        if (data.conversation_id) {
-          // automatically select
-          selectConversation(data.conversation_id);
-
-          const conversationsList = document.getElementById("conversations-list");
-          if (!conversationsList) return;
-
-          // Add it to top of the conversation list
-          const convoItem = document.createElement("div");
-          convoItem.classList.add(
-            "list-group-item",
-            "conversation-item",
-            "active"
-          );
-          convoItem.setAttribute("data-conversation-id", data.conversation_id);
-
-          const date = new Date();
-          convoItem.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <span>${data.conversation_id}</span><br>
-                <small>${date.toLocaleString()}</small>
-              </div>
-              <button
-                class="btn btn-danger btn-sm delete-btn"
-                data-conversation-id="${data.conversation_id}"
-              >
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          `;
-          conversationsList.prepend(convoItem);
-
-          // remove 'active' from others
-          const items = document.querySelectorAll(".conversation-item");
-          items.forEach((item) => {
-            if (
-              item.getAttribute("data-conversation-id") !== data.conversation_id
-            ) {
-              item.classList.remove("active");
-            }
-          });
-        } else {
-          throw new Error("Conversation ID not received");
-        }
-      })
-      .catch((error) => {
-        console.error("Error creating conversation:", error);
-        alert(`Failed to create a new conversation: ${error.message}`);
-      });
   });
 }
 
@@ -993,48 +907,52 @@ if (uploadBtn) {
       alert("Please select a file to upload.");
       return;
     }
+
     if (!currentConversationId) {
-      alert("Please select or start a conversation before uploading a file.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("conversation_id", currentConversationId);
-
-    fetch("/upload", {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => {
-        // For debugging:
-        let clonedResponse = response.clone();
-        return response.json().then((data) => {
-          if (!response.ok) {
-            console.error("Upload failed:", data.error || "Unknown error");
-            alert("Error uploading file: " + (data.error || "Unknown error"));
-            throw new Error(data.error || "Upload failed");
-          }
-          return data;
-        });
-      })
-      .then((data) => {
-        console.log("Upload response data:", data);
-        if (data.conversation_id) {
-          currentConversationId = data.conversation_id;
-          loadMessages(currentConversationId);
-        } else {
-          console.error("No conversation_id returned from server.");
-          alert("Error: No conversation ID returned from server.");
-        }
-        resetFileButton();
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-        alert("Error uploading file: " + error.message);
-        resetFileButton();
+      createNewConversation(() => {
+        uploadFileToConversation(file);
       });
+    } else {
+      uploadFileToConversation(file);
+    }
   });
+}
+
+function uploadFileToConversation(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("conversation_id", currentConversationId);
+
+  fetch("/upload", {
+    method: "POST",
+    body: formData,
+  })
+    .then((response) => {
+      let clonedResponse = response.clone();
+      return response.json().then((data) => {
+        if (!response.ok) {
+          console.error("Upload failed:", data.error || "Unknown error");
+          alert("Error uploading file: " + (data.error || "Unknown error"));
+          throw new Error(data.error || "Upload failed");
+        }
+        return data;
+      });
+    })
+    .then((data) => {
+      if (data.conversation_id) {
+        currentConversationId = data.conversation_id;
+        loadMessages(currentConversationId);
+      } else {
+        console.error("No conversation_id returned from server.");
+        alert("Error: No conversation ID returned from server.");
+      }
+      resetFileButton();
+    })
+    .catch((error) => {
+      console.error("Error:", error);
+      alert("Error uploading file: " + error.message);
+      resetFileButton();
+    });
 }
 
 /*************************************************
@@ -1042,7 +960,6 @@ if (uploadBtn) {
  *************************************************/
 const chatboxEl = document.getElementById("chatbox");
 if (chatboxEl) {
-  // Catch clicks on citation/file links
   chatboxEl.addEventListener("click", (event) => {
     if (event.target && event.target.matches("a.citation-link")) {
       event.preventDefault();
@@ -1054,10 +971,6 @@ if (chatboxEl) {
       const conversationId = event.target.getAttribute("data-conversation-id");
       fetchFileContent(conversationId, fileId);
     }
-  });
-
-  // If user clicks on the generated image
-  chatboxEl.addEventListener("click", (event) => {
     if (event.target.classList.contains("generated-image")) {
       const imageSrc = event.target.getAttribute("data-image-src");
       showImagePopup(imageSrc);
@@ -1167,7 +1080,6 @@ function showFileContentPopup(fileContent, filename, isTable) {
 
   if (isTable) {
     fileContentElement.innerHTML = `<div class="table-responsive">${fileContent}</div>`;
-    // If using DataTables
     $(document).ready(function () {
       $("#file-content table").DataTable({
         responsive: true,
@@ -1189,8 +1101,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const tooltipTriggerList = [].slice.call(
     document.querySelectorAll('[data-bs-toggle="tooltip"]')
   );
-  tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
   });
 });
 
@@ -1198,14 +1110,11 @@ document.addEventListener("DOMContentLoaded", function () {
  *  ON PAGE LOAD
  *************************************************/
 window.onload = function () {
-  // 1) Always load conversation list
   loadConversations();
 
-  // 2) Conditionally load docs (only if doc UI is in DOM)
   loadAllDocs().then(() => {
-    // Then read URL params:
     const searchDocsParam = getUrlParameter("search_documents") === "true";
-    const docScopeParam = getUrlParameter("doc_scope") || ""; // e.g. "personal","group","all",""
+    const docScopeParam = getUrlParameter("doc_scope") || "";
     const documentIdParam = getUrlParameter("document_id") || "";
 
     const searchDocsBtn = document.getElementById("search-documents-btn");
@@ -1213,25 +1122,37 @@ window.onload = function () {
     const docSelectEl = document.getElementById("document-select");
 
     if (searchDocsParam && searchDocsBtn && docScopeSel && docSelectEl) {
-      // 1) Turn on "Search Documents"
       searchDocsBtn.classList.add("active");
-
-      // 2) Show doc scope & doc select
       docScopeSel.style.display = "inline-block";
       docSelectEl.style.display = "inline-block";
 
-      // 3) If doc_scope param is present, set it
       if (docScopeParam) {
         docScopeSel.value = docScopeParam;
       }
-
-      // 4) Populate the final doc list
       populateDocumentSelectScope();
 
-      // 5) If there's a doc ID, select it
       if (documentIdParam) {
         docSelectEl.value = documentIdParam;
       }
     }
   });
 };
+
+const newConversationBtn = document.getElementById("new-conversation-btn");
+if (newConversationBtn) {
+  newConversationBtn.addEventListener("click", () => {
+    createNewConversation();
+  });
+}
+
+/*************************************************
+ *  OPTIONAL: GET URL PARAM
+ *************************************************/
+function getUrlParameter(name) {
+  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+  const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+  const results = regex.exec(location.search);
+  return results === null
+    ? ""
+    : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
