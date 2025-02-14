@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.199.3'
+app.config['VERSION'] = '0.200.0'
 Session(app)
 
 CLIENTS = {}
@@ -130,20 +130,6 @@ feedback_container = database.create_container_if_not_exists(
 archived_conversations_container_name = "archived_conversations"
 archived_conversations_container = database.create_container_if_not_exists(
     id=archived_conversations_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
-
-archived_feedback_container_name = "archived_feedback"
-archived_feedback_container = database.create_container_if_not_exists(
-    id=archived_feedback_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
-
-archived_safety_container_name = "archived_safety"
-archived_safety_container = database.create_container_if_not_exists(
-    id=archived_safety_container_name,
     partition_key=PartitionKey(path="/id"),
     offer_throughput=400
 )

@@ -555,7 +555,7 @@
             <!-- SAFETY TAB -->
             <div class="tab-pane fade" id="safety" role="tabpanel" aria-labelledby="safety-tab">
                 <p class="text-muted">
-                    Configure content safety and user feedback settings. If Content Safety is enabled, user messages will be sent to the safety endpoint for analysis. If User Feedback is enabled, users will see thumbs up/down to provide feedback on AI responses.
+                    Configure content safety, archiving, and user feedback settings. If Content Safety is enabled, user messages will be sent to the safety endpoint for analysis. If User Feedback is enabled, users will see thumbs up/down to provide feedback on AI responses.
                 </p>
                 <div class="card p-3">
 
@@ -633,14 +633,23 @@
                         </label>
                     </div>
 
-                    <!-- Example: If you want to show extra user-feedback settings, add a block here:
-                    <div
-                    id="user_feedback_settings"
-                    {% if not settings.enable_user_feedback %}style="display: none;"{% endif %}
-                    >
-                        ... additional fields ...
+                    <!-- USER FEEDBACK DETAILS -->
+                    <div class="card p-3 mb-3">
+                        <h5>Conversation Archiving</h5>
+                        <p class="text-muted">When enabled, conversation deletions will be archived instead of permanently deleted.</p>
+                        <div class="form-group form-check form-switch mb-3">
+                            <input 
+                              type="checkbox" 
+                              class="form-check-input" 
+                              id="enable_conversation_archiving" 
+                              name="enable_conversation_archiving" 
+                              {% if settings.enable_conversation_archiving %}checked{% endif %}
+                            >
+                            <label class="form-check-label ms-2" for="enable_conversation_archiving">
+                                Enable Conversation Archiving
+                            </label>
+                        </div>
                     </div>
-                    -->
                     
                 </div>
             </div>
