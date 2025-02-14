@@ -3,6 +3,7 @@ let groupDocs = [];
 let activeGroupName = "";
 let currentConversationId = null;
 
+
 /*************************************************
  *  LOAD / DISPLAY CONVERSATIONS
  *************************************************/
@@ -296,7 +297,7 @@ function scrollChatToBottom() {
   }
 }
 
-function appendMessage(sender, messageContent, modelName = null) {
+function appendMessage(sender, messageContent, modelName = null, messageId = null) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
 
@@ -308,6 +309,7 @@ function appendMessage(sender, messageContent, modelName = null) {
   let messageClass = "";
   let senderLabel = "";
   let messageContentHtml = "";
+  let feedbackHtml = "";
 
   if (sender === "System") {
     return;
@@ -318,7 +320,18 @@ function appendMessage(sender, messageContent, modelName = null) {
     senderLabel = "Content Safety";
     avatarAltText = "Content Safety Avatar";
     avatarImg = "/static/images/alert.png";
-    messageContentHtml = DOMPurify.sanitize(marked.parse(messageContent));
+    const linkToViolations = `
+      <br>
+      <small>
+        <a href="/safety_violations" target="_blank" rel="noopener" style="font-size: 0.85em; color: #6c757d;">
+          View My Safety Violations
+        </a>
+      </small>
+    `;
+
+    messageContentHtml = DOMPurify.sanitize(
+      marked.parse(messageContent + linkToViolations)
+    );
   } else if (sender === "image") {
     messageClass = "ai-message";
     senderLabel = modelName
@@ -350,6 +363,8 @@ function appendMessage(sender, messageContent, modelName = null) {
     senderLabel = modelName
       ? `AI <span style="color: #6c757d; font-size: 0.8em;">(${modelName})</span>`
       : "AI";
+
+    feedbackHtml = renderFeedbackIcons(messageId, currentConversationId);
 
     let cleaned = messageContent.trim().replace(/\n{3,}/g, "\n\n");
     cleaned = cleaned.replace(/(\bhttps?:\/\/\S+)(%5D|\])+/gi, (_, url) => url);
@@ -386,6 +401,7 @@ function appendMessage(sender, messageContent, modelName = null) {
       <div class="message-bubble">
         <div class="message-sender">${senderLabel}</div>
         <div class="message-text">${messageContentHtml}</div>
+        ${feedbackHtml || ""}
       </div>
     </div>
   `;
@@ -409,7 +425,7 @@ function loadMessages(conversationId) {
         if (msg.role === "user") {
           appendMessage("You", msg.content);
         } else if (msg.role === "assistant") {
-          appendMessage("AI", msg.content, msg.model_deployment_name);
+          appendMessage("AI", msg.content, msg.model_deployment_name, msg.message_id);
         } else if (msg.role === "file") {
           appendMessage("File", msg);
         } else if (msg.role === "image") {
@@ -776,7 +792,8 @@ function actuallySendMessage(textVal) {
             "System",
             `Your message was blocked by Content Safety.\n\n` +
               `**Categories triggered**: ${categories}\n` +
-              `**Reason**: ${reasonMsg}`
+              `**Reason**: ${reasonMsg}`,
+            data.message_id
           );
         } else {
           appendMessage(
@@ -786,10 +803,10 @@ function actuallySendMessage(textVal) {
         }
       } else {
         if (data.reply) {
-          appendMessage("AI", data.reply, data.model_deployment_name);
+          appendMessage("AI", data.reply, data.model_deployment_name, data.message_id);
         }
         if (data.image_url) {
-          appendMessage("image", data.image_url, data.model_deployment_name);
+          appendMessage("image", data.image_url, data.model_deployment_name, data.message_id);
         }
 
         if (data.conversation_id) {
@@ -1155,4 +1172,103 @@ function getUrlParameter(name) {
   return results === null
     ? ""
     : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+/*************************************************
+ *  THUMBS UP / DOWN FEEDBACK
+ *************************************************/
+function renderFeedbackIcons(messageId, conversationId) {
+  return `
+    <div class="feedback-icons" data-ai-message-id="${messageId}">
+      <i class="bi bi-hand-thumbs-up-fill text-muted me-3 feedback-btn" 
+         data-feedback-type="positive" 
+         data-conversation-id="${conversationId}"
+         title="Thumbs Up"
+         style="cursor:pointer;"></i>
+      <i class="bi bi-hand-thumbs-down-fill text-muted feedback-btn" 
+         data-feedback-type="negative" 
+         data-conversation-id="${conversationId}"
+         title="Thumbs Down"
+         style="cursor:pointer;"></i>
+    </div>
+  `;
+}
+
+// Add event listener for thumbs up/down
+document.addEventListener("click", function (event) {
+  const feedbackBtn = event.target.closest(".feedback-btn");
+  if (!feedbackBtn) return;
+
+  const feedbackType = feedbackBtn.getAttribute("data-feedback-type");
+  const messageId = feedbackBtn.closest(".feedback-icons").getAttribute("data-ai-message-id");
+  const conversationId = feedbackBtn.getAttribute("data-conversation-id");
+
+  // 1) VISUAL FEEDBACK: Add "clicked" class
+  feedbackBtn.classList.add("clicked");
+
+  if (feedbackType === "positive") {
+    // Immediately submit thumbs-up, no reason needed
+    submitFeedback(messageId, conversationId, "positive", "");
+
+    // 2) Remove the class after 500ms or so
+    setTimeout(() => {
+      feedbackBtn.classList.remove("clicked");
+    }, 500);
+  } else {
+    // Thumbs down => open modal for optional reason
+    const modalEl = new bootstrap.Modal(document.getElementById("feedback-modal"));
+    document.getElementById("feedback-ai-response-id").value = messageId;
+    document.getElementById("feedback-conversation-id").value = conversationId;
+    document.getElementById("feedback-type").value = "negative";
+    document.getElementById("feedback-reason").value = "";
+    modalEl.show();
+  }
+});
+
+// Form submission for thumbs-down reason
+const feedbackForm = document.getElementById("feedback-form");
+if (feedbackForm) {
+  feedbackForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const messageId = document.getElementById("feedback-ai-response-id").value;
+    const conversationId = document.getElementById("feedback-conversation-id").value;
+    const feedbackType = document.getElementById("feedback-type").value;
+    const reason = document.getElementById("feedback-reason").value.trim();
+
+    // Submit feedback
+    submitFeedback(messageId, conversationId, feedbackType, reason);
+
+    // Hide modal
+    const modalEl = bootstrap.Modal.getInstance(
+      document.getElementById("feedback-modal")
+    );
+    if (modalEl) modalEl.hide();
+  });
+}
+
+function submitFeedback(messageId, conversationId, feedbackType, reason) {
+  fetch("/feedback/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messageId,
+      conversationId,
+      feedbackType,
+      reason
+    }),
+  })
+    .then((resp) => resp.json())
+    .then((data) => {
+      if (data.success) {
+        // Optionally highlight the icons or show a "thank you" message
+        console.log("Feedback submitted:", data);
+      } else {
+        console.error("Feedback error:", data.error || data);
+        alert("Error submitting feedback: " + (data.error || "Unknown error."));
+      }
+    })
+    .catch((err) => {
+      console.error("Error sending feedback:", err);
+      alert("Error sending feedback.");
+    });
 }

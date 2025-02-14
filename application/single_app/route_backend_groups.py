@@ -12,6 +12,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/discover", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def discover_groups():
         """
         GET /api/groups/discover?search=<term>&showAll=<true|false>
@@ -21,9 +22,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
 
         search_query = request.args.get("search", "").lower()
         show_all_str = request.args.get("showAll", "false").lower()
@@ -59,13 +57,11 @@ def register_route_backend_groups(app):
     @app.route("/api/groups", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_list_groups():
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-        
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
-        
+                
         user_settings_data = get_user_settings(user_id)
         db_active_group_id = user_settings_data["settings"].get("activeGroupOid", "")
 
@@ -92,15 +88,13 @@ def register_route_backend_groups(app):
     @app.route("/api/groups", methods=["POST"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_create_group():
         """
         POST /api/groups
         Expects JSON: { "name": "", "description": "" }
         Creates a new group with the current user as the owner.
-        """
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
-        
+        """        
         data = request.get_json()
         name = data.get("name", "Untitled Group")
         description = data.get("description", "")
@@ -114,14 +108,12 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_get_group_details(group_id):
         """
         GET /api/groups/<group_id>
         Returns the full group details for that group.
-        """
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
-        
+        """        
         group_doc = find_group_by_id(group_id)
         
         if not group_doc:
@@ -131,6 +123,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["DELETE"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_delete_group(group_id):
         """
         DELETE /api/groups/<group_id>
@@ -138,8 +131,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -155,6 +146,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["PATCH", "PUT"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_update_group(group_id):
         """
         PATCH /api/groups/<group_id> or PUT /api/groups/<group_id>
@@ -163,9 +155,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -192,6 +181,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/setActive", methods=["PATCH"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_set_active_group():
         """
         PATCH /api/groups/setActive
@@ -204,9 +194,6 @@ def register_route_backend_groups(app):
 
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
 
         group_doc = find_group_by_id(group_id)
         if not group_doc:
@@ -223,6 +210,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/requests", methods=["POST"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def request_to_join(group_id):
         """
         POST /api/groups/<group_id>/requests
@@ -231,9 +219,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -262,6 +247,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/requests", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def view_pending_requests(group_id):
         """
         GET /api/groups/<group_id>/requests
@@ -269,9 +255,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -287,6 +270,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/requests/<request_id>", methods=["PATCH"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def approve_reject_request(group_id, request_id):
         """
         PATCH /api/groups/<group_id>/requests/<request_id>
@@ -295,9 +279,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -339,6 +320,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/members", methods=["POST"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def add_member_directly(group_id):
         """
         POST /api/groups/<group_id>/members
@@ -348,9 +330,6 @@ def register_route_backend_groups(app):
         user_info = get_current_user_info()
         user_id = user_info["userId"]
 
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
-        
         group_doc = find_group_by_id(group_id)
         
         if not group_doc:
@@ -382,6 +361,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["DELETE"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def remove_member(group_id, member_id):
         """
         DELETE /api/groups/<group_id>/members/<member_id>
@@ -391,9 +371,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -462,6 +439,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["PATCH"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def update_member_role(group_id, member_id):
         """
         PATCH /api/groups/<group_id>/members/<member_id>
@@ -470,9 +448,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -512,6 +487,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/members", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def view_group_members(group_id):
         """
         GET /api/groups/<group_id>/members?search=<term>&role=<role>
@@ -519,9 +495,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         
@@ -565,6 +538,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/transferOwnership", methods=["PATCH"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def transfer_ownership(group_id):
         """
         PATCH /api/groups/<group_id>/transferOwnership
@@ -583,9 +557,6 @@ def register_route_backend_groups(app):
         if not new_owner_id:
             return jsonify({"error": "Missing newOwnerId"}), 400
         
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
-
         group_doc = find_group_by_id(group_id)
 
         if not group_doc:
@@ -639,6 +610,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>/fileCount", methods=["GET"])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def get_group_file_count(group_id):
         """
         GET /api/groups/<group_id>/fileCount
@@ -647,9 +619,6 @@ def register_route_backend_groups(app):
         """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_doc = find_group_by_id(group_id)
         

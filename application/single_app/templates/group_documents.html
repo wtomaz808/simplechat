@@ -4,13 +4,7 @@ Application{% endblock %} {% block content %}
 <div class="container">
   <h2>Group Documents</h2>
   <h3 id="active-group-name" style="margin-bottom: 20px; display: none"></h3>
-  <div
-    class="modal fade"
-    id="loadingModal"
-    tabindex="-1"
-    aria-labelledby="loadingModalLabel"
-    aria-hidden="true"
-  >
+  <div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content text-center">
         <div class="modal-body">
@@ -32,6 +26,7 @@ Application{% endblock %} {% block content %}
       <button class="btn btn-primary" id="btn-change-group">
         Change Active Group
       </button>
+      <button class="btn btn-secondary" id="btn-my-groups">My Groups</button>
     </div>
   </div>
 
@@ -140,16 +135,14 @@ Application{% endblock %} {% block content %}
             <td>${doc.version}</td>
             <td>${doc.num_chunks}</td>
             <td>
-              ${
-                userRoleInActiveGroup === "Owner" ||
-                userRoleInActiveGroup === "Admin" ||
-                userRoleInActiveGroup === "DocumentManager"
-                  ? `<button class="btn btn-sm btn-danger" onclick="onDeleteDocument('${doc.id}', '${doc.group_id}')">Delete</button>`
-                  : ``
-              }
-              <button class="btn btn-sm btn-primary" onclick="onSearchInChat('${
-                doc.id
-              }')">Search in Chat</button>
+              ${userRoleInActiveGroup === "Owner" ||
+              userRoleInActiveGroup === "Admin" ||
+              userRoleInActiveGroup === "DocumentManager"
+              ? `<button class="btn btn-sm btn-danger" onclick="onDeleteDocument('${doc.id}', '${doc.group_id}')">Delete</button>`
+              : ``
+            }
+              <button class="btn btn-sm btn-primary" onclick="onSearchInChat('${doc.id
+            }')">Search in Chat</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -232,9 +225,15 @@ Application{% endblock %} {% block content %}
     }
   }
 
+
+
   document.addEventListener("DOMContentLoaded", () => {
     fetchUserGroups().then(() => {
       fetchGroupDocuments();
+    });
+
+    document.getElementById('btn-my-groups').addEventListener('click', function () {
+      window.location.href = "{{ url_for('my_groups') }}";
     });
 
     document

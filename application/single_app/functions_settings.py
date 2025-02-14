@@ -30,6 +30,7 @@ def get_settings():
             'enable_user_documents': True,
             'enable_group_documents': True,
             'enable_content_safety': False,
+            'enable_user_feedback': True,
             'content_safety_endpoint': '',
             'content_safety_key': '',
             'azure_openai_gpt_endpoint': '',
@@ -142,3 +143,32 @@ def update_user_settings(user_id, new_settings):
             **new_settings
         }
         user_settings_container.upsert_item(doc)
+
+def enabled_required(setting_key):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            settings = get_settings()
+            if not settings.get(setting_key, False):
+                setting_key_as_statement = setting_key.replace("_", " ").title()
+                return jsonify({"error": f"{setting_key_as_statement} is disabled."}), 400
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+import re
+
+def sanitize_settings_for_user(full_settings: dict) -> dict:
+    keys_to_exclude = {
+        'azure_document_intelligence_key',
+        'azure_ai_search_key',
+        'azure_openai_gpt_key',
+        'azure_openai_embedding_key',
+        'azure_openai_image_gen_key',
+        'bing_search_key',
+        'azure_apim_gpt_subscription_key',
+        'azure_apim_embedding_subscription_key',
+        'azure_apim_image_gen_subscription_key',
+        # any others that are secrets
+    }
+    return {k:v for k,v in full_settings.items() if k not in keys_to_exclude}

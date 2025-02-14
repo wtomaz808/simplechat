@@ -12,9 +12,11 @@ def register_route_frontend_chats(app):
     def chats():
         user_id = get_current_user_id()
         settings = get_settings()
+        #public_settings = sanitize_settings_for_user(settings)
         if not user_id:
             return redirect(url_for('login'))
         return render_template('chats.html', settings=settings)
+    
     @app.route('/upload', methods=['POST'])
     @login_required
     @user_required
