@@ -1,6 +1,39 @@
 <!-- BEGIN RELEASE_NOTES.MD BLOCK -->
 
 # Feature Release
+## (V0.199.3)
+
+We introduced a robust user feedback system, expanded content-safety features for both admins and end users, added new Cosmos DB containers, and refined route-level permission toggles. These changes help administrators collect feedback on AI responses, manage content safety more seamlessly, and give end users clearer ways to manage their documents, groups, and personal logs. Enjoy the new functionality, and let us know if you have any questions or issues!
+
+1. **New “User Feedback” System**
+   - **Thumbs Up / Thumbs Down**: Users can now provide feedback on individual AI responses (when enabled in App Settings)
+   - **Frontend Feedback Pages**:
+     - **/my_feedback** page shows each user’s submitted feedback.
+     - **/admin/feedback_review** page allows admins to review, filter, and manage all feedback.
+2. **Extended Content Safety Features**
+   - **New “Safety Violations” Page**: Admins can manage safety violations.
+   - **New “My Safety Violations” Page**: Users can view their violations and add personal notes to each violation.
+3. **New or Updated Database Containers**
+   - feedback_container for user feedback.
+   - archived_conversations_container / archived_feedback_container / archived_safety_container for long-term archival.
+4. **Route-Level Feature Toggles**
+   - **enabled_required(setting_key) Decorator**:
+     - Dynamically block or allow routes based on an admin setting (e.g., enable_user_documents or enable_group_documents).
+     - Reduces scattered if checks; you simply annotate the route.
+5. **Conversation & Messaging Improvements**
+   - **Unique message_id for Each Chat Message**:
+     - Every user, assistant, safety, or image message now includes a message_id.
+     - Makes it easier to tie user feedback or safety logs to a specific message.
+   - **Public vs. Secret Settings**:
+     - Frontend references a public_settings = sanitize_settings_for_user(settings) to avoid the potential to expose secrets on the client side.
+6. **UI/UX Tweaks**
+   - **Chat Layout Updates**:
+     - “Start typing to create a new conversation…” message if none selected.
+     - Automatic creation of new conversation when user tries to send a message with no active conversation.
+   - **Navigation Bar Adjustments**:
+     - Consolidated admin links into a dropdown.
+     - “My Account” dropdown for quick access to “My Groups,” “My Feedback,” etc., if enabled.
+
 ## (v0.196.9)
 
 1. **Content Safety Integration**
