@@ -555,29 +555,60 @@
             <!-- SAFETY TAB -->
             <div class="tab-pane fade" id="safety" role="tabpanel" aria-labelledby="safety-tab">
                 <p class="text-muted">
-                    Configure content safety settings. If enabled, user messages will be sent to the safety endpoint for analysis.
+                    Configure content safety and user feedback settings. If Content Safety is enabled, user messages will be sent to the safety endpoint for analysis. If User Feedback is enabled, users will see thumbs up/down to provide feedback on AI responses.
                 </p>
                 <div class="card p-3">
+
+                    <!-- ENABLE CONTENT SAFETY -->
                     <div class="form-group form-check form-switch mb-3">
-                        <input type="checkbox" class="form-check-input" id="enable_content_safety" name="enable_content_safety" 
-                            {% if settings.enable_content_safety %}checked{% endif %}>
+                        <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="enable_content_safety"
+                        name="enable_content_safety"
+                        {% if settings.enable_content_safety %}checked{% endif %}
+                        >
                         <label class="form-check-label ms-2" for="enable_content_safety">
                             Enable Content Safety
                         </label>
                     </div>
-                    <div id="content_safety_settings" {% if not settings.enable_content_safety %}style="display: none;"{% endif %}>
-                        
+
+                    <!-- CONTENT SAFETY DETAILS - Shown/Hidden based on toggle -->
+                    <div
+                    id="content_safety_settings"
+                    {% if not settings.enable_content_safety %}style="display: none;"{% endif %}
+                    >
                         <div class="mb-3">
-                            <label for="content_safety_endpoint" class="form-label">Content Safety Endpoint</label>
-                            <input type="text" class="form-control" id="content_safety_endpoint" name="content_safety_endpoint"
-                                value="{{ settings.content_safety_endpoint or '' }}">
+                            <label for="content_safety_endpoint" class="form-label">
+                                Content Safety Endpoint
+                            </label>
+                            <input
+                            type="text"
+                            class="form-control"
+                            id="content_safety_endpoint"
+                            name="content_safety_endpoint"
+                            value="{{ settings.content_safety_endpoint or '' }}"
+                            >
                         </div>
                         <div class="mb-3">
-                            <label for="content_safety_key" class="form-label">Content Safety Key</label>
+                            <label for="content_safety_key" class="form-label">
+                                Content Safety Key
+                            </label>
                             <div class="input-group">
-                                <input type="password" class="form-control" id="content_safety_key" name="content_safety_key"
-                                    value="{{ settings.content_safety_key or '' }}">
-                                <button type="button" class="btn btn-outline-secondary" id="toggle_content_safety_key">Show</button>
+                                <input
+                                type="password"
+                                class="form-control"
+                                id="content_safety_key"
+                                name="content_safety_key"
+                                value="{{ settings.content_safety_key or '' }}"
+                                >
+                                <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                id="toggle_content_safety_key"
+                                >
+                                    Show
+                                </button>
                             </div>
                         </div>
                         <button type="button" class="btn btn-secondary" id="test_safety_button">
@@ -585,6 +616,32 @@
                         </button>
                         <div id="test_safety_result" class="mt-2"></div>
                     </div>
+
+                    <hr>
+
+                    <!-- ENABLE USER FEEDBACK -->
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="enable_user_feedback"
+                        name="enable_user_feedback"
+                        {% if settings.enable_user_feedback %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_user_feedback">
+                            Enable User Feedback (Thumbs Up/Down)
+                        </label>
+                    </div>
+
+                    <!-- Example: If you want to show extra user-feedback settings, add a block here:
+                    <div
+                    id="user_feedback_settings"
+                    {% if not settings.enable_user_feedback %}style="display: none;"{% endif %}
+                    >
+                        ... additional fields ...
+                    </div>
+                    -->
+                    
                 </div>
             </div>
 

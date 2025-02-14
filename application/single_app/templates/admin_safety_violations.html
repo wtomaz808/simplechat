@@ -5,6 +5,9 @@
 {% block content %}
 <div class="container">
   <h2>Safety Violations</h2>
+  <p class="text-muted">
+    Review and manage safety violations reported by the system. Use the filters to narrow down the list.
+  </p>
   <hr/>
 
   <!-- FILTERS ROW -->
@@ -20,21 +23,23 @@
       </select>
     </div>
     <div class="col-md-4">
-      <label for="filterCategory" class="form-label">Filter by Category:</label>
-      <select id="filterCategory" class="form-select form-select-sm">
+      <label for="filterAction" class="form-label">Filter by Action:</label>
+      <select id="filterAction" class="form-select form-select-sm">
         <option value="">(All)</option>
-        <option value="Hate">Hate</option>
-        <option value="SelfHarm">SelfHarm</option>
-        <option value="Sexual">Sexual</option>
-        <option value="Violence">Violence</option>
+        <option value="None">None</option>
+        <option value="WarnUser">WarnUser</option>
+        <option value="SuspendUser">SuspendUser</option>
+        <option value="Escalate">Escalate</option>
+        <option value="BlockUser">BlockUser</option>
       </select>
     </div>
   </div>
 
-  <table class="table table-striped" id="safetyLogsTable" width="100%">
+  <!-- Safety Violations Table -->
+  <table class="table table-striped" id="safetyLogsTable">
     <thead>
       <tr>
-        <!-- ID removed. We'll keep the rest read-only in the table. -->
+        <!-- ID is intentionally hidden, but we keep the rest read-only in the table. -->
         <th>User ID</th>
         <th>Message</th>
         <th>Triggered Categories</th>
@@ -54,7 +59,7 @@
 
 <!-- ===== Modal for Editing a Single Violation ===== -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editModalLabel">Edit Violation</h5>
@@ -62,25 +67,33 @@
       </div>
       <div class="modal-body">
 
-        <!-- Read-only fields -->
+        <!-- Read-only fields as plain text -->
         <div class="mb-3">
-          <label class="form-label">User ID</label>
-          <input type="text" class="form-control" id="editUserId" readonly />
+          <label class="form-label fw-bold">User ID:</label>
+          <p id="editUserId" class="form-control-plaintext"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Message</label>
-          <textarea class="form-control" id="editMessage" rows="2" readonly></textarea>
+          <label class="form-label fw-bold">Message:</label>
+          <p
+            id="editMessage"
+            class="form-control-plaintext"
+            style="white-space: pre-wrap;"
+          ></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Triggered Categories</label>
-          <input type="text" class="form-control" id="editCategories" readonly />
+          <label class="form-label fw-bold">Triggered Categories:</label>
+          <p
+            id="editCategories"
+            class="form-control-plaintext"
+            style="white-space: pre-wrap;"
+          ></p>
         </div>
 
         <!-- Editable fields: Status, Action, Notes -->
         <div class="mb-3">
-          <label class="form-label">Status</label>
+          <label class="form-label fw-bold">Status:</label>
           <select class="form-select" id="editStatus">
             <option value="New">New</option>
             <option value="In-Review">In-Review</option>
@@ -90,7 +103,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Action</label>
+          <label class="form-label fw-bold">Action:</label>
           <select class="form-select" id="editAction">
             <option value="None">None</option>
             <option value="WarnUser">WarnUser</option>
@@ -101,11 +114,11 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Notes</label>
+          <label class="form-label fw-bold">Notes:</label>
           <textarea class="form-control" id="editNotes" rows="3"></textarea>
         </div>
 
-        <!-- We'll store the record's ID in a hidden field for patching -->
+        <!-- Hidden field for log ID -->
         <input type="hidden" id="editLogId" />
       </div>
       <div class="modal-footer">
@@ -132,62 +145,44 @@
       const tableBody = $("#safetyLogsTable tbody");
 
       logs.forEach(log => {
-        const row = $("<tr></tr>");
+        const row = $("<tr></tr>").data("logId", log.id);
 
-        // Note: ID is hidden from the table, but we keep it in row data attributes for reference
-        row.data("logId", log.id);
-
-        // user_id
-        const userCell = $("<td></td>").text(log.user_id || "");
-        // message
+        // Build each cell
+        const userCell    = $("<td></td>").text(log.user_id || "");
         const messageCell = $("<td></td>").text(log.message || "");
-        // triggered_categories
-        const categories = (log.triggered_categories || [])
-          .map(cat => `${cat.category}(s=${cat.severity})`)
-          .join(", ");
-        const catCell = $("<td></td>").text(categories);
+        const categories  = (log.triggered_categories || [])
+                              .map(cat => `${cat.category}(s=${cat.severity})`)
+                              .join(", ");
+        const catCell     = $("<td></td>").text(categories);
+        const statusCell  = $("<td></td>").text(log.status || "New");
+        const actionCell  = $("<td></td>").text(log.action || "None");
+        const notesCell   = $("<td></td>").text(log.notes || "");
+        const createdVal  = log.created_at ? new Date(log.created_at).toLocaleString() : "";
+        const createdCell = $("<td></td>").text(createdVal);
+        const updatedVal  = log.last_updated ? new Date(log.last_updated).toLocaleString() : "";
+        const updatedCell = $("<td></td>").text(updatedVal);
 
-        // status (read-only in table)
-        const currentStatus = log.status || "New";
-        const statusCell = $("<td></td>").text(currentStatus);
-
-        // action (read-only in table)
-        const currentAction = log.action || "None";
-        const actionCell = $("<td></td>").text(currentAction);
-
-        // notes (read-only in table)
-        const currentNotes = log.notes || "";
-        const notesCell = $("<td></td>").text(currentNotes);
-
-        // created_at
-        const created = log.created_at ? new Date(log.created_at).toLocaleString() : "";
-        const createdCell = $("<td></td>").text(created);
-
-        // last_updated
-        const updated = log.last_updated ? new Date(log.last_updated).toLocaleString() : "";
-        const updatedCell = $("<td></td>").text(updated);
-
-        // "Edit" button
+        // Edit button
         const editBtn = $("<button class='btn btn-primary btn-sm'>Edit</button>");
         editBtn.click(function() {
           // Open the modal & populate fields
           $("#editLogId").val(log.id);
-          $("#editUserId").val(log.user_id || "");
-          $("#editMessage").val(log.message || "");
-          $("#editCategories").val(categories || "");
 
-          // Set status dropdown
-          $("#editStatus").val(currentStatus);
-          // Set action dropdown
-          $("#editAction").val(currentAction);
-          // Set notes
-          $("#editNotes").val(currentNotes);
+          // Update read-only fields with .text(...)
+          $("#editUserId").text(log.user_id || "");
+          $("#editMessage").text(log.message || "");
+          $("#editCategories").text(categories || "");
 
-          // Show the modal
+          // Editable fields
+          $("#editStatus").val(log.status || "New");
+          $("#editAction").val(log.action || "None");
+          $("#editNotes").val(log.notes || "");
+
           $("#editModal").modal("show");
         });
         const editCell = $("<td></td>").append(editBtn);
 
+        // Append cells to row
         row.append(userCell);
         row.append(messageCell);
         row.append(catCell);
@@ -207,34 +202,33 @@
       });
 
       // 3) Add filtering logic
-      $.fn.dataTable.ext.search.push(function(settings, rowData, index, rowNodes) {
-        // rowData = [0: user_id, 1: message, 2: categories, 3: status, 4: action, 5: notes, 6: created, 7: updated, 8: edit button]
+      $.fn.dataTable.ext.search.push(function(settings, rowData) {
         const rowStatus = rowData[3] || "";
-        const rowCategories = rowData[2] || "";
+        const rowActions = rowData[2] || "";
 
         const selectedStatus = $("#filterStatus").val();
-        const selectedCategory = $("#filterCategory").val();
+        const selectedAction = $("#filterAction").val();
 
         if (selectedStatus && rowStatus !== selectedStatus) {
           return false;
         }
-        if (selectedCategory && !rowCategories.includes(selectedCategory)) {
+        if (selectedAction && !rowActions.includes(selectedAction)) {
           return false;
         }
         return true;
       });
 
-      $("#filterStatus, #filterCategory").on("change", function() {
+      $("#filterStatus, #filterAction").on("change", function() {
         table.draw();
       });
     });
 
-    // Handle the "Save Changes" in the modal
+    // Handle the "Save Changes" button in the modal
     $("#saveChangesBtn").click(function() {
-      const logId = $("#editLogId").val();
+      const logId     = $("#editLogId").val();
       const newStatus = $("#editStatus").val();
       const newAction = $("#editAction").val();
-      const newNotes = $("#editNotes").val();
+      const newNotes  = $("#editNotes").val();
 
       // Patch request
       $.ajax({
@@ -246,15 +240,11 @@
           action: newAction,
           notes: newNotes
         }),
-        success: function(response) {
+        success: function() {
           alert("Updated successfully.");
-
           // Close the modal
           $("#editModal").modal("hide");
-
-          // Optionally, refresh the table row in memory:
-          // (e.g., find the row with this logId, update the displayed status/action/notes).
-          // For simplicity, let's do a quick reload or you can do partial updates on the row.
+          // Reload the page to refresh the table
           location.reload();
         },
         error: function(err) {

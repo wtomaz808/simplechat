@@ -68,10 +68,12 @@ def register_route_backend_chats(app):
         # ---------------------------------------------------------------------
         # 2) Append the user message to conversation immediately
         # ---------------------------------------------------------------------
+        user_message_id = f"{conversation_id}_user_{int(time.time())}_{random.randint(1000,9999)}"
         conversation_item['messages'].append({
             'role': 'user',
             'content': user_message,
-            'model_deployment_name': None
+            'model_deployment_name': None,
+            'message_id': user_message_id
         })
 
         # Set conversation title if it's still the default
@@ -162,10 +164,12 @@ def register_route_backend_chats(app):
                         )
 
                     # Insert a special "role": "safety" or "blocked"
+                    safety_message_id = f"{conversation_id}_safety_{int(time.time())}_{random.randint(1000,9999)}"
                     conversation_item['messages'].append({
                         'role': 'safety',
                         'content': blocked_msg_content.strip(),
-                        'model_deployment_name': None
+                        'model_deployment_name': None,
+                        'message_id': safety_message_id
                     })
                     conversation_item['last_updated'] = datetime.utcnow().isoformat()
                     container.upsert_item(body=conversation_item)
@@ -177,7 +181,8 @@ def register_route_backend_chats(app):
                         'triggered_categories': triggered_categories,
                         'blocklist_matches': blocklist_matches,
                         'conversation_id': conversation_id,
-                        'conversation_title': conversation_item['title']
+                        'conversation_title': conversation_item['title'],
+                        'message_id': safety_message_id
                     }), 200
 
             except HttpResponseError as e:
@@ -220,10 +225,12 @@ def register_route_backend_chats(app):
                     f"{retrieved_content}"
                 )
 
+                system_message_id = f"{conversation_id}_system_{int(time.time())}_{random.randint(1000,9999)}"
                 conversation_item['messages'].append({
                     'role': 'system',
                     'content': system_prompt,
-                    'model_deployment_name': None
+                    'model_deployment_name': None,
+                    'message_id': system_message_id
                 })
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
                 container.upsert_item(body=conversation_item)
@@ -250,10 +257,12 @@ def register_route_backend_chats(app):
                     "Assistant: The capital of France is Paris (Source: OfficialFrancePage) [https://url.com].\n\n"
                     f"{retrieved_content}"
                 )
+                system_message_id = f"{conversation_id}_system_{int(time.time())}_{random.randint(1000,9999)}"
                 conversation_item['messages'].append({
                     'role': 'system',
                     'content': system_prompt,
-                    'model_deployment_name': None
+                    'model_deployment_name': None,
+                    'message_id': system_message_id
                 })
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
                 container.upsert_item(body=conversation_item)
@@ -288,12 +297,14 @@ def register_route_backend_chats(app):
                 )
                 generated_image_url = json.loads(image_response.model_dump_json())['data'][0]['url']
 
+                image_message_id = f"{conversation_id}_image_{int(time.time())}_{random.randint(1000,9999)}"
                 conversation_item['messages'].append({
                     'role': 'image',
                     'content': generated_image_url,
                     'prompt': user_message,
                     'created_at': datetime.utcnow().isoformat(),
-                    'model_deployment_name': image_gen_model
+                    'model_deployment_name': image_gen_model,
+                    'message_id': image_message_id
                 })
 
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
@@ -304,7 +315,8 @@ def register_route_backend_chats(app):
                     'image_url': generated_image_url,
                     'conversation_id': conversation_id,
                     'conversation_title': conversation_item['title'],
-                    'model_deployment_name': image_gen_model
+                    'model_deployment_name': image_gen_model,
+                    'message_id': image_message_id
                 }), 200
             except Exception as e:
                 return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
@@ -369,10 +381,12 @@ def register_route_backend_chats(app):
             return jsonify({'error': f'Error generating model response: {str(e)}'}), 500
 
         # 6) Save GPT response
+        assistant_message_id = f"{conversation_id}_assistant_{int(time.time())}_{random.randint(1000,9999)}"
         conversation_item['messages'].append({
             'role': 'assistant',
             'content': ai_message,
-            'model_deployment_name': gpt_model
+            'model_deployment_name': gpt_model,
+            'message_id': assistant_message_id
         })
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
         container.upsert_item(body=conversation_item)
@@ -382,5 +396,6 @@ def register_route_backend_chats(app):
             'reply': ai_message,
             'conversation_id': conversation_id,
             'conversation_title': conversation_item['title'],
-            'model_deployment_name': gpt_model
+            'model_deployment_name': gpt_model,
+            'message_id': assistant_message_id
         }), 200

@@ -17,6 +17,7 @@ def register_route_backend_group_documents(app):
     @app.route('/api/group_documents', methods=['GET'])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_get_group_documents():
         """
         Return the list of documents for the user's *active* group.
@@ -24,9 +25,6 @@ def register_route_backend_group_documents(app):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
     
         user_settings = get_user_settings(user_id)
         active_group_id = user_settings["settings"].get("activeGroupOid")
@@ -52,6 +50,7 @@ def register_route_backend_group_documents(app):
     @app.route('/api/group_documents/upload', methods=['POST'])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_upload_group_document():
         """
         Upload a new document into the active group’s collection, if user role
@@ -60,9 +59,6 @@ def register_route_backend_group_documents(app):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         user_settings = get_user_settings(user_id)
         active_group_id = user_settings["settings"].get("activeGroupOid")
@@ -94,13 +90,11 @@ def register_route_backend_group_documents(app):
     @app.route('/api/group_documents/<doc_id>', methods=['DELETE'])
     @login_required
     @user_required
+    @enabled_required("enable_group_documents")
     def api_delete_group_document(doc_id):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-
-        if not get_settings().get('enable_group_documents', True):
-            return "Group Documents feature is disabled by the admin.", 403
         
         group_id = request.args.get('group_id')
         if not group_id:

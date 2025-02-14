@@ -5,13 +5,23 @@ from functions_authentication import *
 from functions_settings import *
 
 def register_route_frontend_safety(app):
+
     @app.route('/admin/safety_violations', methods=['GET'])
     @login_required
     @admin_required
+    @enabled_required("enable_content_safety")
     def admin_safety_violations():
-        settings = get_settings()
-
-        if not settings.get("enable_content_safety"):
-            return jsonify({"error": "Safety violations are disabled."}), 400
-        
+        """
+        Renders the admin safety violations page (admin_safety_violations.html).
+        """
         return render_template('admin_safety_violations.html')
+
+    @app.route('/safety_violations', methods=['GET'])
+    @login_required
+    @user_required
+    @enabled_required("enable_content_safety")
+    def my_safety_violations():
+        """
+        Displays the logged-in user's safety violations.
+        """        
+        return render_template('my_safety_violations.html')

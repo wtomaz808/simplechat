@@ -15,9 +15,9 @@ def user_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = session.get('user', {})
-        # If 'roles' is not in user or 'User' is not part of roles, block access
+        # If 'roles' is not in user or 'User' is not part of role or 'Admin' is not part of role, block access
         if 'roles' not in user or ('User' not in user['roles'] and 'Admin' not in user['roles']):
-            return "Unauthorized", 403  # or redirect somewhere else if you prefer
+            return "Unauthorized", 403
         return f(*args, **kwargs)
     return decorated_function
 
