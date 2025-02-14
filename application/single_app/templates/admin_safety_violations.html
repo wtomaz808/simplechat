@@ -67,25 +67,33 @@
       </div>
       <div class="modal-body">
 
-        <!-- Read-only fields -->
+        <!-- Read-only fields as plain text -->
         <div class="mb-3">
-          <label class="form-label">User ID</label>
-          <input type="text" class="form-control" id="editUserId" readonly />
+          <label class="form-label fw-bold">User ID:</label>
+          <p id="editUserId" class="form-control-plaintext"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Message</label>
-          <textarea class="form-control" id="editMessage" rows="2" readonly></textarea>
+          <label class="form-label fw-bold">Message:</label>
+          <p
+            id="editMessage"
+            class="form-control-plaintext"
+            style="white-space: pre-wrap;"
+          ></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Triggered Categories</label>
-          <input type="text" class="form-control" id="editCategories" readonly />
+          <label class="form-label fw-bold">Triggered Categories:</label>
+          <p
+            id="editCategories"
+            class="form-control-plaintext"
+            style="white-space: pre-wrap;"
+          ></p>
         </div>
 
         <!-- Editable fields: Status, Action, Notes -->
         <div class="mb-3">
-          <label class="form-label">Status</label>
+          <label class="form-label fw-bold">Status:</label>
           <select class="form-select" id="editStatus">
             <option value="New">New</option>
             <option value="In-Review">In-Review</option>
@@ -95,7 +103,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Action</label>
+          <label class="form-label fw-bold">Action:</label>
           <select class="form-select" id="editAction">
             <option value="None">None</option>
             <option value="WarnUser">WarnUser</option>
@@ -106,7 +114,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Notes</label>
+          <label class="form-label fw-bold">Notes:</label>
           <textarea class="form-control" id="editNotes" rows="3"></textarea>
         </div>
 
@@ -140,31 +148,36 @@
         const row = $("<tr></tr>").data("logId", log.id);
 
         // Build each cell
-        const userCell      = $("<td></td>").text(log.user_id || "");
-        const messageCell   = $("<td></td>").text(log.message || "");
-        const categories    = (log.triggered_categories || [])
-                                .map(cat => `${cat.category}(s=${cat.severity})`)
-                                .join(", ");
-        const catCell       = $("<td></td>").text(categories);
-        const statusCell    = $("<td></td>").text(log.status || "New");
-        const actionCell    = $("<td></td>").text(log.action || "None");
-        const notesCell     = $("<td></td>").text(log.notes || "");
-        const created       = log.created_at ? new Date(log.created_at).toLocaleString() : "";
-        const createdCell   = $("<td></td>").text(created);
-        const updated       = log.last_updated ? new Date(log.last_updated).toLocaleString() : "";
-        const updatedCell   = $("<td></td>").text(updated);
+        const userCell    = $("<td></td>").text(log.user_id || "");
+        const messageCell = $("<td></td>").text(log.message || "");
+        const categories  = (log.triggered_categories || [])
+                              .map(cat => `${cat.category}(s=${cat.severity})`)
+                              .join(", ");
+        const catCell     = $("<td></td>").text(categories);
+        const statusCell  = $("<td></td>").text(log.status || "New");
+        const actionCell  = $("<td></td>").text(log.action || "None");
+        const notesCell   = $("<td></td>").text(log.notes || "");
+        const createdVal  = log.created_at ? new Date(log.created_at).toLocaleString() : "";
+        const createdCell = $("<td></td>").text(createdVal);
+        const updatedVal  = log.last_updated ? new Date(log.last_updated).toLocaleString() : "";
+        const updatedCell = $("<td></td>").text(updatedVal);
 
         // Edit button
         const editBtn = $("<button class='btn btn-primary btn-sm'>Edit</button>");
         editBtn.click(function() {
           // Open the modal & populate fields
           $("#editLogId").val(log.id);
-          $("#editUserId").val(log.user_id || "");
-          $("#editMessage").val(log.message || "");
-          $("#editCategories").val(categories || "");
+
+          // Update read-only fields with .text(...)
+          $("#editUserId").text(log.user_id || "");
+          $("#editMessage").text(log.message || "");
+          $("#editCategories").text(categories || "");
+
+          // Editable fields
           $("#editStatus").val(log.status || "New");
           $("#editAction").val(log.action || "None");
           $("#editNotes").val(log.notes || "");
+
           $("#editModal").modal("show");
         });
         const editCell = $("<td></td>").append(editBtn);

@@ -158,5 +158,9 @@
 
 {% block scripts %}
 
+<script>
+    window.enableUserFeedback = "{{ enable_user_feedback }}";
+</script>
+
 <script src="{{ url_for('static', filename='js/chats.js') }}"></script>
 {% endblock %}

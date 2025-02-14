@@ -61,53 +61,53 @@
       <div class="modal-body">
         <!-- Read-only fields -->
         <div class="mb-3">
-          <label class="form-label">Timestamp</label>
-          <input type="text" class="form-control" id="editTimestamp" readonly />
+          <label class="form-label fw-bold">Timestamp:</label>
+          <p id="editTimestamp" class="form-control-plaintext"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">User ID</label>
-          <input type="text" class="form-control" id="editUserId" readonly />
+          <label class="form-label fw-bold">User ID:</label>
+          <p id="editUserId" class="form-control-plaintext"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Prompt</label>
-          <textarea class="form-control" id="editPrompt" rows="2" readonly></textarea>
+          <label class="form-label fw-bold">Prompt:</label>
+          <p id="editPrompt" class="form-control-plaintext" style="white-space: pre-wrap;"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">AI Response</label>
-          <textarea class="form-control" id="editAiResponse" rows="2" readonly></textarea>
+          <label class="form-label fw-bold">AI Response:</label>
+          <p id="editAiResponse" class="form-control-plaintext" style="white-space: pre-wrap;"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Feedback Type</label>
-          <input type="text" class="form-control" id="editFeedbackType" readonly />
+          <label class="form-label fw-bold">Feedback Type:</label>
+          <p id="editFeedbackType" class="form-control-plaintext"></p>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Reason</label>
-          <textarea class="form-control" id="editReason" rows="2" readonly></textarea>
+          <label class="form-label fw-bold">Reason:</label>
+          <p id="editReason" class="form-control-plaintext" style="white-space: pre-wrap;"></p>
         </div>
 
         <!-- Editable fields -->
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="editAcknowledged" />
-          <label class="form-check-label">Acknowledged</label>
+          <label class="form-check-label" for="editAcknowledged">Acknowledged</label>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Analysis Notes</label>
+          <label class="form-label fw-bold">Analysis Notes:</label>
           <textarea class="form-control" id="editAnalysisNotes" rows="2"></textarea>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Response to User</label>
+          <label class="form-label fw-bold">Response to User:</label>
           <textarea class="form-control" id="editResponseToUser" rows="2"></textarea>
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Action Taken</label>
+          <label class="form-label fw-bold">Action Taken:</label>
           <input type="text" class="form-control" id="editActionTaken" />
         </div>
 
@@ -187,10 +187,10 @@ function populateTable(data) {
   tableBody.innerHTML = "";
 
   data.forEach(item => {
-    const row = document.createElement("tr");
     // Convert boolean acknowledged to a more display-friendly value
     const ackText = item.adminReview?.acknowledged ? "Yes" : "No";
 
+    const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.prompt || ""}</td>
       <td>${item.aiResponse || ""}</td>
@@ -221,9 +221,9 @@ function initializeDataTable() {
 
   // Add a custom DataTables filter
   $.fn.dataTable.ext.search.push(function(settings, rowData) {
-    // rowData = [Timestamp, UserID, Prompt, AIResp, FBType, Reason, Ack, Action, EditBtn, RetestBtn]
-    const fbTypeCell = rowData[4] || "";
-    const acknowledgedCell = rowData[6] || ""; // "Yes" or "No"
+    // rowData = [Prompt, AIResp, FBType, Reason, Ack, Action, Edit, Retest]
+    const fbTypeCell = rowData[2] || "";
+    const acknowledgedCell = rowData[4] || ""; // "Yes" or "No"
 
     const selectedFbType = $("#filterFeedbackType").val(); // e.g. "Positive"
     const selectedAck = $("#filterAcknowledged").val();    // "true" or "false"
@@ -257,23 +257,23 @@ function openEditModal(feedbackId) {
   const item = feedbackData.find(f => f.id == feedbackId);
   if (!item) return;
 
-  // Populate modal fields
-  document.getElementById("editFeedbackId").value = item.id;
-  document.getElementById("editTimestamp").value = item.timestamp || "";
-  document.getElementById("editUserId").value = item.userId || "";
-  document.getElementById("editPrompt").value = item.prompt || "";
-  document.getElementById("editAiResponse").value = item.aiResponse || "";
-  document.getElementById("editFeedbackType").value = item.feedbackType || "";
-  document.getElementById("editReason").value = item.reason || "";
+  // Assign read-only fields with .textContent
+  document.getElementById("editTimestamp").textContent = item.timestamp || "";
+  document.getElementById("editUserId").textContent = item.userId || "";
+  document.getElementById("editPrompt").textContent = item.prompt || "";
+  document.getElementById("editAiResponse").textContent = item.aiResponse || "";
+  document.getElementById("editFeedbackType").textContent = item.feedbackType || "";
+  document.getElementById("editReason").textContent = item.reason || "";
 
+  // Editable fields
   const acknowledged = item.adminReview?.acknowledged ? true : false;
   document.getElementById("editAcknowledged").checked = acknowledged;
-  document.getElementById("editAnalysisNotes").value =
-    item.adminReview?.analysisNotes || "";
-  document.getElementById("editResponseToUser").value =
-    item.adminReview?.responseToUser || "";
-  document.getElementById("editActionTaken").value =
-    item.adminReview?.actionTaken || "";
+  document.getElementById("editAnalysisNotes").value = item.adminReview?.analysisNotes || "";
+  document.getElementById("editResponseToUser").value = item.adminReview?.responseToUser || "";
+  document.getElementById("editActionTaken").value = item.adminReview?.actionTaken || "";
+
+  // Hidden ID field
+  document.getElementById("editFeedbackId").value = item.id;
 
   // Show the modal
   const modalEl = new bootstrap.Modal(document.getElementById("editFeedbackModal"));

@@ -1174,24 +1174,34 @@ function getUrlParameter(name) {
     : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
+function toBoolean(str) {
+  return String(str).toLowerCase() === "true";
+}
+
 /*************************************************
  *  THUMBS UP / DOWN FEEDBACK
  *************************************************/
 function renderFeedbackIcons(messageId, conversationId) {
-  return `
-    <div class="feedback-icons" data-ai-message-id="${messageId}">
-      <i class="bi bi-hand-thumbs-up-fill text-muted me-3 feedback-btn" 
-         data-feedback-type="positive" 
-         data-conversation-id="${conversationId}"
-         title="Thumbs Up"
-         style="cursor:pointer;"></i>
-      <i class="bi bi-hand-thumbs-down-fill text-muted feedback-btn" 
-         data-feedback-type="negative" 
-         data-conversation-id="${conversationId}"
-         title="Thumbs Down"
-         style="cursor:pointer;"></i>
-    </div>
-  `;
+  
+  if (toBoolean(window.enableUserFeedback)) {
+    return `
+      <div class="feedback-icons" data-ai-message-id="${messageId}">
+        <i class="bi bi-hand-thumbs-up-fill text-muted me-3 feedback-btn" 
+          data-feedback-type="positive" 
+          data-conversation-id="${conversationId}"
+          title="Thumbs Up"
+          style="cursor:pointer;"></i>
+        <i class="bi bi-hand-thumbs-down-fill text-muted feedback-btn" 
+          data-feedback-type="negative" 
+          data-conversation-id="${conversationId}"
+          title="Thumbs Down"
+          style="cursor:pointer;"></i>
+      </div>
+    `;
+  }
+  else {
+    return "";
+  }
 }
 
 // Add event listener for thumbs up/down
