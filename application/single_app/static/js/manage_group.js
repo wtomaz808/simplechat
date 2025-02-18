@@ -1,6 +1,4 @@
-// js/manage_groups.js
-
-const groupId = "{{ group_id }}"; 
+// js/manage_group.js
 let currentUserRole = null;
 let userId = "";
 

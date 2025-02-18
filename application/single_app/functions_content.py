@@ -89,15 +89,29 @@ def generate_embedding(
             azure_endpoint = settings.get('azure_apim_embedding_endpoint'),
             api_key=settings.get('azure_apim_embedding_subscription_key'))
     else:
-        embedding_client = AzureOpenAI(
-            api_version=settings.get('azure_openai_embedding_api_version'),
-            azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
-            api_key=settings.get('azure_openai_embedding_key'))
+        if (settings.get('azure_openai_embedding_authentication_type') == 'managed_identity'):
+            token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+            embedding_client = AzureOpenAI(
+                api_version=settings.get('azure_openai_embedding_api_version'),
+                azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
+                azure_ad_token_provider=token_provider
+            )
         
-        embedding_model_obj = settings.get('embedding_model', {})
-        if embedding_model_obj and embedding_model_obj.get('selected'):
-             selected_embedding_model = embedding_model_obj['selected'][0]
-             embedding_model = selected_embedding_model['deploymentName']
+            embedding_model_obj = settings.get('embedding_model', {})
+            if embedding_model_obj and embedding_model_obj.get('selected'):
+                selected_embedding_model = embedding_model_obj['selected'][0]
+                embedding_model = selected_embedding_model['deploymentName']
+        else:
+            embedding_client = AzureOpenAI(
+                api_version=settings.get('azure_openai_embedding_api_version'),
+                azure_endpoint=settings.get('azure_openai_embedding_endpoint'),
+                api_key=settings.get('azure_openai_embedding_key')
+            )
+            
+            embedding_model_obj = settings.get('embedding_model', {})
+            if embedding_model_obj and embedding_model_obj.get('selected'):
+                selected_embedding_model = embedding_model_obj['selected'][0]
+                embedding_model = selected_embedding_model['deploymentName']
 
     while True:
         random_delay = random.uniform(0.5, 2.0)

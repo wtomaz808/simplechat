@@ -93,6 +93,7 @@ def register_route_frontend_admin_settings(app):
             default_system_prompt = request.form.get('default_system_prompt', '')
             use_external_apis = request.form.get('use_external_apis') == 'on'
             external_chunking_api = request.form.get('external_chunking_api', '')
+            enable_conversation_archiving = request.form.get('enable_conversation_archiving') == 'on'
             external_embedding_api = request.form.get('external_embedding_api', '')
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_documents = request.form.get('enable_user_documents') == 'on'
@@ -187,6 +188,7 @@ def register_route_frontend_admin_settings(app):
                 'use_external_apis': use_external_apis,
                 'external_chunking_api': external_chunking_api,
                 'external_embedding_api': external_embedding_api,
+                'enable_conversation_archiving': enable_conversation_archiving,
                 'show_logo': show_logo,
                 'logo_path': logo_path_relative,
                 'enable_web_search': enable_web_search,

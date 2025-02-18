@@ -2,6 +2,7 @@
 
 from config import *
 from functions_authentication import *
+from functions_settings import *
 
 def register_route_backend_conversations(app):
 
@@ -63,21 +64,44 @@ def register_route_backend_conversations(app):
     @login_required
     @user_required
     def delete_conversation(conversation_id):
-        user_id = get_current_user_id()
-        if not user_id:
-            return jsonify({'error': 'User not authenticated'}), 401
+        """
+        Delete a conversation. If archiving is enabled, copy it to archived_conversations first.
+        """
+        settings = get_settings()
+        archiving_enabled = settings.get('enable_conversation_archiving', False)
+
         try:
+            # 1) Fetch the conversation item
             conversation_item = container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
+        except CosmosResourceNotFoundError:
+            return jsonify({"error": f"Conversation {conversation_id} not found."}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+        if archiving_enabled:
+            # 2) Copy conversation to archived_conversations
+            #    You can store a timestamp or other metadata if desired
+            archived_item = dict(conversation_item)  # shallow copy
+            archived_item["archived_at"] = datetime.utcnow().isoformat()
+            
+            # Make sure 'id' is still unique in the archived container.
+            # Usually it's the same ID, which is fine, but you can change if needed.
+            archived_conversations_container.upsert_item(archived_item)
+            #print(f"Conversation {conversation_id} archived.")
+        
+        # 3) Permanently remove from main 'conversations' container
+        try:
             container.delete_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
-
-            return jsonify({'message': 'Conversation deleted successfully'}), 200
-        except CosmosResourceNotFoundError:
-            return jsonify({'error': 'Conversation not found'}), 404
+            #print(f"Conversation {conversation_id} deleted from active container.")
         except Exception as e:
-            return jsonify({'error': 'An error occurred while deleting the conversation'}), 500
+            # If archiving was enabled and we already inserted into archived container,
+            # you might choose to handle partial success/failure here.
+            return jsonify({"error": str(e)}), 500
+
+        return jsonify({"success": True}), 200

@@ -14,25 +14,15 @@ def get_settings():
     except CosmosResourceNotFoundError:
         default_settings = {
             'id': 'app_settings',
-            'app_title': 'AI Chat Application',
+
+            # General Settings
+            'app_title': 'Simple Chat',
+            'landing_page_text': 'You can add text here and it supports Markdown. You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
             'show_logo': False,
             'logo_path': 'images/logo.svg',
-            'max_file_size_mb': 150,
-            'conversation_history_limit': 10,
-            'default_system_prompt': '',
-            'use_external_apis': False,
-            'external_chunking_api': '',
-            'external_embedding_api': '',
-            'azure_document_intelligence_endpoint': '',
-            'azure_document_intelligence_key': '',
-            'azure_ai_search_endpoint': '',
-            'azure_ai_search_key': '',
-            'enable_user_documents': True,
-            'enable_group_documents': True,
-            'enable_content_safety': False,
-            'enable_user_feedback': True,
-            'content_safety_endpoint': '',
-            'content_safety_key': '',
+
+            # GPT Settings
+            'enable_gpt_apim': False,
             'azure_openai_gpt_endpoint': '',
             'azure_openai_gpt_api_version': '',
             'azure_openai_gpt_authentication_type': 'key',
@@ -41,8 +31,15 @@ def get_settings():
             'azure_openai_gpt_key': '',
             'gpt_model': {
                 "selected": [],
-                "all": [] 
+                "all": []
             },
+            'azure_apim_gpt_endpoint': '',
+            'azure_apim_gpt_subscription_key': '',
+            'azure_apim_gpt_deployment': '',
+            'azure_apim_gpt_api_version': '',
+
+            # Embeddings Settings
+            'enable_embedding_apim': False,
             'azure_openai_embedding_endpoint': '',
             'azure_openai_embedding_api_version': '',
             'azure_openai_embedding_authentication_type': 'key',
@@ -53,7 +50,14 @@ def get_settings():
                 "selected": [],
                 "all": []
             },
+            'azure_apim_embedding_endpoint': '',
+            'azure_apim_embedding_subscription_key': '',
+            'azure_apim_embedding_deployment': '',
+            'azure_apim_embedding_api_version': '',
+
+            # Image Generation Settings
             'enable_image_generation': False,
+            'enable_image_gen_apim': False,
             'azure_openai_image_gen_endpoint': '',
             'azure_openai_image_gen_api_version': '',
             'azure_openai_image_gen_authentication_type': 'key',
@@ -64,26 +68,45 @@ def get_settings():
                 "selected": [],
                 "all": []
             },
-            'enable_web_search': False,
-            'bing_search_key': '',
-            'landing_page_text': 'Click the button below to start chatting with the AI assistant.',
-            'enable_gpt_apim': False,
-            'enable_image_gen_apim': False,
-            'enable_embedding_apim': False,
-            'azure_apim_gpt_endpoint': '',
-            'azure_apim_gpt_subscription_key': '',
-            'azure_apim_gpt_deployment': '',
-            'azure_apim_gpt_api_version': '',
-            'azure_apim_embedding_endpoint': '',
-            'azure_apim_embedding_subscription_key': '',
-            'azure_apim_embedding_deployment': '',
-            'azure_apim_embedding_api_version': '',
             'azure_apim_image_gen_endpoint': '',
             'azure_apim_image_gen_subscription_key': '',
             'azure_apim_image_gen_deployment': '',
-            'azure_apim_image_gen_api_version': ''          
-            
+            'azure_apim_image_gen_api_version': '',
+
+            # Workspaces
+            'enable_user_documents': True,
+            'enable_group_documents': True,
+
+            # Safety Settings
+            'enable_content_safety': False,
+            'content_safety_endpoint': '',
+            'content_safety_key': '',
+            'content_safety_authentication_type': 'key',
+            'enable_user_feedback': True,
+            'enable_conversation_archiving': False,
+
+            # Search and Extract
+            'enable_web_search': False,
+            'bing_search_key': '',
+            'azure_ai_search_endpoint': '',
+            'azure_ai_search_key': '',
+            'azure_ai_search_authentication_type': 'key',
+            'azure_document_intelligence_endpoint': '',
+            'azure_document_intelligence_key': '',
+            'azure_document_intelligence_authentication_type': 'key',
+
+            # External APIs
+            'use_external_apis': False,
+            'external_chunking_api': '',
+            'external_embedding_api': '',
+
+            # Other Settings
+            'max_file_size_mb': 150,
+            'conversation_history_limit': 10,
+            'default_system_prompt': ''
         }
+
+
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")
         return default_settings

@@ -1,6 +1,61 @@
 <!-- BEGIN RELEASE_NOTES.MD BLOCK -->
 
 # Feature Release
+## (v0.201.5)
+
+#### 1. **Managed Identity Support**
+
+- Azure Cosmos DB (enabled/disabled via environment variable)
+- Azure Document Intelligence (enabled/disabled via app settings)
+- Azure AI Search (enabled/disabled via app settings)
+- Azure OpenAI (enabled/disabled via app settings)
+
+#### 2. **Conversation Archiving**
+
+- Introduced a new setting 
+
+  ```
+  enable_conversation_archiving
+  ```
+
+  - When enabled, deleting a conversation will first copy (archive) the conversation document into an `archived_conversations_container` before removing it from the main `conversations` container.
+  - Helps preserve conversation history if you want to restore or analyze it later.
+
+#### 3. **Configuration & Environment Variable Updates**
+
+- `example.env` & `example_advance_edit_environment_variables.json`:
+  - Added `AZURE_COSMOS_AUTHENTICATION_TYPE` to demonstrate how to switch between `key`-based or `managed_identity`-based authentication.
+  - Cleaned up references to Azure AI Search and Azure Document Intelligence environment variables to reduce clutter and reflect the new approach of toggling authentication modes.
+- Default Settings Updates
+  - `functions_settings.py` has more descriptive defaults covering GPT, Embeddings, and Image Generation for both key-based and managed identity scenarios.
+  - New config fields such as `content_safety_authentication_type`, `azure_document_intelligence_authentication_type`, and `enable_conversation_archiving`.
+
+#### 6. **Bug Fixes**
+
+- Fixed bug affecting the ability to manage groups
+  - Renamed or refactored `manage_groups.js` to `manage_group.js`, and updated the template (`manage_group.html`) to use the new filename.
+  - Injected `groupId` directly via Jinja for improved client-side handling.
+
+#### 7. **Architecture Diagram Updates**
+
+- Updated `architecture.vsdx` and `architecture.png` to align with the new authentication flow and container usage.
+
+------
+
+#### How to Use / Test the New Features
+
+1. **Enable Managed Identity**
+   - In your `.env` or Azure App Service settings, set `AZURE_COSMOS_AUTHENTICATION_TYPE="managed_identity"` (and similarly for `azure_document_intelligence_authentication_type`, etc.).
+   - Ensure the Azure resource (e.g., App Service, VM) has a system- or user-assigned Managed Identity with the correct roles (e.g., “Cosmos DB Account Contributor”).
+   - Deploy, and the application will now connect to Azure resources without storing any keys in configuration.
+2. **Test Conversation Archiving**
+   - In the Admin Settings, enable `Enable Conversation Archiving`.
+   - Delete a conversation.
+   - Verify the record is copied to `archived_conversations_container` before being removed from the active container.
+3. **Check New Environment Variables**
+   - Review `example.env` and `example_advance_edit_environment_variables.json` for the newly added variables.
+   - Update your application settings in Azure or your local `.env` accordingly to test various authentication modes (key vs. managed identity).
+
 ## (V0.199.3)
 
 We introduced a robust user feedback system, expanded content-safety features for both admins and end users, added new Cosmos DB containers, and refined route-level permission toggles. These changes help administrators collect feedback on AI responses, manage content safety more seamlessly, and give end users clearer ways to manage their documents, groups, and personal logs. Enjoy the new functionality, and let us know if you have any questions or issues!

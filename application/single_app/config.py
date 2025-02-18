@@ -36,7 +36,7 @@ from azure.search.documents.models import VectorizedQuery
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
-from azure.identity import ClientSecretCredential
+from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
 
@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.199.3'
+app.config['VERSION'] = '0.201.5'
 Session(app)
 
 CLIENTS = {}
@@ -69,7 +69,12 @@ BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
 cosmos_key = os.getenv("AZURE_COSMOS_KEY")
-cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
+cosmos_authentication_type = os.getenv("AZURE_COSMOS_AUTHENTICATION_TYPE", "key") #key or managed_identity
+if cosmos_authentication_type == "managed_identity":
+    cosmos_client = CosmosClient(cosmos_endpoint, credential=DefaultAzureCredential())
+else:
+    cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
+
 database_name = os.getenv("AZURE_COSMOS_DB_NAME")
 container_name = os.getenv("AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME")
 database = cosmos_client.create_database_if_not_exists(database_name)
@@ -134,20 +139,6 @@ archived_conversations_container = database.create_container_if_not_exists(
     offer_throughput=400
 )
 
-archived_feedback_container_name = "archived_feedback"
-archived_feedback_container = database.create_container_if_not_exists(
-    id=archived_feedback_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
-
-archived_safety_container_name = "archived_safety"
-archived_safety_container = database.create_container_if_not_exists(
-    id=archived_safety_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
-)
-
 def initialize_clients(settings):
     """
     Initialize/re-initialize all your clients based on the provided settings.
@@ -160,43 +151,72 @@ def initialize_clients(settings):
         azure_ai_search_endpoint = settings.get("azure_ai_search_endpoint")
         azure_ai_search_key = settings.get("azure_ai_search_key")
 
-        document_intelligence_client = DocumentAnalysisClient(
-            endpoint=form_recognizer_endpoint,
-            credential=AzureKeyCredential(form_recognizer_key)
-        )
+        try:
+            if settings.get("azure_document_intelligence_authentication_type") == "managed_identity":
+                document_intelligence_client = DocumentIntelligenceClient(
+                    endpoint=form_recognizer_endpoint,
+                    credential=DefaultAzureCredential()
+                )
+            else:
+                document_intelligence_client = DocumentAnalysisClient(
+                    endpoint=form_recognizer_endpoint,
+                    credential=AzureKeyCredential(form_recognizer_key)
+                )
+            CLIENTS["document_intelligence_client"] = document_intelligence_client
+        except Exception as e:
+            print(f"Failed to initialize Document Intelligence client: {e}")
 
-        search_client_user = SearchClient(
-            endpoint=azure_ai_search_endpoint,
-            index_name="simplechat-user-index",
-            credential=AzureKeyCredential(azure_ai_search_key)
-        )
+        try:
+            if settings.get("azure_ai_search_authentication_type") == "managed_identity":
+                search_client_user = SearchClient(
+                    endpoint=azure_ai_search_endpoint,
+                    index_name="simplechat-user-index",
+                    credential=DefaultAzureCredential()
+                )
+                search_client_group = SearchClient(
+                    endpoint=azure_ai_search_endpoint,
+                    index_name="simplechat-group-index",
+                    credential=DefaultAzureCredential()
+                )
+            else:
+                search_client_user = SearchClient(
+                    endpoint=azure_ai_search_endpoint,
+                    index_name="simplechat-user-index",
+                    credential=AzureKeyCredential(azure_ai_search_key)
+                )
+                search_client_group = SearchClient(
+                    endpoint=azure_ai_search_endpoint,
+                    index_name="simplechat-group-index",
+                    credential=AzureKeyCredential(azure_ai_search_key)
+                )
 
-        search_client_group = SearchClient(
-            endpoint=azure_ai_search_endpoint,
-            index_name="simplechat-group-index",
-            credential=AzureKeyCredential(azure_ai_search_key)
-        )
+            CLIENTS["search_client_user"] = search_client_user
+            CLIENTS["search_client_group"] = search_client_group
+        except Exception as e:
+            print(f"Failed to initialize Search clients: {e}")
 
-        # 2) Content Safety init if enabled
         if settings.get("enable_content_safety"):
             safety_endpoint = settings.get("content_safety_endpoint", "")
             safety_key = settings.get("content_safety_key", "")
 
             if safety_endpoint and safety_key:
                 try:
-                    content_safety_client = ContentSafetyClient(
-                        endpoint=safety_endpoint,
-                        credential=AzureKeyCredential(safety_key)
-                    )
+                    if settings.get("content_safety_authentication_type") == "managed_identity":
+                        content_safety_client = ContentSafetyClient(
+                            endpoint=safety_endpoint,
+                            credential=DefaultAzureCredential()
+                        )
+                    else:
+                        content_safety_client = ContentSafetyClient(
+                            endpoint=safety_endpoint,
+                            credential=AzureKeyCredential(safety_key)
+                        )
                     CLIENTS["content_safety_client"] = content_safety_client
                 except Exception as e:
                     print(f"Failed to initialize Content Safety client: {e}")
+                    CLIENTS["content_safety_client"] = None
             else:
                 print("Content Safety enabled, but endpoint/key not provided.")
         else:
             if "content_safety_client" in CLIENTS:
                 del CLIENTS["content_safety_client"]
-
-        CLIENTS["document_intelligence_client"] = document_intelligence_client
-        CLIENTS["search_client_user"] = search_client_user
-        CLIENTS["search_client_group"] = search_client_group

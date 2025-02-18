@@ -24,47 +24,71 @@ https://github.com/user-attachments/assets/a1045817-e2e4-4336-8a18-d4f83a6a02af
 - **Azure Cosmos DB**: Stores conversations, documents, and metadata.
 - **Azure Cognitive Search**: Facilitates efficient search and retrieval of document data.
 - **Azure Document Intelligence**: Extracts data from various document formats, including PDFs, Word documents, and images.
+- **Optional Content Safety**: Toggle content safety to analyze all user messages before they are sent to any service. Provides access to Admin and User specific Safety Violation pages.
+- **Optional Feedback System**: Toggle feedback for users to submit feedback on AI generated content. Provide access to Admin and user specific Feedback pages.
 - **Optional Bing Web Search**: Toggle web-search-based augmentation from the Admin Settings.  
 - **Optional Image Generation**: Toggle image generation with Azure OpenAI from the Admin Settings.
-- **Authentication & RBAC**: Secured via Azure Active Directory (AAD) integration, using MSAL (Microsoft Authentication Library), plus group-based access control and app roles.
+- **Authentication & RBAC**: Secured via Azure Active Directory (AAD) integration, using MSAL (Microsoft Authentication Library), managed identities, plus group-based access control and app roles.
 
 ![Architecture Diagram](./images/architecture.png)
 
 ## Latest Features 
 Below is a suggested “What’s New” or “Latest Features” section you can add to your README (or Release Notes) based on the diffs provided. Feel free to adjust the version number, headings, or wording to match your project’s style.
 
-### (v0.199.3)
+### (v0.201.5)
 
-We introduced a robust user feedback system, expanded content-safety features for both admins and end users, added new Cosmos DB containers, and refined route-level permission toggles. These changes help administrators collect feedback on AI responses, manage content safety more seamlessly, and give end users clearer ways to manage their documents, groups, and personal logs. Enjoy the new functionality, and let us know if you have any questions or issues!
+#### 1. **Managed Identity Support**
 
-1. **New “User Feedback” System**
-   - **Thumbs Up / Thumbs Down**: Users can now provide feedback on individual AI responses (when enabled in App Settings)
-   - **Frontend Feedback Pages**:
-     - **/my_feedback** page shows each user’s submitted feedback.
-     - **/admin/feedback_review** page allows admins to review, filter, and manage all feedback.
-2. **Extended Content Safety Features**
-   - **New “Safety Violations” Page**: Admins can manage safety violations.
-   - **New “My Safety Violations” Page**: Users can view their violations and add personal notes to each violation.
-3. **New or Updated Database Containers**
-   - feedback_container for user feedback.
-   - archived_conversations_container / archived_feedback_container / archived_safety_container for long-term archival.
-4. **Route-Level Feature Toggles**
-   - **enabled_required(setting_key) Decorator**:
-     - Dynamically block or allow routes based on an admin setting (e.g., enable_user_documents or enable_group_documents).
-     - Reduces scattered if checks; you simply annotate the route.
-5. **Conversation & Messaging Improvements**
-   - **Unique message_id for Each Chat Message**:
-     - Every user, assistant, safety, or image message now includes a message_id.
-     - Makes it easier to tie user feedback or safety logs to a specific message.
-   - **Public vs. Secret Settings**:
-     - Frontend references a public_settings = sanitize_settings_for_user(settings) to avoid the potential to expose secrets on the client side.
-6. **UI/UX Tweaks**
-   - **Chat Layout Updates**:
-     - “Start typing to create a new conversation…” message if none selected.
-     - Automatic creation of new conversation when user tries to send a message with no active conversation.
-   - **Navigation Bar Adjustments**:
-     - Consolidated admin links into a dropdown.
-     - “My Account” dropdown for quick access to “My Groups,” “My Feedback,” etc., if enabled.
+- Azure Cosmos DB (enabled/disabled via environment variable)
+- Azure Document Intelligence (enabled/disabled via app settings)
+- Azure AI Search (enabled/disabled via app settings)
+- Azure OpenAI (enabled/disabled via app settings)
+
+#### 2. **Conversation Archiving**
+
+- Introduced a new setting 
+
+  ```
+  enable_conversation_archiving
+  ```
+
+  - When enabled, deleting a conversation will first copy (archive) the conversation document into an `archived_conversations_container` before removing it from the main `conversations` container.
+  - Helps preserve conversation history if you want to restore or analyze it later.
+
+#### 3. **Configuration & Environment Variable Updates**
+
+- `example.env` & `example_advance_edit_environment_variables.json`:
+  - Added `AZURE_COSMOS_AUTHENTICATION_TYPE` to demonstrate how to switch between `key`-based or `managed_identity`-based authentication.
+  - Cleaned up references to Azure AI Search and Azure Document Intelligence environment variables to reduce clutter and reflect the new approach of toggling authentication modes.
+- Default Settings Updates
+  - `functions_settings.py` has more descriptive defaults covering GPT, Embeddings, and Image Generation for both key-based and managed identity scenarios.
+  - New config fields such as `content_safety_authentication_type`, `azure_document_intelligence_authentication_type`, and `enable_conversation_archiving`.
+
+#### 6. **Bug Fixes**
+
+- Fixed bug affecting the ability to manage groups
+  - Renamed or refactored `manage_groups.js` to `manage_group.js`, and updated the template (`manage_group.html`) to use the new filename.
+  - Injected `groupId` directly via Jinja for improved client-side handling.
+
+#### 7. **Architecture Diagram Updates**
+
+- Updated `architecture.vsdx` and `architecture.png` to align with the new authentication flow and container usage.
+
+------
+
+#### How to Use / Test the New Features
+
+1. **Enable Managed Identity**
+   - In your `.env` or Azure App Service settings, set `AZURE_COSMOS_AUTHENTICATION_TYPE="managed_identity"` (and similarly for `azure_document_intelligence_authentication_type`, etc.).
+   - Ensure the Azure resource (e.g., App Service, VM) has a system- or user-assigned Managed Identity with the correct roles (e.g., “Cosmos DB Account Contributor”).
+   - Deploy, and the application will now connect to Azure resources without storing any keys in configuration.
+2. **Test Conversation Archiving**
+   - In the Admin Settings, enable `Enable Conversation Archiving`.
+   - Delete a conversation.
+   - Verify the record is copied to `archived_conversations_container` before being removed from the active container.
+3. **Check New Environment Variables**
+   - Review `example.env` and `example_advance_edit_environment_variables.json` for the newly added variables.
+   - Update your application settings in Azure or your local `.env` accordingly to test various authentication modes (key vs. managed identity).
 
 ## Release Notes
 For a detailed list of features released by version, please refer to the [Release Notes](./RELEASE_NOTES.md).
