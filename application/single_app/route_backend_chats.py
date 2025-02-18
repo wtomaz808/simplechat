@@ -277,17 +277,28 @@ def register_route_backend_chats(app):
                     api_key=settings.get('azure_apim_image_gen_subscription_key')
                 )
             else:
-                image_gen_client = AzureOpenAI(
-                    api_version=settings.get('azure_openai_image_gen_api_version'),
-                    azure_endpoint=settings.get('azure_openai_image_gen_endpoint'),
-                    api_key=settings.get('azure_openai_image_gen_key')
-                )
-                image_gen_obj = settings.get('image_gen_model', {})
-                if image_gen_obj and image_gen_obj.get('selected'):
-                    selected_image_gen_model = image_gen_obj['selected'][0]
-                    image_gen_model = selected_image_gen_model['deploymentName']
+                if (settings.get('azure_openai_image_gen_authentication_type') == 'managed_identity'):
+                    token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+                    image_gen_client = AzureOpenAI(
+                        api_version=settings.get('azure_openai_image_gen_api_version'),
+                        azure_endpoint=settings.get('azure_openai_image_gen_endpoint'),
+                        azure_ad_token_provider=token_provider
+                    )
+                    image_gen_model_obj = settings.get('image_gen_model', {})
+
+                    if image_gen_model_obj and image_gen_model_obj.get('selected'):
+                        selected_image_gen_model = image_gen_model_obj['selected'][0]
+                        image_gen_model = selected_image_gen_model['deploymentName']
                 else:
-                    image_gen_model = "dall-e"  # fallback
+                    image_gen_client = AzureOpenAI(
+                        api_version=settings.get('azure_openai_image_gen_api_version'),
+                        azure_endpoint=settings.get('azure_openai_image_gen_endpoint'),
+                        api_key=settings.get('azure_openai_image_gen_key')
+                    )
+                    image_gen_obj = settings.get('image_gen_model', {})
+                    if image_gen_obj and image_gen_obj.get('selected'):
+                        selected_image_gen_model = image_gen_obj['selected'][0]
+                        image_gen_model = selected_image_gen_model['deploymentName']
 
             try:
                 image_response = image_gen_client.images.generate(
@@ -358,17 +369,27 @@ def register_route_backend_chats(app):
                 api_key=settings.get('azure_apim_gpt_subscription_key')
             )
         else:
-            gpt_client = AzureOpenAI(
-                api_version=settings.get('azure_openai_gpt_api_version'),
-                azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
-                api_key=settings.get('azure_openai_gpt_key')
-            )
-            gpt_model_obj = settings.get('gpt_model', {})
-            if gpt_model_obj and gpt_model_obj.get('selected'):
-                selected_gpt_model = gpt_model_obj['selected'][0]
-                gpt_model = selected_gpt_model['deploymentName']
+            if (settings.get('azure_openai_gpt_authentication_type') == 'managed_identity'):
+                token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+                gpt_client = AzureOpenAI(
+                    api_version=settings.get('azure_openai_gpt_api_version'),
+                    azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
+                    azure_ad_token_provider=token_provider
+                )
+                gpt_model_obj = settings.get('gpt_model', {})
+                if gpt_model_obj and gpt_model_obj.get('selected'):
+                    selected_gpt_model = gpt_model_obj['selected'][0]
+                    gpt_model = selected_gpt_model['deploymentName']
             else:
-                gpt_model = "gpt-3.5-turbo"  # fallback
+                gpt_client = AzureOpenAI(
+                    api_version=settings.get('azure_openai_gpt_api_version'),
+                    azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
+                    api_key=settings.get('azure_openai_gpt_key')
+                )
+                gpt_model_obj = settings.get('gpt_model', {})
+                if gpt_model_obj and gpt_model_obj.get('selected'):
+                    selected_gpt_model = gpt_model_obj['selected'][0]
+                    gpt_model = selected_gpt_model['deploymentName']
 
         try:
             response = gpt_client.chat.completions.create(
