@@ -24,6 +24,8 @@ def register_route_backend_chats(app):
         selected_document_id = data.get('selected_document_id')
         bing_search_enabled = data.get('bing_search')
         image_gen_enabled = data.get('image_generation')
+        gpt_model = ""
+        image_gen_model = ""
 
         # Convert toggles from string -> bool if needed
         if isinstance(hybrid_search_enabled, str):
