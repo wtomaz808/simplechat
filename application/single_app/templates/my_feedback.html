@@ -1,7 +1,11 @@
+<!-- templates/my_feedback.html -->
+ 
 {% extends "base.html" %}
-{% block title %}My Feedback{% endblock %}
-
+{% block title %}
+  My Feedback - {{ app_settings.app_title }}
+{% endblock %}
 {% block content %}
+
 <div class="container">
   <h2>My Feedback</h2>
   <p class="text-muted">

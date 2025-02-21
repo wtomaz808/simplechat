@@ -132,7 +132,7 @@ For a quick estimate of monthly costs based on our recommended baseline SKUs, ch
 | Content Safety         | Azure AI Content Safety, Standard: 10 x 1,000 text records and 1 x 1,000 images included per month |
 | Document Intelligence  | Azure Form Recognizer, Pay as you go, S0: 0 x 1,000 Custom pages, 1 x 1,000 Pre-built pages, 1 x 1,000 Read pages, 1 x 1,000 Add-on pages, 1 x 1,000 Query pages |
 | Bing Search            | Bing Search, S1 tier: 1,000 transactions                     |
-| Azure Cosmos DB        | Azure Cosmos DB for MongoDB (RU), Autoscale provisioned throughput, Always-free quantity disabled, Pay as you go, Single Region Write (Single-Master) - East US (Write Region), 1,000 RU/s x 730 Hours x 30% Avg Utilization x 1.5 Autoscale factor, 100 GB transactional storage, Analytical storage disabled, 2 copies of periodic backup storage |
+| Azure Cosmos DB        | Azure Cosmos DB for NoSQL (RU), Autoscale provisioned throughput, Always-free quantity disabled, Pay as you go, Single Region Write (Single-Master) - East US (Write Region), 1,000 RU/s x 730 Hours x 30% Avg Utilization x 1.5 Autoscale factor, 100 GB transactional storage, Analytical storage disabled, 2 copies of periodic backup storage |
 
 > **Note**: Pricing is subject to change and may vary based on your usage, region, and specific configuration. Always confirm with the official Azure Pricing Calculator and your Azure subscription details for the most accurate cost estimates.
 
@@ -412,7 +412,6 @@ After deployment and login (with a role of Admin or Owner), navigate to `Admin S
 3. **Embeddings**: Provide the Azure OpenAI Embedding endpoint and select the embedding model deployment.
 4. **Image Generation** (optional): Enable to add an “Image” button in chat for AI image generation.
 5. **Web Search** (Bing): Toggle to enable or disable web-based augmentation with Bing Search.
-6. **External APIs** (optional): If you have custom chunking or embedding endpoints, set them here.
 7. **Other**: Additional limits (max file size, conversation history limit, default system prompt, etc.).
 
 Changes are stored in your Azure Cosmos DB’s configuration container. Once saved, the new settings are applied almost immediately, without editing `.env`.
@@ -438,14 +437,11 @@ For deployments in **Azure Government**, ensure that the endpoints for **Azure C
 
 5. **Upload Ephemeral Documents**: Files that live for one conversation only (not in Cognitive Search).
 
-6. **Bing Web Search** (optional): Toggle “Search the Web” for external augmentation.
+6. **Bing Web Search** (optional): Toggle “Search the Web” for internet augmentation.
 
 7. **Image Generation** (optional): Enable “Image” mode to generate images via Azure OpenAI.
 
 8. Groups
-
-   :
-
    - Create or join existing groups; each group has an owner and optional admins.
    - Switch to the “active group” to see that group’s documents.
 

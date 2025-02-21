@@ -77,35 +77,45 @@ def get_settings():
             'enable_user_documents': True,
             'enable_group_documents': True,
 
-            # Safety Settings
+            # Safety (Content Safety) Settings
             'enable_content_safety': False,
             'content_safety_endpoint': '',
             'content_safety_key': '',
             'content_safety_authentication_type': 'key',
+            'enable_content_safety_apim': False,
+            'azure_apim_content_safety_endpoint': '',
+            'azure_apim_content_safety_subscription_key': '',
+
+            # User Feedback / Conversation Archiving
             'enable_user_feedback': True,
             'enable_conversation_archiving': False,
 
             # Search and Extract
             'enable_web_search': False,
             'bing_search_key': '',
+            'enable_web_search_apim': False,
+            'azure_apim_web_search_endpoint': '',
+            'azure_apim_web_search_subscription_key': '',
+
             'azure_ai_search_endpoint': '',
             'azure_ai_search_key': '',
             'azure_ai_search_authentication_type': 'key',
+            'enable_ai_search_apim': False,
+            'azure_apim_ai_search_endpoint': '',
+            'azure_apim_ai_search_subscription_key': '',
+
             'azure_document_intelligence_endpoint': '',
             'azure_document_intelligence_key': '',
             'azure_document_intelligence_authentication_type': 'key',
-
-            # External APIs
-            'use_external_apis': False,
-            'external_chunking_api': '',
-            'external_embedding_api': '',
+            'enable_document_intelligence_apim': False,
+            'azure_apim_document_intelligence_endpoint': '',
+            'azure_apim_document_intelligence_subscription_key': '',
 
             # Other Settings
             'max_file_size_mb': 150,
             'conversation_history_limit': 10,
             'default_system_prompt': ''
         }
-
 
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")

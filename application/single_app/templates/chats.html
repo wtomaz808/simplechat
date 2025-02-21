@@ -1,5 +1,9 @@
+<!-- templates/chats.html -->
+
 {% extends "base.html" %}
-{% block title %}Chats - AI Chat Application{% endblock %}
+{% block title %}
+    Chats - {{ app_settings.app_title }}
+{% endblock %}
 
 {% block head %}
     <link rel="stylesheet" href="/static/css/chats.css">

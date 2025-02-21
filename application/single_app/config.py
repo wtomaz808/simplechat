@@ -36,7 +36,7 @@ from azure.search.documents.models import VectorizedQuery
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
-from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider
+from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider, AzureAuthorityHosts
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
 
@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.201.5'
+app.config['VERSION'] = '0.202.11'
 Session(app)
 
 CLIENTS = {}
@@ -63,6 +63,16 @@ TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
 SCOPE = ["User.Read"]  # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
+AZURE_ENVIRONMENT = os.getenv("AZURE_ENVIRONMENT", "public") # public, usgovernment
+
+if AZURE_ENVIRONMENT == "usgovernment":
+    resource_manager = "https://management.usgovcloudapi.net"
+    authority = AzureAuthorityHosts.AZURE_GOVERNMENT
+    credential_scopes=[resource_manager + "/.default"]
+else:
+    resource_manager = "https://management.azure.com"
+    authority = AzureAuthorityHosts.AZURE_PUBLIC_CLOUD
+    credential_scopes=[resource_manager + "/.default"]
 
 BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
 

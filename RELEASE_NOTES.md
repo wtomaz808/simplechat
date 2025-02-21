@@ -110,7 +110,6 @@ We introduced a robust user feedback system, expanded content-safety features fo
    - **Admin Dropdown**: Admin-specific features (App Settings, Safety Violations, etc.) are grouped in an “Admin” dropdown on the main navbar.
    - **Safety**: For Content Safety (as noted above).
    - **Search & Extract**: For Bing Search, Azure AI Search, and Document Intelligence.
-   - **External APIs**: Simplified chunking/embedding form under one collapsible panel.
    - **Minor Styling Adjustments**: Updated top navbar to show/hide “Groups” or “Documents” links based on new toggles (Enable Your Documents, Enable My Groups).
 
 ## (v0.191.0)
@@ -125,11 +124,7 @@ We introduced a robust user feedback system, expanded content-safety features fo
    - **Test Connectivity**: Each service tab (GPT, Embeddings, Image Gen) now has a dedicated “Test Connection” button, providing immediate feedback on whether your settings and credentials are valid.  
    - **Improved UX for Keys**: Updated show/hide password toggles for all key fields (including APIM subscription keys), making it easier to confirm you’ve entered credentials correctly.
 
-3. **External APIs Refreshed**  
-   - **New Form Layout**: The “External APIs” tab has been refined for chunking or embedding endpoints outside of Azure OpenAI, aligning the UI design with the rest of the Admin Settings.  
-   - **Connection Testing**: A dedicated “Test Connection” button has been added to verify external chunking or embedding services before saving changes.
-
-4. **Miscellaneous Improvements**  
+3. **Miscellaneous Improvements**  
    - **UI Polishing**: Minor styling updates and improved tooltips in Admin Settings to guide first-time users.  
    - **Performance Tweaks**: Reduced initial load time for the Admin Settings page when large model lists are returned from the OpenAI endpoints.  
    - **Logging & Error Handling**: More descriptive error messages and client-side alerts for failed fetches (e.g., if the user tries to fetch GPT models but hasn’t set the endpoint properly).
@@ -146,11 +141,7 @@ We introduced a robust user feedback system, expanded content-safety features fo
    - **Test Connectivity**: Each service tab (GPT, Embeddings, Image Gen) now has a dedicated “Test Connection” button, providing immediate feedback on whether your settings and credentials are valid.  
    - **Improved UX for Keys**: Updated show/hide password toggles for all key fields (including APIM subscription keys), making it easier to confirm you’ve entered credentials correctly.
 
-3. **External APIs Refreshed**  
-   - **New Form Layout**: The “External APIs” tab has been refined for chunking or embedding endpoints outside of Azure OpenAI, aligning the UI design with the rest of the Admin Settings.  
-   - **Connection Testing**: A dedicated “Test Connection” button has been added to verify external chunking or embedding services before saving changes.
-
-4. **Miscellaneous Improvements**  
+3. **Miscellaneous Improvements**  
    - **UI Polishing**: Minor styling updates and improved tooltips in Admin Settings to guide first-time users.  
    - **Performance Tweaks**: Reduced initial load time for the Admin Settings page when large model lists are returned from the OpenAI endpoints.  
    - **Logging & Error Handling**: More descriptive error messages and client-side alerts for failed fetches (e.g., if the user tries to fetch GPT models but hasn’t set the endpoint properly).

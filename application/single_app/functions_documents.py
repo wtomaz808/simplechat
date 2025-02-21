@@ -31,15 +31,8 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
     
 def process_document_and_store_chunks(extracted_content , file_name, user_id):
     settings = get_settings()
-    use_external_apis = settings.get('use_external_apis')
-    external_chunking_api = settings.get('external_chunking_api')
-    external_embedding_api = settings.get('external_embedding_api')
 
-    if use_external_apis:
-        response = requests.post(f"{external_chunking_api}/chunk", json={'text': extracted_content })
-        chunks = response.json().get('chunks', [])
-    else:
-        chunks = chunk_text(extracted_content )
+    chunks = chunk_text(extracted_content )
 
     document_id = str(uuid.uuid4())
     chunks = chunk_text(extracted_content )
@@ -78,11 +71,7 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
     for idx, chunk_text_content in enumerate(chunks):
         chunk_id = f"{document_id}_{idx}"
 
-        if use_external_apis:
-            response = requests.post(f"{external_embedding_api}/embed", json={'text': chunk_text_content})
-            embedding = response.json().get('embedding')
-        else:
-            embedding = generate_embedding(chunk_text_content)
+        embedding = generate_embedding(chunk_text_content)
 
         chunk_document = {
             "id": chunk_id,

@@ -1,11 +1,11 @@
 <!-- templates/index.html -->
+ 
 {% extends "base.html" %}
-
 {% block title %}
-Home - {{ app_settings.app_title }}
+    Home - {{ app_settings.app_title }}
 {% endblock %}
-
 {% block content %}
+
 <div class="text-center mt-5">
     {% if app_settings.show_logo %}
         <img src="{{ url_for('static', filename=app_settings.logo_path) }}"
