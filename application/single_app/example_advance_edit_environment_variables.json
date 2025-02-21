@@ -3,6 +3,8 @@
     { "name": "AZURE_COSMOS_KEY", "value": "<your-cosmosdb-key>", "slotSetting": false },
     { "name": "AZURE_COSMOS_AUTHENTICATION_TYPE", "value": "key", "slotSetting": false },
     { "name": "BING_SEARCH_ENDPOINT", "value": "https://api.bing.microsoft.com/", "slotSetting": false },
+    { "name": "CLIENT_ID", "value": "<your-client-id>", "slotSetting": false },
+    { "name": "TENANT_ID", "value": "<your-tenant-id>", "slotSetting": false },
     { "name": "AZURE_ENVIRONMENT", "value": "public", "slotSetting": false },
     { "name": "SECRET_KEY", "value": "<your-32-character-secret>", "slotSetting": false }
 ]
