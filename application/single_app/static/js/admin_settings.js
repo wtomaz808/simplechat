@@ -464,8 +464,7 @@ function setupTestButtons() {
                     subscription_id: document.getElementById('azure_openai_embedding_subscription_id').value,
                     resource_group: document.getElementById('azure_openai_embedding_resource_group').value,
                     key: document.getElementById('azure_openai_embedding_key').value,
-                    api_version: document.getElementById('azure_openai_embedding_api_version').value
-                };
+                    api_version: document.getElementById('azure_openai_embedding_api_version').value                };
             }
 
             try {

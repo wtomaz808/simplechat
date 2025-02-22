@@ -1,6 +1,5 @@
 // js/manage_group.js
 let currentUserRole = null;
-let userId = "";
 
 $(document).ready(function () {
   loadGroupInfo(function () {
@@ -34,9 +33,9 @@ $(document).ready(function () {
 
   $("#changeRoleForm").on("submit", function (e) {
     e.preventDefault();
-    const userId = $("#roleChangeUserId").val();
+    const memberUserId = $("#roleChangeUserId").val();
     const newRole = $("#roleSelect").val();
-    setRole(userId, newRole);
+    setRole(memberUserId, newRole);
   });
 
   $("#memberSearchBtn").on("click", function () {
@@ -148,7 +147,6 @@ function loadGroupInfo(doneCallback) {
       </p>
     `);
 
-    userId = "{{ session['user'].get('oid') }}";
     const admins = group.admins || [];
     const docManagers = group.documentManagers || [];
 

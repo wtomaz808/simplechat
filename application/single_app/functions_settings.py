@@ -24,7 +24,7 @@ def get_settings():
             # GPT Settings
             'enable_gpt_apim': False,
             'azure_openai_gpt_endpoint': '',
-            'azure_openai_gpt_api_version': '',
+            'azure_openai_gpt_api_version': '2024-05-01-preview',
             'azure_openai_gpt_authentication_type': 'key',
             'azure_openai_gpt_subscription_id': '',
             'azure_openai_gpt_resource_group': '',
@@ -41,7 +41,7 @@ def get_settings():
             # Embeddings Settings
             'enable_embedding_apim': False,
             'azure_openai_embedding_endpoint': '',
-            'azure_openai_embedding_api_version': '',
+            'azure_openai_embedding_api_version': '2024-05-01-preview',
             'azure_openai_embedding_authentication_type': 'key',
             'azure_openai_embedding_subscription_id': '',
             'azure_openai_embedding_resource_group': '',
@@ -59,7 +59,7 @@ def get_settings():
             'enable_image_generation': False,
             'enable_image_gen_apim': False,
             'azure_openai_image_gen_endpoint': '',
-            'azure_openai_image_gen_api_version': '',
+            'azure_openai_image_gen_api_version': '2024-05-01-preview',
             'azure_openai_image_gen_authentication_type': 'key',
             'azure_openai_image_gen_subscription_id': '',
             'azure_openai_image_gen_resource_group': '',

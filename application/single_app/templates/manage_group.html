@@ -333,6 +333,7 @@
 <script>
   // Inline the real group ID from Jinja
   const groupId = "{{ group_id }}"; // This will become the real UUID
+  const userId = "{{ session['user'].get('oid') }}";
 </script>
 
 <script src="{{ url_for('static', filename='js/manage_group.js') }}"></script>
