@@ -1,7 +1,11 @@
 <!-- templates/manage_group.html -->
  
-{% extends "base.html" %} {% block title %} Manage Group - {{
-app_settings.app_title }} {% endblock %} {% block content %}
+{% extends "base.html" %}
+{% block title %}
+  Manage Group - {{app_settings.app_title }}
+{% endblock %}
+{% block content %}
+
 <div class="container">
   <h2>Manage Group</h2>
   <div id="groupInfoContainer" class="mb-3">
@@ -329,6 +333,7 @@ app_settings.app_title }} {% endblock %} {% block content %}
 <script>
   // Inline the real group ID from Jinja
   const groupId = "{{ group_id }}"; // This will become the real UUID
+  const userId = "{{ session['user'].get('oid') }}";
 </script>
 
 <script src="{{ url_for('static', filename='js/manage_group.js') }}"></script>

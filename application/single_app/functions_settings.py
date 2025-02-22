@@ -24,7 +24,7 @@ def get_settings():
             # GPT Settings
             'enable_gpt_apim': False,
             'azure_openai_gpt_endpoint': '',
-            'azure_openai_gpt_api_version': '',
+            'azure_openai_gpt_api_version': '2024-05-01-preview',
             'azure_openai_gpt_authentication_type': 'key',
             'azure_openai_gpt_subscription_id': '',
             'azure_openai_gpt_resource_group': '',
@@ -41,7 +41,7 @@ def get_settings():
             # Embeddings Settings
             'enable_embedding_apim': False,
             'azure_openai_embedding_endpoint': '',
-            'azure_openai_embedding_api_version': '',
+            'azure_openai_embedding_api_version': '2024-05-01-preview',
             'azure_openai_embedding_authentication_type': 'key',
             'azure_openai_embedding_subscription_id': '',
             'azure_openai_embedding_resource_group': '',
@@ -59,7 +59,7 @@ def get_settings():
             'enable_image_generation': False,
             'enable_image_gen_apim': False,
             'azure_openai_image_gen_endpoint': '',
-            'azure_openai_image_gen_api_version': '',
+            'azure_openai_image_gen_api_version': '2024-05-01-preview',
             'azure_openai_image_gen_authentication_type': 'key',
             'azure_openai_image_gen_subscription_id': '',
             'azure_openai_image_gen_resource_group': '',
@@ -77,35 +77,45 @@ def get_settings():
             'enable_user_documents': True,
             'enable_group_documents': True,
 
-            # Safety Settings
+            # Safety (Content Safety) Settings
             'enable_content_safety': False,
             'content_safety_endpoint': '',
             'content_safety_key': '',
             'content_safety_authentication_type': 'key',
+            'enable_content_safety_apim': False,
+            'azure_apim_content_safety_endpoint': '',
+            'azure_apim_content_safety_subscription_key': '',
+
+            # User Feedback / Conversation Archiving
             'enable_user_feedback': True,
             'enable_conversation_archiving': False,
 
             # Search and Extract
             'enable_web_search': False,
             'bing_search_key': '',
+            'enable_web_search_apim': False,
+            'azure_apim_web_search_endpoint': '',
+            'azure_apim_web_search_subscription_key': '',
+
             'azure_ai_search_endpoint': '',
             'azure_ai_search_key': '',
             'azure_ai_search_authentication_type': 'key',
+            'enable_ai_search_apim': False,
+            'azure_apim_ai_search_endpoint': '',
+            'azure_apim_ai_search_subscription_key': '',
+
             'azure_document_intelligence_endpoint': '',
             'azure_document_intelligence_key': '',
             'azure_document_intelligence_authentication_type': 'key',
-
-            # External APIs
-            'use_external_apis': False,
-            'external_chunking_api': '',
-            'external_embedding_api': '',
+            'enable_document_intelligence_apim': False,
+            'azure_apim_document_intelligence_endpoint': '',
+            'azure_apim_document_intelligence_subscription_key': '',
 
             # Other Settings
             'max_file_size_mb': 150,
             'conversation_history_limit': 10,
             'default_system_prompt': ''
         }
-
 
         settings_container.create_item(body=default_settings)
         print("Default settings created and returned.")

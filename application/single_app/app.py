@@ -28,6 +28,7 @@ from route_backend_group_documents import *
 from route_backend_models import *
 from route_backend_safety import *
 from route_backend_feedback import *
+from route_backend_settings import *
 
 # =================== Helper Functions ===================
 @app.before_first_request
@@ -149,6 +150,9 @@ register_route_backend_safety(app)
 
 # ------------------- API Feedback Routes ---------------
 register_route_backend_feedback(app)
+
+# ------------------- API Settings Routes ---------------
+register_route_backend_settings(app)
 
 if __name__ == '__main__':
     settings = get_settings()

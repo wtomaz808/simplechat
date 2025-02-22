@@ -35,60 +35,49 @@ https://github.com/user-attachments/assets/a1045817-e2e4-4336-8a18-d4f83a6a02af
 ## Latest Features 
 Below is a suggested “What’s New” or “Latest Features” section you can add to your README (or Release Notes) based on the diffs provided. Feel free to adjust the version number, headings, or wording to match your project’s style.
 
-### (v0.201.5)
+### (v0.202.21)
 
-#### 1. **Managed Identity Support**
+- **Azure Government Support**:
 
-- Azure Cosmos DB (enabled/disabled via environment variable)
-- Azure Document Intelligence (enabled/disabled via app settings)
-- Azure AI Search (enabled/disabled via app settings)
-- Azure OpenAI (enabled/disabled via app settings)
-
-#### 2. **Conversation Archiving**
-
-- Introduced a new setting 
+  - Introduced an `AZURE_ENVIRONMENT` variable (e.g. `"public"` or `"usgovernment"`) and logic to handle separate authority hosts, resource managers, and credential scopes.
 
   ```
-  enable_conversation_archiving
+  # Azure Cosmos DB
+  AZURE_COSMOS_ENDPOINT="<your-cosmosdb-endpoint>"
+  AZURE_COSMOS_KEY="<your-cosmosdb-key>"
+  AZURE_COSMOS_AUTHENTICATION_TYPE="key" # key or managed_identity
+  
+  # Azure Bing Search
+  BING_SEARCH_ENDPOINT="https://api.bing.microsoft.com/"
+  
+  # Azure AD Authentication
+  CLIENT_ID="<your-client-id>"
+  TENANT_ID="<your-tenant-id>"
+  AZURE_ENVIRONMENT="public" #public, usgovernment
+  SECRET_KEY="32-characters" # Example - "YouSh0uldGener8teYour0wnSecr3tKey!", import secrets; print(secrets.token_urlsafe(32))
   ```
 
-  - When enabled, deleting a conversation will first copy (archive) the conversation document into an `archived_conversations_container` before removing it from the main `conversations` container.
-  - Helps preserve conversation history if you want to restore or analyze it later.
+- **Admin Settings Overhaul**:
 
-#### 3. **Configuration & Environment Variable Updates**
+  - **Route & UI**: Added `route_backend_settings.py` and significantly expanded `admin_settings.html` to configure GPT, Embeddings, Image Gen, Content Safety, Web Search, AI Search, and Document Intelligence—all from a single Admin page.
+  - **APIM Toggles**: Each service (GPT, Embeddings, Image Generation, Content Safety, etc.) can now be routed through Azure API Management instead of direct endpoints by switching a toggle.
+  - **“Test Connection” Buttons**: Each service (GPT, Embeddings, Image Generation, Content Safety, Bing Web Search, Azure AI Search, and Document Intelligence) now has a dedicated “Test Connection” button that performs a live connectivity check.
 
-- `example.env` & `example_advance_edit_environment_variables.json`:
-  - Added `AZURE_COSMOS_AUTHENTICATION_TYPE` to demonstrate how to switch between `key`-based or `managed_identity`-based authentication.
-  - Cleaned up references to Azure AI Search and Azure Document Intelligence environment variables to reduce clutter and reflect the new approach of toggling authentication modes.
-- Default Settings Updates
-  - `functions_settings.py` has more descriptive defaults covering GPT, Embeddings, and Image Generation for both key-based and managed identity scenarios.
-  - New config fields such as `content_safety_authentication_type`, `azure_document_intelligence_authentication_type`, and `enable_conversation_archiving`.
+- **Improved Safety Features**:
 
-#### 6. **Bug Fixes**
+  - New pages/sections for “Admin Safety Violations” vs. “My Safety Violations.”
 
-- Fixed bug affecting the ability to manage groups
-  - Renamed or refactored `manage_groups.js` to `manage_group.js`, and updated the template (`manage_group.html`) to use the new filename.
-  - Injected `groupId` directly via Jinja for improved client-side handling.
+- **Miscellaneous Frontend & Template Updates**:
 
-#### 7. **Architecture Diagram Updates**
+  - All templates now reference an `app_settings.app_title` for a dynamic page title.
+  - Enhanced navigation and labeling in “My Documents,” “My Groups,” and “Profile” pages.
 
-- Updated `architecture.vsdx` and `architecture.png` to align with the new authentication flow and container usage.
+#### Bug Fixes
 
-------
-
-#### How to Use / Test the New Features
-
-1. **Enable Managed Identity**
-   - In your `.env` or Azure App Service settings, set `AZURE_COSMOS_AUTHENTICATION_TYPE="managed_identity"` (and similarly for `azure_document_intelligence_authentication_type`, etc.).
-   - Ensure the Azure resource (e.g., App Service, VM) has a system- or user-assigned Managed Identity with the correct roles (e.g., “Cosmos DB Account Contributor”).
-   - Deploy, and the application will now connect to Azure resources without storing any keys in configuration.
-2. **Test Conversation Archiving**
-   - In the Admin Settings, enable `Enable Conversation Archiving`.
-   - Delete a conversation.
-   - Verify the record is copied to `archived_conversations_container` before being removed from the active container.
-3. **Check New Environment Variables**
-   - Review `example.env` and `example_advance_edit_environment_variables.json` for the newly added variables.
-   - Update your application settings in Azure or your local `.env` accordingly to test various authentication modes (key vs. managed identity).
+- **Conversation Pipeline**:
+  - Removed the `"image"` role from the allowed conversation roles to streamline message handling.
+- **Group Management**:
+  - Now correctly passes and references the current user’s ID in various group actions.
 
 ## Release Notes
 For a detailed list of features released by version, please refer to the [Release Notes](./RELEASE_NOTES.md).
@@ -117,6 +106,63 @@ For a detailed list of features released by version, please refer to the [Releas
 ![Chat with Temp Docs](./images/ChatwithTempDocs.gif)
 
 ## Setup Instructions
+
+### Provision Azure Resources
+
+For a quick estimate of monthly costs based on our recommended baseline SKUs, check out the [Azure Pricing Calculator](https://azure.com/e/11e3a66700924f248722186c089b275c). Below are the services and SKUs reflected in that link:
+
+| Service Type           | Description                                                  |
+| ---------------------- | ------------------------------------------------------------ |
+| Front End App Service  | Basic Tier; 1 B1 (1 Core(s), 1.75 GB RAM, 10 GB Storage) x 730 Hours; Windows OS; 0 SNI SSL Connections; 0 IP SSL Connections; 0 Custom Domains; 0 Standard SLL Certificates; 0 Wildcard SSL Certificates |
+| Azure OpenAI GPT Model | Language Models, Standard (On-Demand), GPT-4o US/EU Data Zones, 10,000 x 1,000 input tokens, 3,000 x 1,000 output tokens |
+| Azure OpenAI Embedding | Embedding Models, Text-Embedding-3-Small, 1,000,000 x 1,000 Tokens |
+| Azure OpenAI Image Gen | Image Models, Dall-E-3, 1 x 100 Standard 1024 x 1024 images, 1 x 100 Standard 1024 x 1792 images, 1 x 100 HD 1024 x 1024 images, 1 x 100 HD 1024 x 1792 images |
+| Azure AI Search        | Standard S1, 1 Unit(s), 360 Hours, 10K semantic queries      |
+| Content Safety         | Azure AI Content Safety, Standard: 10 x 1,000 text records and 1 x 1,000 images included per month |
+| Document Intelligence  | Azure Form Recognizer, Pay as you go, S0: 0 x 1,000 Custom pages, 1 x 1,000 Pre-built pages, 1 x 1,000 Read pages, 1 x 1,000 Add-on pages, 1 x 1,000 Query pages |
+| Bing Search            | Bing Search, S1 tier: 1,000 transactions                     |
+| Azure Cosmos DB        | Azure Cosmos DB for NoSQL (RU), Autoscale provisioned throughput, Always-free quantity disabled, Pay as you go, Single Region Write (Single-Master) - East US (Write Region), 1,000 RU/s x 730 Hours x 30% Avg Utilization x 1.5 Autoscale factor, 100 GB transactional storage, Analytical storage disabled, 2 copies of periodic backup storage |
+
+> **Note**: Pricing is subject to change and may vary based on your usage, region, and specific configuration. Always confirm with the official Azure Pricing Calculator and your Azure subscription details for the most accurate cost estimates.
+
+1. **Create or Select a Resource Group**  
+   - It’s often easiest to group all resources together under one Azure Resource Group (e.g., `rg-simple-chat`).  
+   - For best performance, match regions as shown above (e.g., `East US` for Azure OpenAI, `West US` for App Service) or adjust to your local region needs.
+2. **Deploy App Service**  
+   - Create an **Azure App Service** in with at least **P0v3** tier.  
+   - After creation, note the **App Name** and **URL** (e.g., `https://my-simplechat-app.azurewebsites.net`).
+3. **Deploy Azure OpenAI**  
+   - Deploy one or more **Azure OpenAI** resources in whichever region best supports your requirements.
+   - Enable the necessary **GPT-4** model (called **GPT-4o** in the Pricing Calculator link), **Embedding** model (`text-embedding-3-small`), and **Image Generation** (DALL-E 3).  
+   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+4. **Deploy Azure AI Search**  
+   - Create a **Standard S1** instance in **East US**.  
+   - [Initialize indexes](#initializing-indexes-in-azure-ai-search) (personal and group).
+   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+5. **Deploy Azure Cosmos DB**  
+   - Use **Azure Cosmos DB for MongoDB** with RU-based autoscale (1,000 RU/s).  
+   - Optionally, set up **Managed Identity** authentication if you do not want to store keys.
+6. **Deploy Azure AI Document Intelligence**  
+   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+7. **Deploy Azure AI Content Safety** (optional)  
+   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+8. **Deploy Bing Search** (optional)  
+   - Provide that **Bing Search** key in the **App Settings**.
+
+### Configure Environment / `.env` File
+
+- Configure your **App Service** or local `.env` with connection strings, keys, or **Managed Identity** references.  
+- Refer to the [Configuration and Environment Variables](#configuring-environment-variables-and-env-file) section for step-by-step instructions or the Advanced Edit JSON approach.
+
+### Proceed with Application-Specific Configuration
+
+Follow the remaining steps in this README for:
+- [AAD Integration](#setting-up-authentication-for-the-simple-chat-application)
+- [Uploading Index Schemas](#initializing-indexes-in-azure-ai-search)
+- [Admin Settings for GPT / Embeddings / Image Generation](#admin-settings-configuration)
+- [Deployment Instructions](#installing-and-deploying)
+
+Once your Azure services are provisioned and the environment variables are set, you can deploy the **Simple Chat Application** (via Azure CLI, VS Code, or other preferred methods) and start using it in your Azure subscription.
 
 ### Initializing Indexes in Azure AI Search
 
@@ -271,16 +317,23 @@ If you prefer, you can update your environment variables directly in the Azure P
 
 > [!NOTE]
 >
-> Replace the placeholder values (e.g., `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`, `FLASK_KEY`, etc.) with your actual configuration values.
+> Replace the placeholder values (e.g., `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`, `SECRET_KEY`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_COSMOS_ENDPOINT`, `AZURE_COSMOS_KEY`, `AZURE_COSMOS_AUTHENTICATION_TYPE`, `CLIENT_ID`, `TENANT_ID`, `WEBSITE_AUTH_AAD_ALLOWED_TENANTS`) with your actual configuration values.
 
 ```json
 [
+    { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "InstrumentationKey=<your-instrumentation-key>;IngestionEndpoint=<your-ingestion-endpoint>;LiveEndpoint=<your-live-endpoint>;ApplicationId=<your-application-id>", "slotSetting": false },
     { "name": "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", "value": "<your-authentication-secret>", "slotSetting": true },
     { "name": "WEBSITE_AUTH_AAD_ALLOWED_TENANTS", "value": "<your-allowed-tenant-id>", "slotSetting": false },
+    { "name": "AZURE_COSMOS_ENDPOINT", "value": "<your-cosmosdb-endpoint>", "slotSetting": false },
+    { "name": "AZURE_COSMOS_KEY", "value": "<your-cosmosdb-key>", "slotSetting": false },
+    { "name": "AZURE_COSMOS_AUTHENTICATION_TYPE", "value": "key", "slotSetting": false },
+    { "name": "CLIENT_ID", "value": "<your-client-id>", "slotSetting": false },
+    { "name": "TENANT_ID", "value": "<your-tenant-id>", "slotSetting": false },
+    { "name": "SECRET_KEY", "value": "<your-32-character-secret>", "slotSetting": false },
+    { "name": "BING_SEARCH_ENDPOINT", "value": "https://api.bing.microsoft.com/", "slotSetting": false },
     { "name": "SCM_DO_BUILD_DURING_DEPLOYMENT", "value": "true", "slotSetting": false },
     { "name": "WEBSITE_HTTPLOGGING_RETENTION_DAYS", "value": "7", "slotSetting": false },
     { "name": "APPINSIGHTS_INSTRUMENTATIONKEY", "value": "<your-instrumentation-key>", "slotSetting": false },
-    { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "InstrumentationKey=<your-instrumentation-key>;IngestionEndpoint=<your-ingestion-endpoint>;LiveEndpoint=<your-live-endpoint>;ApplicationId=<your-application-id>", "slotSetting": false },
     { "name": "ApplicationInsightsAgent_EXTENSION_VERSION", "value": "~3", "slotSetting": false },
     { "name": "APPLICATIONINSIGHTSAGENT_EXTENSION_ENABLED", "value": "true", "slotSetting": false },
     { "name": "XDT_MicrosoftApplicationInsights_Mode", "value": "default", "slotSetting": false },
@@ -289,25 +342,8 @@ If you prefer, you can update your environment variables directly in the Azure P
     { "name": "SnapshotDebugger_EXTENSION_VERSION", "value": "disabled", "slotSetting": false },
     { "name": "InstrumentationEngine_EXTENSION_VERSION", "value": "disabled", "slotSetting": false },
     { "name": "XDT_MicrosoftApplicationInsights_BaseExtensions", "value": "disabled", "slotSetting": false },
-    { "name": "XDT_MicrosoftApplicationInsights_PreemptSdk", "value": "disabled", "slotSetting": false },
-    { "name": "AZURE_COSMOS_ENDPOINT", "value": "<your-cosmosdb-endpoint>", "slotSetting": false },
-    { "name": "AZURE_COSMOS_KEY", "value": "<your-cosmosdb-key>", "slotSetting": false },
-    { "name": "AZURE_COSMOS_DB_NAME", "value": "SimpleChat", "slotSetting": false },
-    { "name": "AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME", "value": "documents", "slotSetting": false },
-    { "name": "AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME", "value": "conversations", "slotSetting": false },
-    { "name": "AZURE_COSMOS_LOGS_CONTAINER_NAME", "value": "logs", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_ENDPOINT", "value": "<your-ai-search-endpoint>", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_KEY", "value": "<your-ai-search-key>", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_USER_INDEX", "value": "simplechat-user-index", "slotSetting": false },
-    { "name": "AZURE_AI_SEARCH_GROUP_INDEX", "value": "simplechat-group-index", "slotSetting": false },
-    { "name": "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "value": "<your-document-intelligence-endpoint>", "slotSetting": false },
-    { "name": "AZURE_DOCUMENT_INTELLIGENCE_KEY", "value": "<your-document-intelligence-key>", "slotSetting": false },
-    { "name": "BING_SEARCH_ENDPOINT", "value": "https://api.bing.microsoft.com/", "slotSetting": false },
-    { "name": "CLIENT_ID", "value": "<your-client-id>", "slotSetting": false },
-    { "name": "TENANT_ID", "value": "<your-tenant-id>", "slotSetting": false },
-    { "name": "SECRET_KEY", "value": "<your-32-character-secret>", "slotSetting": false }
+    { "name": "XDT_MicrosoftApplicationInsights_PreemptSdk", "value": "disabled", "slotSetting": false }
 ]
-
 ```
 
 #### Notes:
@@ -365,7 +401,6 @@ After deployment and login (with a role of Admin or Owner), navigate to `Admin S
 3. **Embeddings**: Provide the Azure OpenAI Embedding endpoint and select the embedding model deployment.
 4. **Image Generation** (optional): Enable to add an “Image” button in chat for AI image generation.
 5. **Web Search** (Bing): Toggle to enable or disable web-based augmentation with Bing Search.
-6. **External APIs** (optional): If you have custom chunking or embedding endpoints, set them here.
 7. **Other**: Additional limits (max file size, conversation history limit, default system prompt, etc.).
 
 Changes are stored in your Azure Cosmos DB’s configuration container. Once saved, the new settings are applied almost immediately, without editing `.env`.
@@ -391,14 +426,11 @@ For deployments in **Azure Government**, ensure that the endpoints for **Azure C
 
 5. **Upload Ephemeral Documents**: Files that live for one conversation only (not in Cognitive Search).
 
-6. **Bing Web Search** (optional): Toggle “Search the Web” for external augmentation.
+6. **Bing Web Search** (optional): Toggle “Search the Web” for internet augmentation.
 
 7. **Image Generation** (optional): Enable “Image” mode to generate images via Azure OpenAI.
 
 8. Groups
-
-   :
-
    - Create or join existing groups; each group has an owner and optional admins.
    - Switch to the “active group” to see that group’s documents.
 

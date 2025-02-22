@@ -26,12 +26,23 @@ def register_route_backend_models(app):
         if not subscription_id or not resource_group or not account_name:
             return jsonify({"error": "Azure GPT Model subscription/RG/endpoint not configured"}), 400
 
-        credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+        if AZURE_ENVIRONMENT == "usgovernment":
+            
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET, authority=authority)
 
-        client = CognitiveServicesManagementClient(
-            credential=credential,
-            subscription_id=subscription_id
-        )
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id,
+                base_url=resource_manager,
+                credential_scopes=credential_scopes
+            )
+        else:
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id
+            )
 
         models = []
         try:
@@ -74,12 +85,23 @@ def register_route_backend_models(app):
         if not subscription_id or not resource_group or not account_name:
             return jsonify({"error": "Azure Embedding Model subscription/RG/endpoint not configured"}), 400
 
-        credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+        if AZURE_ENVIRONMENT == "usgovernment":
+            
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET, authority=authority)
 
-        client = CognitiveServicesManagementClient(
-            credential=credential,
-            subscription_id=subscription_id
-        )
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id,
+                base_url=resource_manager,
+                credential_scopes=credential_scopes
+            )
+        else:
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id
+            )
 
         models = []
         try:
@@ -119,12 +141,23 @@ def register_route_backend_models(app):
         if not subscription_id or not resource_group or not account_name:
             return jsonify({"error": "Azure Image Model subscription/RG/endpoint not configured"}), 400
 
-        credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+        if AZURE_ENVIRONMENT == "usgovernment":
+            
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET, authority=authority)
 
-        client = CognitiveServicesManagementClient(
-            credential=credential,
-            subscription_id=subscription_id
-        )
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id,
+                base_url=resource_manager,
+                credential_scopes=credential_scopes
+            )
+        else:
+            credential = ClientSecretCredential(TENANT_ID, CLIENT_ID, MICROSOFT_PROVIDER_AUTHENTICATION_SECRET)
+
+            client = CognitiveServicesManagementClient(
+                credential=credential,
+                subscription_id=subscription_id
+            )
 
         models = []
         try:

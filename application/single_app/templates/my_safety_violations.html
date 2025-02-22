@@ -1,7 +1,11 @@
-{% extends "base.html" %}
-{% block title %}My Safety Violations{% endblock %}
+<!-- templates/my_safety_violations.html -->
 
+{% extends "base.html" %}
+{% block title %}
+  My Safety Violations - {{ app_settings.app_title }}
+{% endblock %}
 {% block content %}
+
 <div class="container">
   <h2>My Safety Violations</h2>
   <p class="text-muted">

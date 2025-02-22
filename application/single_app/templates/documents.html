@@ -1,6 +1,11 @@
 <!-- templates/documents.html -->
-{% extends "base.html" %} {% block title %}Documents - AI Chat Application{%
-endblock %} {% block content %}
+
+{% extends "base.html" %}
+{% block title %}
+  Your Documents - {{ app_settings.app_title }}
+{%endblock %}
+{% block content %}
+
 <div class="container">
   <h2>Your Documents</h2>
 

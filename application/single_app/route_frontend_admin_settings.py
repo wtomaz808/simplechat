@@ -52,7 +52,7 @@ def register_route_frontend_admin_settings(app):
                     )
                     all_deployments = client_embeddings.deployments.list().data
                     embedding_deployments = [
-                        dep for dep in all_deployments 
+                        dep for dep in all_deployments
                         if "embedding" in dep.model.lower() or "ada" in dep.model.lower()
                     ]
             except Exception as e:
@@ -77,7 +77,6 @@ def register_route_frontend_admin_settings(app):
                 print(f"Error retrieving Image deployments: {e}")
 
             update_settings(settings)
-
             return render_template(
                 'admin_settings.html',
                 settings=settings,
@@ -91,10 +90,7 @@ def register_route_frontend_admin_settings(app):
             max_file_size_mb = int(request.form.get('max_file_size_mb', 16))
             conversation_history_limit = int(request.form.get('conversation_history_limit', 10))
             default_system_prompt = request.form.get('default_system_prompt', '')
-            use_external_apis = request.form.get('use_external_apis') == 'on'
-            external_chunking_api = request.form.get('external_chunking_api', '')
             enable_conversation_archiving = request.form.get('enable_conversation_archiving') == 'on'
-            external_embedding_api = request.form.get('external_embedding_api', '')
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_documents = request.form.get('enable_user_documents') == 'on'
             enable_group_documents = request.form.get('enable_group_documents') == 'on'
@@ -107,6 +103,7 @@ def register_route_frontend_admin_settings(app):
             azure_document_intelligence_endpoint = request.form.get('azure_document_intelligence_endpoint', '')
             azure_document_intelligence_key = request.form.get('azure_document_intelligence_key', '')
 
+            # GPT
             azure_openai_gpt_endpoint = request.form.get('azure_openai_gpt_endpoint', '')
             azure_openai_gpt_api_version = request.form.get('azure_openai_gpt_api_version', '')
             azure_openai_gpt_authentication_type = request.form.get('azure_openai_gpt_authentication_type', 'key')
@@ -114,6 +111,7 @@ def register_route_frontend_admin_settings(app):
             azure_openai_gpt_resource_group = request.form.get('azure_openai_gpt_resource_group', '')
             azure_openai_gpt_key = request.form.get('azure_openai_gpt_key', '')
 
+            # Embedding
             azure_openai_embedding_endpoint = request.form.get('azure_openai_embedding_endpoint', '')
             azure_openai_embedding_api_version = request.form.get('azure_openai_embedding_api_version', '')
             azure_openai_embedding_authentication_type = request.form.get('azure_openai_embedding_authentication_type', 'key')
@@ -121,6 +119,7 @@ def register_route_frontend_admin_settings(app):
             azure_openai_embedding_resource_group = request.form.get('azure_openai_embedding_resource_group', '')
             azure_openai_embedding_key = request.form.get('azure_openai_embedding_key', '')
 
+            # Image Generation
             enable_image_generation = request.form.get('enable_image_generation') == 'on'
             azure_openai_image_gen_endpoint = request.form.get('azure_openai_image_gen_endpoint', '')
             azure_openai_image_gen_api_version = request.form.get('azure_openai_image_gen_api_version', '')
@@ -133,27 +132,45 @@ def register_route_frontend_admin_settings(app):
             bing_search_key = request.form.get('bing_search_key', '')
             landing_page_text = request.form.get('landing_page_text', '')
 
+            # Model JSONs
             gpt_model_json = request.form.get('gpt_model_json', '')
             embedding_model_json = request.form.get('embedding_model_json', '')
             image_gen_model_json = request.form.get('image_gen_model_json', '')
 
+            # APIM toggles/fields
             enable_gpt_apim = request.form.get('enable_gpt_apim') == 'on'
-            azure_apim_gpt_deployment = request.form.get('azure_apim_gpt_deployment', '')
             azure_apim_gpt_endpoint = request.form.get('azure_apim_gpt_endpoint', '')
             azure_apim_gpt_subscription_key = request.form.get('azure_apim_gpt_subscription_key', '')
             azure_apim_gpt_api_version = request.form.get('azure_apim_gpt_api_version', '')
+            azure_apim_gpt_deployment = request.form.get('azure_apim_gpt_deployment', '')
 
             enable_embedding_apim = request.form.get('enable_embedding_apim') == 'on'
-            azure_apim_embedding_deployment = request.form.get('azure_apim_embedding_deployment', '')
             azure_apim_embedding_endpoint = request.form.get('azure_apim_embedding_endpoint', '')
             azure_apim_embedding_subscription_key = request.form.get('azure_apim_embedding_subscription_key', '')
             azure_apim_embedding_api_version = request.form.get('azure_apim_embedding_api_version', '')
+            azure_apim_embedding_deployment = request.form.get('azure_apim_embedding_deployment', '')
 
             enable_image_gen_apim = request.form.get('enable_image_gen_apim') == 'on'
-            azure_apim_image_gen_deployment = request.form.get('azure_apim_image_gen_deployment', '')
             azure_apim_image_gen_endpoint = request.form.get('azure_apim_image_gen_endpoint', '')
             azure_apim_image_gen_subscription_key = request.form.get('azure_apim_image_gen_subscription_key', '')
             azure_apim_image_gen_api_version = request.form.get('azure_apim_image_gen_api_version', '')
+            azure_apim_image_gen_deployment = request.form.get('azure_apim_image_gen_deployment', '')
+
+            enable_content_safety_apim = request.form.get('enable_content_safety_apim') == 'on'
+            azure_apim_content_safety_endpoint = request.form.get('azure_apim_content_safety_endpoint', '')
+            azure_apim_content_safety_subscription_key = request.form.get('azure_apim_content_safety_subscription_key', '')
+
+            enable_web_search_apim = request.form.get('enable_web_search_apim') == 'on'
+            azure_apim_web_search_endpoint = request.form.get('azure_apim_web_search_endpoint', '')
+            azure_apim_web_search_subscription_key = request.form.get('azure_apim_web_search_subscription_key', '')
+
+            enable_ai_search_apim = request.form.get('enable_ai_search_apim') == 'on'
+            azure_apim_ai_search_endpoint = request.form.get('azure_apim_ai_search_endpoint', '')
+            azure_apim_ai_search_subscription_key = request.form.get('azure_apim_ai_search_subscription_key', '')
+
+            enable_document_intelligence_apim = request.form.get('enable_document_intelligence_apim') == 'on'
+            azure_apim_document_intelligence_endpoint = request.form.get('azure_apim_document_intelligence_endpoint', '')
+            azure_apim_document_intelligence_subscription_key = request.form.get('azure_apim_document_intelligence_subscription_key', '')
 
             try:
                 gpt_model_obj = json.loads(gpt_model_json) if gpt_model_json else {'selected': [], 'all': []}
@@ -171,7 +188,7 @@ def register_route_frontend_admin_settings(app):
                 image_gen_model_obj = {'selected': [], 'all': []}
 
             logo_file = request.files.get('logo_file')
-            if logo_file and allowed_file(logo_file.filename, allowed_extensions={'png','jpg','jpeg'}):
+            if logo_file and allowed_file(logo_file.filename, allowed_extensions={'png', 'jpg', 'jpeg'}):
                 filename = secure_filename(logo_file.filename)
                 logo_path = os.path.join(app.root_path, 'static', 'images', 'custom_logo.png')
                 os.makedirs(os.path.dirname(logo_path), exist_ok=True)
@@ -185,9 +202,6 @@ def register_route_frontend_admin_settings(app):
                 'max_file_size_mb': max_file_size_mb,
                 'conversation_history_limit': conversation_history_limit,
                 'default_system_prompt': default_system_prompt,
-                'use_external_apis': use_external_apis,
-                'external_chunking_api': external_chunking_api,
-                'external_embedding_api': external_embedding_api,
                 'enable_conversation_archiving': enable_conversation_archiving,
                 'show_logo': show_logo,
                 'logo_path': logo_path_relative,
@@ -205,56 +219,76 @@ def register_route_frontend_admin_settings(app):
                 'content_safety_endpoint': content_safety_endpoint.strip(),
                 'content_safety_key': content_safety_key.strip(),
 
+                # GPT
                 'azure_openai_gpt_endpoint': azure_openai_gpt_endpoint,
                 'azure_openai_gpt_api_version': azure_openai_gpt_api_version,
                 'azure_openai_gpt_authentication_type': azure_openai_gpt_authentication_type,
                 'azure_openai_gpt_key': azure_openai_gpt_key,
                 'gpt_model': gpt_model_obj,
+                'azure_openai_gpt_subscription_id': azure_openai_gpt_subscription_id,
+                'azure_openai_gpt_resource_group': azure_openai_gpt_resource_group,
 
+                # Embeddings
                 'azure_openai_embedding_endpoint': azure_openai_embedding_endpoint,
                 'azure_openai_embedding_api_version': azure_openai_embedding_api_version,
                 'azure_openai_embedding_authentication_type': azure_openai_embedding_authentication_type,
                 'azure_openai_embedding_key': azure_openai_embedding_key,
                 'embedding_model': embedding_model_obj,
+                'azure_openai_embedding_subscription_id': azure_openai_embedding_subscription_id,
+                'azure_openai_embedding_resource_group': azure_openai_embedding_resource_group,
 
+                # Image Generation
                 'enable_image_generation': enable_image_generation,
                 'azure_openai_image_gen_endpoint': azure_openai_image_gen_endpoint,
                 'azure_openai_image_gen_api_version': azure_openai_image_gen_api_version,
                 'azure_openai_image_gen_authentication_type': azure_openai_image_gen_authentication_type,
                 'azure_openai_image_gen_key': azure_openai_image_gen_key,
                 'image_gen_model': image_gen_model_obj,
-
-                'azure_openai_gpt_subscription_id': azure_openai_gpt_subscription_id,
-                'azure_openai_gpt_resource_group': azure_openai_gpt_resource_group,
-
-                'azure_openai_embedding_subscription_id': azure_openai_embedding_subscription_id,
-                'azure_openai_embedding_resource_group': azure_openai_embedding_resource_group,
-
                 'azure_openai_image_gen_subscription_id': azure_openai_image_gen_subscription_id,
                 'azure_openai_image_gen_resource_group': azure_openai_image_gen_resource_group,
 
+                #  APIM toggles/fields for GPT, Embedding, Image Gen
                 'enable_gpt_apim': enable_gpt_apim,
                 'azure_apim_gpt_endpoint': azure_apim_gpt_endpoint,
                 'azure_apim_gpt_subscription_key': azure_apim_gpt_subscription_key,
                 'azure_apim_gpt_api_version': azure_apim_gpt_api_version,
                 'azure_apim_gpt_deployment': azure_apim_gpt_deployment,
 
+                'enable_embedding_apim': enable_embedding_apim,
+                'azure_apim_embedding_endpoint': azure_apim_embedding_endpoint,
+                'azure_apim_embedding_subscription_key': azure_apim_embedding_subscription_key,
+                'azure_apim_embedding_api_version': azure_apim_embedding_api_version,
+                'azure_apim_embedding_deployment': azure_apim_embedding_deployment,
+
                 'enable_image_gen_apim': enable_image_gen_apim,
                 'azure_apim_image_gen_endpoint': azure_apim_image_gen_endpoint,
                 'azure_apim_image_gen_subscription_key': azure_apim_image_gen_subscription_key,
                 'azure_apim_image_gen_api_version': azure_apim_image_gen_api_version,
                 'azure_apim_image_gen_deployment': azure_apim_image_gen_deployment,
-            
-                'enable_embedding_apim': enable_embedding_apim,
-                'azure_apim_embedding_endpoint': azure_apim_embedding_endpoint,
-                'azure_apim_embedding_subscription_key': azure_apim_embedding_subscription_key,
-                'azure_apim_embedding_api_version': azure_apim_embedding_api_version,
-                'azure_apim_embedding_deployment': azure_apim_embedding_deployment                
-            }
+
+                # Content Safety
+                'enable_content_safety_apim': enable_content_safety_apim,
+                'azure_apim_content_safety_endpoint': azure_apim_content_safety_endpoint,
+                'azure_apim_content_safety_subscription_key': azure_apim_content_safety_subscription_key,
+
+                # Web Search
+                'enable_web_search_apim': enable_web_search_apim,
+                'azure_apim_web_search_endpoint': azure_apim_web_search_endpoint,
+                'azure_apim_web_search_subscription_key': azure_apim_web_search_subscription_key,
+
+                # Azure AI Search
+                'enable_ai_search_apim': enable_ai_search_apim,
+                'azure_apim_ai_search_endpoint': azure_apim_ai_search_endpoint,
+                'azure_apim_ai_search_subscription_key': azure_apim_ai_search_subscription_key,
+
+                # Document Intelligence
+                'enable_document_intelligence_apim': enable_document_intelligence_apim,
+                'azure_apim_document_intelligence_endpoint': azure_apim_document_intelligence_endpoint,
+                'azure_apim_document_intelligence_subscription_key': azure_apim_document_intelligence_subscription_key,
+ }
 
             update_settings(new_settings)
             settings.update(new_settings)
-
             initialize_clients(settings)
 
             print("Admin settings updated successfully.")

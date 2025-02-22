@@ -340,7 +340,7 @@ def register_route_backend_chats(app):
         conversation_history_limit = settings.get('conversation_history_limit', 10)
         conversation_history = conversation_item['messages'][-conversation_history_limit:]
 
-        allowed_roles = ['system', 'assistant', 'user', 'function', 'tool', 'image']
+        allowed_roles = ['system', 'assistant', 'user', 'function', 'tool']
         conversation_history_for_api = []
         for msg in conversation_history:
             if msg['role'] in allowed_roles:

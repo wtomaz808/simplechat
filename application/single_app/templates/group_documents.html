@@ -1,6 +1,11 @@
 <!-- templates/group_documents.html -->
-{% extends "base.html" %} {% block title %}Group Documents - AI Chat
-Application{% endblock %} {% block content %}
+
+{% extends "base.html" %}
+{% block title %}
+  Group Documents - {{ app_settings.app_title }}
+{% endblock %}
+{% block content %}
+
 <div class="container">
   <h2>Group Documents</h2>
   <h3 id="active-group-name" style="margin-bottom: 20px; display: none"></h3>

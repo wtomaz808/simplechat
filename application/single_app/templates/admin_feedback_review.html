@@ -1,7 +1,11 @@
-{% extends "base.html" %}
-{% block title %}Feedback Review - Admin{% endblock %}
+<!-- templates/admin_feedback_review.html -->
 
+{% extends "base.html" %}
+{% block title %}
+  Feedback Review - {{ app_settings.app_title }}
+{% endblock %}
 {% block content %}
+
 <div class="container">
   <h2>Feedback Review</h2>
   <p class="text-muted">
