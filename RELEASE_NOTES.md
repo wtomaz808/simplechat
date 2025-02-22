@@ -1,6 +1,50 @@
 <!-- BEGIN RELEASE_NOTES.MD BLOCK -->
 
 # Feature Release
+## (v0.202.21)
+
+- **Azure Government Support**:
+
+  - Introduced an `AZURE_ENVIRONMENT` variable (e.g. `"public"` or `"usgovernment"`) and logic to handle separate authority hosts, resource managers, and credential scopes.
+
+  ```
+  # Azure Cosmos DB
+  AZURE_COSMOS_ENDPOINT="<your-cosmosdb-endpoint>"
+  AZURE_COSMOS_KEY="<your-cosmosdb-key>"
+  AZURE_COSMOS_AUTHENTICATION_TYPE="key" # key or managed_identity
+  
+  # Azure Bing Search
+  BING_SEARCH_ENDPOINT="https://api.bing.microsoft.com/"
+  
+  # Azure AD Authentication
+  CLIENT_ID="<your-client-id>"
+  TENANT_ID="<your-tenant-id>"
+  AZURE_ENVIRONMENT="public" #public, usgovernment
+  SECRET_KEY="32-characters" # Example - "YouSh0uldGener8teYour0wnSecr3tKey!", import secrets; print(secrets.token_urlsafe(32))
+  ```
+
+- **Admin Settings Overhaul**:
+
+  - **Route & UI**: Added `route_backend_settings.py` and significantly expanded `admin_settings.html` to configure GPT, Embeddings, Image Gen, Content Safety, Web Search, AI Search, and Document Intelligence—all from a single Admin page.
+  - **APIM Toggles**: Each service (GPT, Embeddings, Image Generation, Content Safety, etc.) can now be routed through Azure API Management instead of direct endpoints by switching a toggle.
+  - **“Test Connection” Buttons**: Each service (GPT, Embeddings, Image Generation, Content Safety, Bing Web Search, Azure AI Search, and Document Intelligence) now has a dedicated “Test Connection” button that performs a live connectivity check.
+
+- **Improved Safety Features**:
+
+  - New pages/sections for “Admin Safety Violations” vs. “My Safety Violations.”
+
+- **Miscellaneous Frontend & Template Updates**:
+
+  - All templates now reference an `app_settings.app_title` for a dynamic page title.
+  - Enhanced navigation and labeling in “My Documents,” “My Groups,” and “Profile” pages.
+
+### Bug Fixes
+
+- **Conversation Pipeline**:
+  - Removed the `"image"` role from the allowed conversation roles to streamline message handling.
+- **Group Management**:
+  - Now correctly passes and references the current user’s ID in various group actions.
+
 ## (v0.201.5)
 
 #### 1. **Managed Identity Support**
