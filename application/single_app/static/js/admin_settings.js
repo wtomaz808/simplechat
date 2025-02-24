@@ -367,6 +367,33 @@ function setupToggles() {
                 (this.value === 'key') ? 'block' : 'none';
         });
     }
+
+    // Content Safety Auth Type
+    const contentSafetyAuthType = document.getElementById('content_safety_authentication_type');
+    if (contentSafetyAuthType) {
+        contentSafetyAuthType.addEventListener('change', function () {
+            document.getElementById('content_safety_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
+
+    // AI Search Auth Type
+    const aiSearchAuthType = document.getElementById('azure_ai_search_authentication_type');
+    if (aiSearchAuthType) {
+        aiSearchAuthType.addEventListener('change', function () {
+            document.getElementById('azure_ai_search_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
+
+    // Document Intelligence Auth Type
+    const docIntelAuthType = document.getElementById('azure_document_intelligence_authentication_type');
+    if (docIntelAuthType) {
+        docIntelAuthType.addEventListener('change', function () {
+            document.getElementById('azure_document_intelligence_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -566,6 +593,7 @@ function setupTestButtons() {
             } else {
                 payload.direct = {
                     endpoint: document.getElementById('content_safety_endpoint').value,
+                    auth_type: document.getElementById('content_safety_authentication_type').value,
                     key: document.getElementById('content_safety_key').value
                 };
             }
@@ -663,6 +691,7 @@ function setupTestButtons() {
             } else {
                 payload.direct = {
                     endpoint: document.getElementById('azure_ai_search_endpoint').value,
+                    auth_type: document.getElementById('azure_ai_search_authentication_type').value,
                     key: document.getElementById('azure_ai_search_key').value
                 };
             }
@@ -711,6 +740,7 @@ function setupTestButtons() {
             } else {
                 payload.direct = {
                     endpoint: document.getElementById('azure_document_intelligence_endpoint').value,
+                    auth_type: document.getElementById('azure_document_intelligence_authentication_type').value,
                     key: document.getElementById('azure_document_intelligence_key').value
                 };
             }

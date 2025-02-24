@@ -627,6 +627,19 @@
                                 >
                             </div>
                             <div class="mb-3">
+                                <label for="content_safety_authentication_type" class="form-label">
+                                    Authentication Type
+                                </label>
+                                <select class="form-select" id="content_safety_authentication_type" name="content_safety_authentication_type">
+                                    <option value="key" {% if settings.content_safety_authentication_type=='key' %}selected{% endif %}>
+                                        Key
+                                    </option>
+                                    <option value="managed_identity" {% if settings.content_safety_authentication_type=='managed_identity' %}selected{% endif %}>
+                                        Managed Identity
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="content_safety_key_container" {% if settings.content_safety_authentication_type !='key' %}style="display: none;"{% endif %}>
                                 <label for="content_safety_key" class="form-label">
                                     Content Safety Key
                                 </label>
@@ -873,6 +886,19 @@
                                 >
                             </div>
                             <div class="mb-3">
+                                <label for="azure_ai_search_authentication_type" class="form-label">
+                                    Authentication Type
+                                </label>
+                                <select class="form-select" id="azure_ai_search_authentication_type" name="azure_ai_search_authentication_type">
+                                    <option value="key" {% if settings.azure_ai_search_authentication_type=='key' %}selected{% endif %}>
+                                        Key
+                                    </option>
+                                    <option value="managed_identity" {% if settings.azure_ai_search_authentication_type=='managed_identity' %}selected{% endif %}>
+                                        Managed Identity
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="azure_ai_search_key_container" {% if settings.azure_ai_search_authentication_type !='key' %}style="display: none;"{% endif %}>
                                 <label for="azure_ai_search_key" class="form-label">Search Key</label>
                                 <div class="input-group">
                                     <input
@@ -978,6 +1004,19 @@
                                 >
                             </div>
                             <div class="mb-3">
+                                <label for="azure_document_intelligence_authentication_type" class="form-label">
+                                    Authentication Type
+                                </label>
+                                <select class="form-select" id="azure_document_intelligence_authentication_type" name="azure_document_intelligence_authentication_type">
+                                    <option value="key" {% if settings.azure_document_intelligence_authentication_type=='key' %}selected{% endif %}>
+                                        Key
+                                    </option>
+                                    <option value="managed_identity" {% if settings.azure_document_intelligence_authentication_type=='managed_identity' %}selected{% endif %}>
+                                        Managed Identity
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="azure_document_intelligence_key_container" {% if settings.azure_document_intelligence_authentication_type !='key' %}style="display: none;"{% endif %}>
                                 <label for="azure_document_intelligence_key" class="form-label">
                                     Document Intelligence Key
                                 </label>
