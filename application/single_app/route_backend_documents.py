@@ -53,6 +53,7 @@ def register_route_backend_documents(app):
     @enabled_required("enable_user_documents")
     def upload_document():
         user_id = get_current_user_id()
+        settings = get_settings()
 
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401

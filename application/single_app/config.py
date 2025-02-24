@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.202.21'
+app.config['VERSION'] = '0.202.37'
 Session(app)
 
 CLIENTS = {}
@@ -157,49 +157,72 @@ def initialize_clients(settings):
     with CLIENTS_LOCK:
         form_recognizer_endpoint = settings.get("azure_document_intelligence_endpoint")
         form_recognizer_key = settings.get("azure_document_intelligence_key")
+        enable_document_intelligence_apim = settings.get("enable_document_intelligence_apim")
+        azure_apim_document_intelligence_endpoint = settings.get("azure_apim_document_intelligence_endpoint")
+        azure_apim_document_intelligence_subscription_key = settings.get("azure_apim_document_intelligence_subscription_key")
 
         azure_ai_search_endpoint = settings.get("azure_ai_search_endpoint")
         azure_ai_search_key = settings.get("azure_ai_search_key")
+        enable_ai_search_apim = settings.get("enable_ai_search_apim")
+        azure_apim_ai_search_endpoint = settings.get("azure_apim_ai_search_endpoint")
+        azure_apim_ai_search_subscription_key = settings.get("azure_apim_ai_search_subscription_key")
 
         try:
-            if settings.get("azure_document_intelligence_authentication_type") == "managed_identity":
+            if enable_document_intelligence_apim:
                 document_intelligence_client = DocumentIntelligenceClient(
-                    endpoint=form_recognizer_endpoint,
-                    credential=DefaultAzureCredential()
+                    endpoint=azure_apim_document_intelligence_endpoint,
+                    credential=AzureKeyCredential(azure_apim_document_intelligence_subscription_key)
                 )
             else:
-                document_intelligence_client = DocumentAnalysisClient(
-                    endpoint=form_recognizer_endpoint,
-                    credential=AzureKeyCredential(form_recognizer_key)
-                )
+                if settings.get("azure_document_intelligence_authentication_type") == "managed_identity":
+                    document_intelligence_client = DocumentIntelligenceClient(
+                        endpoint=form_recognizer_endpoint,
+                        credential=DefaultAzureCredential()
+                    )
+                else:
+                    document_intelligence_client = DocumentAnalysisClient(
+                        endpoint=form_recognizer_endpoint,
+                        credential=AzureKeyCredential(form_recognizer_key)
+                    )
             CLIENTS["document_intelligence_client"] = document_intelligence_client
         except Exception as e:
             print(f"Failed to initialize Document Intelligence client: {e}")
 
         try:
-            if settings.get("azure_ai_search_authentication_type") == "managed_identity":
+            if enable_ai_search_apim:
                 search_client_user = SearchClient(
-                    endpoint=azure_ai_search_endpoint,
+                    endpoint=azure_apim_ai_search_endpoint,
                     index_name="simplechat-user-index",
-                    credential=DefaultAzureCredential()
+                    credential=AzureKeyCredential(azure_apim_ai_search_subscription_key)
                 )
                 search_client_group = SearchClient(
-                    endpoint=azure_ai_search_endpoint,
+                    endpoint=azure_apim_ai_search_endpoint,
                     index_name="simplechat-group-index",
-                    credential=DefaultAzureCredential()
+                    credential=AzureKeyCredential(azure_apim_ai_search_subscription_key)
                 )
             else:
-                search_client_user = SearchClient(
-                    endpoint=azure_ai_search_endpoint,
-                    index_name="simplechat-user-index",
-                    credential=AzureKeyCredential(azure_ai_search_key)
-                )
-                search_client_group = SearchClient(
-                    endpoint=azure_ai_search_endpoint,
-                    index_name="simplechat-group-index",
-                    credential=AzureKeyCredential(azure_ai_search_key)
-                )
-
+                if settings.get("azure_ai_search_authentication_type") == "managed_identity":
+                    search_client_user = SearchClient(
+                        endpoint=azure_ai_search_endpoint,
+                        index_name="simplechat-user-index",
+                        credential=DefaultAzureCredential()
+                    )
+                    search_client_group = SearchClient(
+                        endpoint=azure_ai_search_endpoint,
+                        index_name="simplechat-group-index",
+                        credential=DefaultAzureCredential()
+                    )
+                else:
+                    search_client_user = SearchClient(
+                        endpoint=azure_ai_search_endpoint,
+                        index_name="simplechat-user-index",
+                        credential=AzureKeyCredential(azure_ai_search_key)
+                    )
+                    search_client_group = SearchClient(
+                        endpoint=azure_ai_search_endpoint,
+                        index_name="simplechat-group-index",
+                        credential=AzureKeyCredential(azure_ai_search_key)
+                    )
             CLIENTS["search_client_user"] = search_client_user
             CLIENTS["search_client_group"] = search_client_group
         except Exception as e:
@@ -208,19 +231,28 @@ def initialize_clients(settings):
         if settings.get("enable_content_safety"):
             safety_endpoint = settings.get("content_safety_endpoint", "")
             safety_key = settings.get("content_safety_key", "")
+            enable_content_safety_apim = settings.get("enable_content_safety_apim")
+            azure_apim_content_safety_endpoint = settings.get("azure_apim_content_safety_endpoint")
+            azure_apim_content_safety_subscription_key = settings.get("azure_apim_content_safety_subscription_key")
 
             if safety_endpoint and safety_key:
                 try:
-                    if settings.get("content_safety_authentication_type") == "managed_identity":
+                    if enable_content_safety_apim:
                         content_safety_client = ContentSafetyClient(
-                            endpoint=safety_endpoint,
-                            credential=DefaultAzureCredential()
+                            endpoint=azure_apim_content_safety_endpoint,
+                            credential=AzureKeyCredential(azure_apim_content_safety_subscription_key)
                         )
                     else:
-                        content_safety_client = ContentSafetyClient(
-                            endpoint=safety_endpoint,
-                            credential=AzureKeyCredential(safety_key)
-                        )
+                        if settings.get("content_safety_authentication_type") == "managed_identity":
+                            content_safety_client = ContentSafetyClient(
+                                endpoint=safety_endpoint,
+                                credential=DefaultAzureCredential()
+                            )
+                        else:
+                            content_safety_client = ContentSafetyClient(
+                                endpoint=safety_endpoint,
+                                credential=AzureKeyCredential(safety_key)
+                            )
                     CLIENTS["content_safety_client"] = content_safety_client
                 except Exception as e:
                     print(f"Failed to initialize Content Safety client: {e}")

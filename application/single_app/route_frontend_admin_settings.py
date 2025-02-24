@@ -98,10 +98,13 @@ def register_route_frontend_admin_settings(app):
             enable_user_feedback = request.form.get('enable_user_feedback') == 'on'
             content_safety_endpoint = request.form.get('content_safety_endpoint', '')
             content_safety_key = request.form.get('content_safety_key', '')
+            content_safety_authentication_type = request.form.get('content_safety_authentication_type', 'key')
             azure_ai_search_endpoint = request.form.get('azure_ai_search_endpoint', '')
             azure_ai_search_key = request.form.get('azure_ai_search_key', '')
+            azure_ai_search_authentication_type = request.form.get('azure_ai_search_authentication_type', 'key')
             azure_document_intelligence_endpoint = request.form.get('azure_document_intelligence_endpoint', '')
             azure_document_intelligence_key = request.form.get('azure_document_intelligence_key', '')
+            azure_document_intelligence_authentication_type = request.form.get('azure_document_intelligence_authentication_type', 'key')
 
             # GPT
             azure_openai_gpt_endpoint = request.form.get('azure_openai_gpt_endpoint', '')
@@ -212,12 +215,15 @@ def register_route_frontend_admin_settings(app):
                 'enable_group_documents': enable_group_documents,
                 'azure_ai_search_endpoint': azure_ai_search_endpoint.strip(),
                 'azure_ai_search_key': azure_ai_search_key.strip(),
+                'azure_ai_search_authentication_type': azure_ai_search_authentication_type,
                 'azure_document_intelligence_endpoint': azure_document_intelligence_endpoint.strip(),
                 'azure_document_intelligence_key': azure_document_intelligence_key.strip(),
+                'azure_document_intelligence_authentication_type': azure_document_intelligence_authentication_type,
                 'enable_content_safety': enable_content_safety,
                 'enable_user_feedback': enable_user_feedback,
                 'content_safety_endpoint': content_safety_endpoint.strip(),
                 'content_safety_key': content_safety_key.strip(),
+                'content_safety_authentication_type': content_safety_authentication_type,
 
                 # GPT
                 'azure_openai_gpt_endpoint': azure_openai_gpt_endpoint,

@@ -55,231 +55,163 @@ def _test_gpt_connection(payload):
     """Attempt to connect to GPT using ephemeral settings from the admin UI."""
     enable_apim = payload.get('enable_apim', False)
     selected_model = payload.get('selected_model') or {}
-    model_deployment = selected_model.get('deploymentName') or ''
+    system_message = {
+        'role': 'system',
+        'content': f"Testing access."
+    }
 
+    # Decide GPT model
     if enable_apim:
-        # Use APIM endpoint
         apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')
         api_version = apim_data.get('api_version')
-        deployment = apim_data.get('deployment') or model_deployment
+        gpt_model = apim_data.get('deployment')
         subscription_key = apim_data.get('subscription_key')
 
-        # Minimal example of calling an APIM endpoint
-        # Adjust URL path & method to match your APIM config
-        url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/chat/completions?api-version={api_version}"
-        headers = {
-            'Content-Type': 'application/json',
-            'Ocp-Apim-Subscription-Key': subscription_key
-        }
-        body = {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an AI assistant that helps people find information."
-                },
-                {
-                    "role": "user",
-                    "content": "I am Testing access."
-                }
-            ],
-            "max_tokens": 800
-        }
-
+        gpt_client = AzureOpenAI(
+            api_version=api_version,
+            azure_endpoint=endpoint,
+            api_key=subscription_key
+        )
     else:
         direct_data = payload.get('direct', {})
+        endpoint = direct_data.get('endpoint')
+        api_version = direct_data.get('api_version')
+        gpt_model = selected_model.get('deploymentName')
 
-        if direct_data.get('auth_type') == 'key':
-            # Direct call to Azure OpenAI
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
-            model_deployment = selected_model.get('deploymentName')
-            key = direct_data.get('key')
+        if direct_data.get('auth_type') == 'managed_identity':
+            token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
             
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/chat/completions?api-version={api_version}"
-            headers = {
-                'Content-Type': 'application/json',
-                'api-key': key
-            }
-            body = {
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are an AI assistant that helps people find information."
-                    },
-                    {
-                        "role": "user",
-                        "content": "I am testing access."
-                    }
-                ],
-                "max_tokens": 800
-            }
-        elif direct_data.get('auth_type') == 'managed_identity':
-            # Direct call to Azure OpenAI with Managed Identity
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
-            model_deployment = selected_model.get('deploymentName')
+            gpt_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                azure_ad_token_provider=token_provider
+            )
+        else:
+            key = direct_data.get('key')
 
-            # Get access token using Managed Identity
-            credential = DefaultAzureCredential()
-            token = credential.get_token("https://cognitiveservices.azure.com/.default").token
+            gpt_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                api_key=key
+            )
 
-            # Construct request URL
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/completions?api-version={api_version}"
-
-            # Set headers with the Bearer token
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {token}'
-            }
-
-            # Request body
-            body = {
-                "prompt": "Hello from test_connection API!",
-                "max_tokens": 5
-            }
-
-    # Make the request
-    resp = requests.post(url, headers=headers, json=body, timeout=10)
-    if resp.status_code == 200:
-        return jsonify({'message': 'GPT connection successful'}), 200
-    else:
-        # Raise an error to fall into the catch-all for test_connection
-        raise Exception(f"GPT connection error: {resp.status_code} - {resp.text}")
+    try:
+        response = gpt_client.chat.completions.create(
+            model=gpt_model,
+            messages=[system_message]
+        )
+        if response:
+            return jsonify({'message': 'GPT connection successful'}), 200
+    except Exception as e:
+        print(str(e))
+        return jsonify({'error': f'Error generating model response: {str(e)}'}), 500
 
 
 def _test_embedding_connection(payload):
     """Attempt to connect to Embeddings using ephemeral settings from the admin UI."""
     enable_apim = payload.get('enable_apim', False)
     selected_model = payload.get('selected_model') or {}
-    model_deployment = selected_model.get('deploymentName') or ''
+    text = "Test text for embedding connection."
 
     if enable_apim:
         apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')
         api_version = apim_data.get('api_version')
-        deployment = apim_data.get('deployment') or model_deployment
+        embedding_model = apim_data.get('deployment')
         subscription_key = apim_data.get('subscription_key')
 
-        url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/embeddings?api-version={api_version}"
-        headers = {
-            'Content-Type': 'application/json',
-            'Ocp-Apim-Subscription-Key': subscription_key
-        }
-        body = {
-            "input": "Test embedding"
-        }
-
+        embedding_client = AzureOpenAI(
+            api_version=api_version,
+            azure_endpoint=endpoint,
+            api_key=subscription_key
+        )
     else:
         direct_data = payload.get('direct', {})
+        endpoint = direct_data.get('endpoint')
+        api_version = direct_data.get('api_version')
+        embedding_model = selected_model.get('deploymentName')
 
-        if direct_data.get('auth_type') == 'key':
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
+        if direct_data.get('auth_type') == 'managed_identity':
+            token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+            
+            embedding_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                azure_ad_token_provider=token_provider
+            )
+        else:
             key = direct_data.get('key')
 
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/embeddings?api-version={api_version}"
-            headers = {
-                'Content-Type': 'application/json',
-                'api-key': key
-            }
-            body = {
-                "input": "Test embedding"
-            }
-        elif direct_data.get('auth_type') == 'managed_identity':
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
+            embedding_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                api_key=key
+            )
+    try:
+        response = embedding_client.embeddings.create(
+            model=embedding_model,
+            input=text
+        )
 
-            # Get access token using Managed Identity
-            credential = DefaultAzureCredential()
-            token = credential.get_token("https://cognitiveservices.azure.com/.default").token
-
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/embeddings?api-version={api_version}"
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {token}'
-            }
-            body = {
-                "input": "Test embedding"
-            }
-
-    resp = requests.post(url, headers=headers, json=body, timeout=10)
-    if resp.status_code == 200:
-        return jsonify({'message': 'Embedding connection successful'}), 200
-    else:
-        raise Exception(f"Embedding connection error: {resp.status_code} - {resp.text}")
-
+        if response:
+            return jsonify({'message': 'Embedding connection successful'}), 200
+    except Exception as e:
+        print(str(e))
+        return jsonify({'error': f'Error generating embedding response: {str(e)}'}), 500
+    
 
 def _test_image_gen_connection(payload):
     """Attempt to connect to an Image Generation endpoint using ephemeral settings."""
     enable_apim = payload.get('enable_apim', False)
     selected_model = payload.get('selected_model') or {}
-    model_deployment = selected_model.get('deploymentName') or ''
+    prompt = "A scenic mountain at sunrise"
 
     if enable_apim:
         apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')
         api_version = apim_data.get('api_version')
-        deployment = apim_data.get('deployment') or model_deployment
+        image_gen_model = apim_data.get('deployment')
         subscription_key = apim_data.get('subscription_key')
 
-        # Adjust the actual path if your APIM route is different
-        url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/images/generations?api-version={api_version}"
-        headers = {
-            'Content-Type': 'application/json',
-            'Ocp-Apim-Subscription-Key': subscription_key
-        }
-        body = {
-            "prompt": "A scenic mountain at sunrise",
-            "n": 1,
-            "size": "512x512"
-        }
-
+        image_gen_client = AzureOpenAI(
+            api_version=api_version,
+            azure_endpoint=endpoint,
+            api_key=subscription_key
+        )
     else:
         direct_data = payload.get('direct', {})
+        endpoint = direct_data.get('endpoint')
+        api_version = direct_data.get('api_version')
+        image_gen_model = selected_model.get('deploymentName')
 
-        if direct_data.get('auth_type') == 'key':
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
+        if direct_data.get('auth_type') == 'managed_identity':
+            token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+            
+            image_gen_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                azure_ad_token_provider=token_provider
+            )
+        else:
             key = direct_data.get('key')
 
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{model_deployment}/images/generations?api-version={api_version}"
-            headers = {
-                'Content-Type': 'application/json',
-                'api-key': key
-            }
-            body = {
-                "prompt": "In the style of WordArt, Microsoft Clippy wearing a cowboy hat.",
-                "n": 1,
-                "style": "natural",
-                "quality": "standard"
-            }
-
-        elif direct_data.get('auth_type') == 'managed_identity':
-            endpoint = direct_data.get('endpoint')
-            api_version = direct_data.get('api_version')
-
-            # Get access token using Managed Identity
-            credential = DefaultAzureCredential()
-            token = credential.get_token("https://cognitiveservices.azure.com/.default").token
-
-            url = f"{endpoint.rstrip('/')}/openai/images/generations?api-version={api_version}"
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {token}'
-            }
-            body = {
-                "prompt": "In the style of WordArt, Microsoft Clippy wearing a cowboy hat.",
-                "n": 1,
-                "style": "natural",
-                "quality": "standard"
-            }
-
-    resp = requests.post(url, headers=headers, json=body, timeout=10)
-    if resp.status_code == 200:
-        return jsonify({'message': 'Image generation connection successful'}), 200
-    else:
-        raise Exception(f"Image Gen connection error: {resp.status_code} - {resp.text}")
+            image_gen_client = AzureOpenAI(
+                api_version=api_version,
+                azure_endpoint=endpoint,
+                api_key=key
+            )
+    try:
+        response = image_gen_client.images.generate(
+            prompt=prompt,
+            n=1,
+            model=image_gen_model
+        )
+        if response:
+            return jsonify({'message': 'Image generation connection successful'}), 200
+    except Exception as e:
+        print(str(e))
+        return jsonify({'error': f'Error generating model response: {str(e)}'}), 500
 
 
 def _test_safety_connection(payload):
@@ -295,33 +227,37 @@ def _test_safety_connection(payload):
         apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')
         subscription_key = apim_data.get('subscription_key')
-        deployment = apim_data.get('deployment')
-        api_version = apim_data.get('api_version')
 
-        # Adjust URL for your APIM route
-        url = f"{endpoint.rstrip('/')}/contentsafety/text:analyze?api-version=2024-09-01"
-        headers = {
-            'Content-Type': 'application/json',
-            'Ocp-Apim-Subscription-Key': subscription_key
-        }
-        body = { "text": "Test content for safety" }
+        content_safety_client = ContentSafetyClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(subscription_key)
+        )
     else:
         direct_data = payload.get('direct', {})
         endpoint = direct_data.get('endpoint')
         key = direct_data.get('key')
 
-        url = f"{endpoint.rstrip('/')}/contentsafety/text:analyze?api-version=2024-09-01"
-        headers = {
-            'Content-Type': 'application/json',
-            'Ocp-Apim-Subscription-Key': key
-        }
-        body = { "text": "Test content for safety" }
+        if direct_data.get('auth_type') == 'managed_identity':
+            
+            content_safety_client = ContentSafetyClient(
+                endpoint=endpoint,
+                credential=DefaultAzureCredential()
+            )
+        else:
+            content_safety_client = ContentSafetyClient(
+                endpoint=endpoint,
+                credential=AzureKeyCredential(key)
+            )
 
-    resp = requests.post(url, headers=headers, json=body, timeout=10)
-    if resp.status_code == 200:
-        return jsonify({'message': 'Safety connection successful'}), 200
-    else:
-        raise Exception(f"Safety connection error: {resp.status_code} - {resp.text}")
+    try:     
+        user_message = "Test message for content safety connection."
+        request_obj = AnalyzeTextOptions(text=user_message)
+        cs_response = content_safety_client.analyze_text(request_obj)
+
+        if cs_response:
+            return jsonify({'message': 'Safety connection successful'}), 200
+    except Exception as e:
+        return jsonify({'error': f'Safety connection error: {str(e)}'}), 500
 
 
 def _test_web_search_connection(payload):
@@ -365,6 +301,32 @@ def _test_azure_ai_search_connection(payload):
 
     if enable_apim:
         apim_data = payload.get('apim', {})
+        endpoint = apim_data.get('endpoint')
+        subscription_key = apim_data.get('subscription_key')
+
+        content_safety_client = ContentSafetyClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(subscription_key)
+        )
+    else:
+        direct_data = payload.get('direct', {})
+        endpoint = direct_data.get('endpoint')
+        key = direct_data.get('key')
+
+        if direct_data.get('auth_type') == 'managed_identity':
+            
+            content_safety_client = ContentSafetyClient(
+                endpoint=endpoint,
+                credential=DefaultAzureCredential()
+            )
+        else:
+            content_safety_client = ContentSafetyClient(
+                endpoint=endpoint,
+                credential=AzureKeyCredential(key)
+            )
+
+    if enable_apim:
+        apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')  # e.g. https://my-apim.azure-api.net/search
         subscription_key = apim_data.get('subscription_key')
         url = f"{endpoint.rstrip('/')}/indexes?api-version=2023-11-01"
@@ -394,28 +356,51 @@ def _test_azure_doc_intelligence_connection(payload):
     """Attempt to connect to Azure Form Recognizer / Document Intelligence."""
     enable_apim = payload.get('enable_apim', False)
 
+    enable_apim = payload.get('enable_apim', False)
+
     if enable_apim:
         apim_data = payload.get('apim', {})
         endpoint = apim_data.get('endpoint')
         subscription_key = apim_data.get('subscription_key')
-        # deployment, api_version, etc., if needed
-        url = f"{endpoint.rstrip('/')}/formrecognizer/documentModels?api-version=2023-07-31"
-        headers = {
-            'content-type': 'application/json',
-            'Ocp-Apim-Subscription-Key': subscription_key
-        }
+
+        document_intelligence_client = DocumentAnalysisClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(subscription_key)
+        )
     else:
         direct_data = payload.get('direct', {})
         endpoint = direct_data.get('endpoint')
         key = direct_data.get('key')
-        url = f"{endpoint.rstrip('/')}/formrecognizer/documentModels?api-version=2023-07-31"
-        headers = {
-            'content-type': 'application/json',
-            'Ocp-Apim-Subscription-Key': key
-        }
 
-    resp = requests.get(url, headers=headers, timeout=10)
-    if resp.status_code == 200:
+        if direct_data.get('auth_type') == 'managed_identity':
+            
+            document_intelligence_client = DocumentAnalysisClient(
+                endpoint=endpoint,
+                credential=DefaultAzureCredential()
+            )
+        else:
+            document_intelligence_client = DocumentAnalysisClient(
+                endpoint=endpoint,
+                credential=AzureKeyCredential(key)
+            )
+    
+    poller = document_intelligence_client.begin_analyze_document_from_url(
+        model_id="prebuilt-read",
+        document_url="https://github.com/RetroBurnCloud/images/blob/5121c601bc61f9806f0bac7783c44352fd185998/Microsoft_Terms_of_Use.pdf"
+    )
+
+    max_wait_time = 600
+    start_time = time.time()
+
+    while True:
+        status = poller.status()
+        if status in ["succeeded", "failed", "canceled"]:
+            break
+        if time.time() - start_time > max_wait_time:
+            raise TimeoutError("Document analysis took too long.")
+        time.sleep(30)
+
+    if status == "succeeded":
         return jsonify({'message': 'Azure document intelligence connection successful'}), 200
     else:
-        raise Exception(f"Doc Intelligence error: {resp.status_code} - {resp.text}")
+        return jsonify({'error': f"Document Intelligence error: {status}"}), 500
