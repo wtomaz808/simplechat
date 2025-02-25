@@ -190,6 +190,8 @@ def register_route_frontend_admin_settings(app):
             except:
                 image_gen_model_obj = {'selected': [], 'all': []}
 
+            logo_path_relative = settings.get('logo_path', 'images/logo.svg')
+
             logo_file = request.files.get('logo_file')
             if logo_file and allowed_file(logo_file.filename, allowed_extensions={'png', 'jpg', 'jpeg'}):
                 filename = secure_filename(logo_file.filename)
@@ -197,8 +199,6 @@ def register_route_frontend_admin_settings(app):
                 os.makedirs(os.path.dirname(logo_path), exist_ok=True)
                 logo_file.save(logo_path)
                 logo_path_relative = 'images/custom_logo.png'
-            else:
-                logo_path_relative = 'images/logo.svg'
 
             new_settings = {
                 'app_title': app_title,

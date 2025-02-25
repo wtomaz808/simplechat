@@ -109,7 +109,11 @@ For a detailed list of features released by version, please refer to the [Releas
 
 ### Provision Azure Resources
 
-For a quick estimate of monthly costs based on our recommended baseline SKUs, check out the [Azure Pricing Calculator](https://azure.com/e/11e3a66700924f248722186c089b275c). Below are the services and SKUs reflected in that link:
+For a quick estimate of monthly costs based on our recommended baseline SKUs for a Demo/POV/MVP solution, check out the [Azure Pricing Calculator](https://azure.com/e/11e3a66700924f248722186c089b275c). Below are the services and SKUs reflected in that link:
+
+> [!IMPORTANT]
+>
+> The following recommended SKUS are for Development/Demo/POC/MVP. You will need to scale services appropriately as you increase user counts or move into Production
 
 | Service Type           | Description                                                  |
 | ---------------------- | ------------------------------------------------------------ |
@@ -129,25 +133,42 @@ For a quick estimate of monthly costs based on our recommended baseline SKUs, ch
    - It’s often easiest to group all resources together under one Azure Resource Group (e.g., `rg-simple-chat`).  
    - For best performance, match regions as shown above (e.g., `East US` for Azure OpenAI, `West US` for App Service) or adjust to your local region needs.
 2. **Deploy App Service**  
-   - Create an **Azure App Service** in with at least **P0v3** tier.  
+   - Create an **Azure App Service**: 
+     - Publish = **Code**
+     - Operating system = **Linux**
+     - Linux Plan = Use **P0v3**
+     - Zone redundancy = **Disabled**
    - After creation, note the **App Name** and **URL** (e.g., `https://my-simplechat-app.azurewebsites.net`).
 3. **Deploy Azure OpenAI**  
+   - Create a **Standard S0**. 
    - Deploy one or more **Azure OpenAI** resources in whichever region best supports your requirements.
-   - Enable the necessary **GPT-4** model (called **GPT-4o** in the Pricing Calculator link), **Embedding** model (`text-embedding-3-small`), and **Image Generation** (DALL-E 3).  
+   - Enable the necessary 
+     - **GPT** model (`gpt-4o` but you can use any GPT or o level model)
+     - **Embedding** model (`text-embedding-3-small`), 
+     - **Image Generation** (`DALL-E 3`).  
    - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
 4. **Deploy Azure AI Search**  
-   - Create a **Standard S1** instance in **East US**.  
+   - Create a **Standard S1**.  
    - [Initialize indexes](#initializing-indexes-in-azure-ai-search) (personal and group).
    - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
 5. **Deploy Azure Cosmos DB**  
-   - Use **Azure Cosmos DB for MongoDB** with RU-based autoscale (1,000 RU/s).  
+   - Use **Azure Cosmos DB for NoSQL** with RU-based autoscale (1,000 RU/s)
+     - Provisioned throughput.
+     - DO NOT APPLY free discount tier (it does not have enough throughput).
+     - Uncheck (aka DISABLE) limit total account throughput.
    - Optionally, set up **Managed Identity** authentication if you do not want to store keys.
-6. **Deploy Azure AI Document Intelligence**  
-   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+6. **Deploy Azure AI Document Intelligence**
+   1. Create a **Standard S0**.  
+   2. If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+
 7. **Deploy Azure AI Content Safety** (optional)  
-   - If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+   1. Create a **Standard S0**.  
+   2. If using **Managed Identity**, make sure to assign the App Service the correct role in your Azure OpenAI resource.
+
 8. **Deploy Bing Search** (optional)  
-   - Provide that **Bing Search** key in the **App Settings**.
+   1. Create a **Standard S1**.  
+   2. Provide that **Bing Search** key in the **App Settings**.
+
 
 ### Configure Environment / `.env` File
 

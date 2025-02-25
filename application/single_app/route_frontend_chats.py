@@ -12,11 +12,13 @@ def register_route_frontend_chats(app):
     def chats():
         user_id = get_current_user_id()
         settings = get_settings()
+        user_settings = get_user_settings(user_id)
         public_settings = sanitize_settings_for_user(settings)
         enable_user_feedback = public_settings.get("enable_user_feedback", False)
+        active_group_id = user_settings["settings"].get("activeGroupOid", "")
         if not user_id:
             return redirect(url_for('login'))
-        return render_template('chats.html', settings=public_settings, enable_user_feedback=enable_user_feedback)
+        return render_template('chats.html', settings=public_settings, enable_user_feedback=enable_user_feedback, active_group_id=active_group_id)
     
     @app.route('/upload', methods=['POST'])
     @login_required

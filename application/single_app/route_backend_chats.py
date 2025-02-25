@@ -26,6 +26,8 @@ def register_route_backend_chats(app):
         image_gen_enabled = data.get('image_generation')
         gpt_model = ""
         image_gen_model = ""
+        document_scope = data.get('doc_scope')
+        active_group_id = data.get('active_group_id')
 
         # Convert toggles from string -> bool if needed
         if isinstance(hybrid_search_enabled, str):
@@ -199,9 +201,9 @@ def register_route_backend_chats(app):
         # Hybrid Search
         if hybrid_search_enabled:
             if selected_document_id:
-                search_results = hybrid_search(user_message, user_id, document_id=selected_document_id, top_n=10)
+                search_results = hybrid_search(user_message, user_id, document_id=selected_document_id, top_n=5, doc_scope=document_scope, active_group_id=active_group_id)
             else:
-                search_results = hybrid_search(user_message, user_id, top_n=10)
+                search_results = hybrid_search(user_message, user_id, top_n=5, doc_scope=document_scope, active_group_id=active_group_id)
             if search_results:
                 retrieved_texts = []
                 for doc in search_results:
