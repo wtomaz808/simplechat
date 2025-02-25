@@ -744,6 +744,9 @@ function actuallySendMessage(textVal) {
     }
   }
 
+  
+
+
   let bingSearchEnabled = false;
   const wbbtn = document.getElementById("search-web-btn");
   if (wbbtn && wbbtn.classList.contains("active")) {
@@ -766,6 +769,8 @@ function actuallySendMessage(textVal) {
       selected_document_id: selectedDocumentId,
       bing_search: bingSearchEnabled,
       image_generation: imageGenEnabled,
+      doc_scope: docScopeSelect.value,
+      active_group_id: activeGroupId
     }),
   })
     .then((response) => {

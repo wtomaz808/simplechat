@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.202.37'
+app.config['VERSION'] = '0.202.41'
 Session(app)
 
 CLIENTS = {}
