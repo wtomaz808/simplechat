@@ -97,6 +97,20 @@
                     >
                         Add to Chat
                     </button>
+
+                    <!-- Optionally, a "Select Prompt" button that toggles the prompt dropdown -->
+                    {% if settings.enable_user_documents or settings.enable_group_documents %}
+                    <button
+                    id="search-prompts-btn"
+                    class="btn btn-outline-secondary search-btn me-2"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Select a saved prompt"
+                    >
+                    <i class="bi bi-lightbulb"></i>
+                    <span class="search-btn-text">Prompts</span>
+                    </button>
+                    {% endif %}
                 </div>
                 <!-- Second Row: Message Input, Doc Scope, Document Select, and Send Button -->
                 <div class="input-group">
@@ -116,6 +130,13 @@
                         class="form-control"
                         placeholder="Type your message here..."
                     />
+
+                    <!-- Our prompt dropdown, which will REPLACE the user input when toggled -->
+                    {% if settings.enable_user_documents or settings.enable_group_documents %}
+                    <select class="form-select me-2" id="prompt-select" style="display: none; max-width: 70%;">
+                        <!-- Prompt options will be populated dynamically -->
+                    </select>
+                    {% endif %}
                     <button class="btn btn-primary" id="send-btn">Send</button>
                 </div>
             </div>
@@ -157,7 +178,9 @@
       </form>
     </div>
   </div>
-  
+
+<div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
+
 {% endblock %}
 
 {% block scripts %}

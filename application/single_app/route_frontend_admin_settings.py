@@ -92,8 +92,8 @@ def register_route_frontend_admin_settings(app):
             default_system_prompt = request.form.get('default_system_prompt', '')
             enable_conversation_archiving = request.form.get('enable_conversation_archiving') == 'on'
             show_logo = request.form.get('show_logo') == 'on'
-            enable_user_documents = request.form.get('enable_user_documents') == 'on'
-            enable_group_documents = request.form.get('enable_group_documents') == 'on'
+            enable_user_workspace = request.form.get('enable_user_workspace') == 'on'
+            enable_group_workspaces = request.form.get('enable_group_workspaces') == 'on'
             enable_content_safety = request.form.get('enable_content_safety') == 'on'
             enable_user_feedback = request.form.get('enable_user_feedback') == 'on'
             content_safety_endpoint = request.form.get('content_safety_endpoint', '')
@@ -211,8 +211,8 @@ def register_route_frontend_admin_settings(app):
                 'enable_web_search': enable_web_search,
                 'bing_search_key': bing_search_key,
                 'landing_page_text': landing_page_text,
-                'enable_user_documents': enable_user_documents,
-                'enable_group_documents': enable_group_documents,
+                'enable_user_workspace': enable_user_workspace,
+                'enable_group_workspaces': enable_group_workspaces,
                 'azure_ai_search_endpoint': azure_ai_search_endpoint.strip(),
                 'azure_ai_search_key': azure_ai_search_key.strip(),
                 'azure_ai_search_authentication_type': azure_ai_search_authentication_type,

@@ -74,8 +74,8 @@ def get_settings():
             'azure_apim_image_gen_api_version': '',
 
             # Workspaces
-            'enable_user_documents': True,
-            'enable_group_documents': True,
+            'enable_user_workspace': True,
+            'enable_group_workspaces': True,
 
             # Safety (Content Safety) Settings
             'enable_content_safety': False,
