@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.202.41'
+app.config['VERSION'] = '0.203.15'
 Session(app)
 
 CLIENTS = {}
@@ -85,68 +85,72 @@ if cosmos_authentication_type == "managed_identity":
 else:
     cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 
-database_name = os.getenv("AZURE_COSMOS_DB_NAME")
-container_name = os.getenv("AZURE_COSMOS_CONVERSATIONS_CONTAINER_NAME")
+database_name = "SimpleChat"
 database = cosmos_client.create_database_if_not_exists(database_name)
+
+container_name = "conversations"
 container = database.create_container_if_not_exists(
     id=container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
-documents_container_name = os.getenv("AZURE_COSMOS_DOCUMENTS_CONTAINER_NAME", "documents")
+documents_container_name = "documents"
 documents_container = database.create_container_if_not_exists(
     id=documents_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 settings_container_name = "settings"
 settings_container = database.create_container_if_not_exists(
     id=settings_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 groups_container_name = "groups"
 groups_container = database.create_container_if_not_exists(
     id=groups_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 group_documents_container_name = "group_documents"
 group_documents_container = database.create_container_if_not_exists(
     id=group_documents_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 user_settings_container_name = "user_settings"
 user_settings_container = database.create_container_if_not_exists(
     id=user_settings_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 safety_container_name = "safety"
 safety_container = database.create_container_if_not_exists(
     id=safety_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 feedback_container_name = "feedback"
 feedback_container = database.create_container_if_not_exists(
     id=feedback_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
 )
 
 archived_conversations_container_name = "archived_conversations"
 archived_conversations_container = database.create_container_if_not_exists(
     id=archived_conversations_container_name,
-    partition_key=PartitionKey(path="/id"),
-    offer_throughput=400
+    partition_key=PartitionKey(path="/id")
+)
+
+prompts_container_name = "prompts"
+prompts_container = database.create_container_if_not_exists(
+    id=prompts_container_name,
+    partition_key=PartitionKey(path="/id")
+)
+
+group_prompts_container_name = "group_prompts"
+group_prompts_container = database.create_container_if_not_exists(
+    id=group_prompts_container_name,
+    partition_key=PartitionKey(path="/id")
 )
 
 def initialize_clients(settings):

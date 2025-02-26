@@ -2,7 +2,93 @@ let personalDocs = [];
 let groupDocs = [];
 let activeGroupName = "";
 let currentConversationId = null;
+let userPrompts = [];
+let groupPrompts = [];
 
+/*************************************************
+ *  LOADING PROMPTS
+ *************************************************/
+
+const promptSelect = document.getElementById("prompt-select");
+
+function loadUserPrompts() {
+  return fetch("/api/prompts")
+    .then(r => r.json())
+    .then(data => {
+      if (data.prompts) {
+        userPrompts = data.prompts;
+      }
+    })
+    .catch(err => console.error("Error loading user prompts:", err));
+}
+
+function loadGroupPrompts() {
+  return fetch("/api/group_prompts")
+    .then(r => r.json())
+    .then(data => {
+      if (data.prompts) {
+        groupPrompts = data.prompts;
+      }
+    })
+    .catch(err => console.error("Error loading group prompts:", err));
+}
+
+function populatePromptSelect() {
+  if (!promptSelect) return;
+
+  promptSelect.innerHTML = "";
+  const defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = "Select a Prompt...";
+  promptSelect.appendChild(defaultOpt);
+
+  // If you want to combine userPrompts + groupPrompts, or separate them
+  // Example: Just combine:
+  const combined = [...userPrompts.map(p => ({...p, scope: "User"})),
+                    ...groupPrompts.map(p => ({...p, scope: "Group"}))];
+
+  combined.forEach(promptObj => {
+    const opt = document.createElement("option");
+    opt.value = promptObj.id;
+    opt.textContent = `[${promptObj.scope}] ${promptObj.name}`;
+    opt.dataset.promptContent = promptObj.content;
+    promptSelect.appendChild(opt);
+  });
+}
+
+// Toggle show/hide
+const searchPromptsBtn = document.getElementById("search-prompts-btn");
+if (searchPromptsBtn) {
+  searchPromptsBtn.addEventListener("click", function() {
+    if (!promptSelect || !userInput) return;
+
+    const isActive = this.classList.toggle("active");
+
+    if (isActive) {
+      // Hide the text input
+      userInput.style.display = "none";
+
+      // Show the prompt dropdown
+      promptSelect.style.display = "inline-block";
+
+      // (Re)populate the dropdown with any prompts
+      populatePromptSelect();
+
+      // Optionally, reset any previously entered text
+      userInput.value = "";
+
+    } else {
+      // Show the text input
+      userInput.style.display = "inline-block";
+
+      // Hide the prompt dropdown
+      promptSelect.style.display = "none";
+
+      // Reset the prompt select back to default
+      promptSelect.selectedIndex = 0;
+    }
+  });
+}
 
 /*************************************************
  *  LOAD / DISPLAY CONVERSATIONS
@@ -526,12 +612,12 @@ function deleteConversation(conversationId) {
             }
           }
         } else {
-          alert("Failed to delete the conversation.");
+          showToast("Failed to delete the conversation.", "danger");
         }
       })
       .catch((error) => {
         console.error("Error deleting conversation:", error);
-        alert("Error deleting the conversation.");
+        showToast("Error deleting the conversation.", "danger");
       });
   }
 }
@@ -553,15 +639,15 @@ function fetchCitedText(citationId) {
       if (data.cited_text && data.file_name && data.page_number !== undefined) {
         showCitedTextPopup(data.cited_text, data.file_name, data.page_number);
       } else if (data.error) {
-        alert(data.error);
+        showToast(data.error, "danger");
       } else {
-        alert("Unexpected response from server.");
+        showToast("Unexpected response from server.", "danger");
       }
     })
     .catch((error) => {
       hideLoadingIndicator();
       console.error("Error fetching cited text:", error);
-      alert("Error fetching cited text.");
+      showToast("Error fetching cited text.", "danger");
     });
 }
 
@@ -662,47 +748,45 @@ function hideLoadingIndicatorInChatbox() {
 /*************************************************
  *  CREATE A NEW CONVERSATION
  *************************************************/
-function createNewConversation(callback) {
-  fetch("/api/create_conversation", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-  })
-    .then((response) => {
-      if (!response.ok) {
-        return response.json().then((errData) => {
-          throw new Error(errData.error || "Failed to create conversation");
-        });
-      }
-      return response.json();
-    })
-    .then((data) => {
-      if (!data.conversation_id) {
-        throw new Error("No conversation_id returned from server.");
-      }
-
-      currentConversationId = data.conversation_id;
-      addConversationToList(data.conversation_id);
-      const currentTitleEl = document.getElementById("current-conversation-title");
-      if (currentTitleEl) {
-        currentTitleEl.textContent = data.conversation_id;
-      }
-
-      const chatbox = document.getElementById("chatbox");
-      if (chatbox) {
-        chatbox.innerHTML = "";
-      }
-
-      if (typeof callback === "function") {
-        callback();
-      } else {
-        loadMessages(data.conversation_id);
-      }
-    })
-    .catch((error) => {
-      console.error("Error creating conversation:", error);
-      alert(`Failed to create a new conversation: ${error.message}`);
+async function createNewConversation(callback) {
+  try {
+    const response = await fetch("/api/create_conversation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin"
     });
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || "Failed to create conversation");
+    }
+
+    const data = await response.json();
+    if (!data.conversation_id) {
+      throw new Error("No conversation_id returned from server.");
+    }
+
+    currentConversationId = data.conversation_id;
+    addConversationToList(data.conversation_id);
+
+    const currentTitleEl = document.getElementById("current-conversation-title");
+    if (currentTitleEl) {
+      currentTitleEl.textContent = data.conversation_id;
+    }
+
+    const chatbox = document.getElementById("chatbox");
+    if (chatbox) {
+      chatbox.innerHTML = "";
+    }
+
+    if (typeof callback === "function") {
+      callback();
+    } else {
+      loadMessages(data.conversation_id);
+    }
+  } catch (error) {
+    console.error("Error creating conversation:", error);
+    showToast(`Failed to create a new conversation: ${error.message}`, "danger");
+  }
 }
 
 /*************************************************
@@ -710,12 +794,23 @@ function createNewConversation(callback) {
  *************************************************/
 function sendMessage() {
   const userInput = document.getElementById("user-input");
-  if (!userInput) return;
+  
+  // If the prompt dropdown is visible, use that value;
+  // otherwise, use the typed input
+  let textVal = "";
+  if (promptSelect && promptSelect.style.display !== "none") {
+    // They are in "prompt mode"
+    const selectedOpt = promptSelect.options[promptSelect.selectedIndex];
+    textVal = selectedOpt?.dataset?.promptContent?.trim() || "";
+  } else if (userInput) {
+    // They are in "typed input mode"
+    textVal = userInput.value.trim();
+  }
 
-  const textVal = userInput.value.trim();
-  if (textVal === "") return;
+  if (!textVal) return;
 
   if (!currentConversationId) {
+    // If no conversation, create one first, then send
     createNewConversation(() => {
       actuallySendMessage(textVal);
     });
@@ -864,9 +959,9 @@ if (sendBtn) {
   sendBtn.addEventListener("click", sendMessage);
 }
 
-const userInputEl = document.getElementById("user-input");
-if (userInputEl) {
-  userInputEl.addEventListener("keypress", function (e) {
+const userInput = document.getElementById("user-input");
+if (userInput) {
+  userInput.addEventListener("keypress", function (e) {
     if (e.key === "Enter") {
       sendMessage();
     }
@@ -926,7 +1021,7 @@ if (uploadBtn) {
 
     const file = fileInput.files[0];
     if (!file) {
-      alert("Please select a file to upload.");
+      showToast("Please select a file to upload.", "danger");
       return;
     }
 
@@ -954,7 +1049,7 @@ function uploadFileToConversation(file) {
       return response.json().then((data) => {
         if (!response.ok) {
           console.error("Upload failed:", data.error || "Unknown error");
-          alert("Error uploading file: " + (data.error || "Unknown error"));
+          showToast("Error uploading file: " + (data.error || "Unknown error"), "danger");
           throw new Error(data.error || "Upload failed");
         }
         return data;
@@ -966,13 +1061,13 @@ function uploadFileToConversation(file) {
         loadMessages(currentConversationId);
       } else {
         console.error("No conversation_id returned from server.");
-        alert("Error: No conversation ID returned from server.");
+        showToast("Error: No conversation ID returned from server.", "danger");
       }
       resetFileButton();
     })
     .catch((error) => {
       console.error("Error:", error);
-      alert("Error uploading file: " + error.message);
+      showToast("Error uploading file: " + error.message, "danger");
       resetFileButton();
     });
 }
@@ -1050,15 +1145,15 @@ function fetchFileContent(conversationId, fileId) {
       if (data.file_content && data.filename) {
         showFileContentPopup(data.file_content, data.filename, data.is_table);
       } else if (data.error) {
-        alert(data.error);
+        showToast(data.error, "danger");
       } else {
-        alert("Unexpected response from server.");
+        ashowToastlert("Unexpected response from server.", "danger");
       }
     })
     .catch((error) => {
       hideLoadingIndicator();
       console.error("Error fetching file content:", error);
-      alert("Error fetching file content.");
+      showToast("Error fetching file content.", "danger");
     });
 }
 
@@ -1134,30 +1229,40 @@ document.addEventListener("DOMContentLoaded", function () {
 window.onload = function () {
   loadConversations();
 
-  loadAllDocs().then(() => {
-    const searchDocsParam = getUrlParameter("search_documents") === "true";
-    const docScopeParam = getUrlParameter("doc_scope") || "";
-    const documentIdParam = getUrlParameter("document_id") || "";
+  // Use Promise.all to run these in parallel.
+  Promise.all([
+    loadAllDocs(),       // loads personal/group docs
+    loadUserPrompts(),   // loads user prompts
+    loadGroupPrompts()   // loads group prompts
+  ])
+    .then(() => {
+      // Once everything is loaded, handle URL params or any next steps
+      const searchDocsParam = getUrlParameter("search_documents") === "true";
+      const docScopeParam = getUrlParameter("doc_scope") || "";
+      const documentIdParam = getUrlParameter("document_id") || "";
 
-    const searchDocsBtn = document.getElementById("search-documents-btn");
-    const docScopeSel = document.getElementById("doc-scope-select");
-    const docSelectEl = document.getElementById("document-select");
+      const searchDocsBtn = document.getElementById("search-documents-btn");
+      const docScopeSel = document.getElementById("doc-scope-select");
+      const docSelectEl = document.getElementById("document-select");
 
-    if (searchDocsParam && searchDocsBtn && docScopeSel && docSelectEl) {
-      searchDocsBtn.classList.add("active");
-      docScopeSel.style.display = "inline-block";
-      docSelectEl.style.display = "inline-block";
+      if (searchDocsParam && searchDocsBtn && docScopeSel && docSelectEl) {
+        searchDocsBtn.classList.add("active");
+        docScopeSel.style.display = "inline-block";
+        docSelectEl.style.display = "inline-block";
 
-      if (docScopeParam) {
-        docScopeSel.value = docScopeParam;
+        if (docScopeParam) {
+          docScopeSel.value = docScopeParam;
+        }
+        populateDocumentSelectScope();
+
+        if (documentIdParam) {
+          docSelectEl.value = documentIdParam;
+        }
       }
-      populateDocumentSelectScope();
-
-      if (documentIdParam) {
-        docSelectEl.value = documentIdParam;
-      }
-    }
-  });
+    })
+    .catch((err) => {
+      console.error("Error loading initial data:", err);
+    });
 };
 
 const newConversationBtn = document.getElementById("new-conversation-btn");
@@ -1279,11 +1384,33 @@ function submitFeedback(messageId, conversationId, feedbackType, reason) {
         console.log("Feedback submitted:", data);
       } else {
         console.error("Feedback error:", data.error || data);
-        alert("Error submitting feedback: " + (data.error || "Unknown error."));
+        showToast("Error submitting feedback: " + (data.error || "Unknown error."), "danger");
       }
     })
     .catch((err) => {
       console.error("Error sending feedback:", err);
-      alert("Error sending feedback.");
+      showToast("Error sending feedback.", "danger");
     });
+}
+
+function showToast(message, variant = "danger") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const id = "toast-" + Date.now();
+  const toastHtml = `
+    <div id="${id}" class="toast align-items-center text-bg-${variant}" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  `;
+  container.insertAdjacentHTML("beforeend", toastHtml);
+
+  const toastEl = document.getElementById(id);
+  const bsToast = new bootstrap.Toast(toastEl, { delay: 5000 });
+  bsToast.show();
 }

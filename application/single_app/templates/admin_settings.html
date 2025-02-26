@@ -4,6 +4,11 @@
 {% block title %}
     Admin Settings - {{ app_settings.app_title }}
 {% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css">
+{% endblock %}
+
 {% block content %}
 
 <div class="container">
@@ -71,14 +76,12 @@
             <!-- GENERAL TAB -->
             <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
                 <p class="text-muted">
-                    Configure general application settings, including the application’s title, logo, and landing page
-                    text.
+                    Configure general application settings, including the application’s title, logo, and landing page text.
                 </p>
                 <div class="card p-3 mb-3">
                     <div class="mb-3">
                         <label for="app_title" class="form-label">Application Title</label>
-                        <input type="text" class="form-control" id="app_title" name="app_title"
-                            value="{{ settings.app_title }}">
+                        <input type="text" class="form-control" id="app_title" name="app_title" value="{{ settings.app_title }}">
                     </div>
                     <h5 class="mt-3">Logo Settings</h5>
                     <div class="form-group form-check form-switch mb-3">
@@ -88,14 +91,46 @@
                     </div>
                     <div class="form-group mb-3">
                         <label for="logo_file">Upload Custom Logo</label>
-                        <input type="file" class="form-control" name="logo_file" id="logo_file"
-                            accept=".png,.jpg,.jpeg">
+                        <input type="file" class="form-control" name="logo_file" id="logo_file" accept=".png,.jpg,.jpeg">
                     </div>
                 </div>
+
+                <!-- Landing Page Text card -->
                 <div class="card p-3">
-                    <label for="landing_page_text" class="form-label">Landing Page Text (Markdown Supported)</label>
-                    <textarea class="form-control" id="landing_page_text" name="landing_page_text"
-                        rows="3">{{ settings.landing_page_text }}</textarea>
+                    <label class="form-label fw-bold">Landing Page Text (Markdown)</label>
+                    <p class="text-muted mb-1">You can either edit the text in a Markdown editor or switch to a preview mode.</p>
+
+                    <!-- Toggle for enabling the editor vs. viewing Markdown preview -->
+                    Preview
+                    <div class="form-check form-switch mb-3">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="toggleLandingPageEditor"
+                            name="enable_landing_page_editor"
+                            {% if settings.enable_landing_page_editor %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="toggleLandingPageEditor">
+                            Enable Markdown Editor
+                        </label>
+                    </div>
+
+                    <!-- The text area that SimpleMDE will attach to -->
+                    <div id="landingPageEditorContainer" style="display: none;">
+                        <textarea
+                            class="form-control"
+                            id="landing_page_text_editor"
+                            name="landing_page_text"
+                            rows="5"
+                        >{{ settings.landing_page_text }}</textarea>
+                    </div>
+
+                    <!-- A read-only container for rendered markdown preview -->
+                    <div
+                        id="landingPageMarkdownPreview"
+                        class="p-2 border rounded"
+                        style="white-space: pre-wrap; display: none;"
+                    ></div>
                 </div>
             </div>
 
@@ -531,38 +566,38 @@
                     Configure workspace settings. Enable or disable workspaces and set the default workspace.
                 </p>
                 
-                <!-- Card for "Enable Your Documents" -->
+                <!-- Card for "Enable Your Workspace" -->
                 <div class="card mb-3 p-3">
-                    <h5>Enable Your Documents</h5>
+                    <h5>Enable Your Workspace</h5>
                     <p class="text-muted">
-                        Turn this on to allow access and management of your personal documents.
+                        Turn this on to allow access and management of your personal workspace.
                     </p>
                     <div class="form-group form-check form-switch mb-3">
                         <input type="checkbox" 
                             class="form-check-input" 
-                            id="enable_user_documents"
-                            name="enable_user_documents"
-                            {% if settings.enable_user_documents %}checked{% endif %}>
-                        <label class="form-check-label ms-2" for="enable_user_documents">
-                            Enable Your Documents
+                            id="enable_user_workspace"
+                            name="enable_user_workspace"
+                            {% if settings.enable_user_workspace %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_user_workspace">
+                            Enable Your Workspace
                         </label>
                     </div>
                 </div>
 
-                <!-- Card for "Enable My Groups (includes Group Documents)" -->
+                <!-- Card for "Enable My Groups (includes Group Workspaces)" -->
                 <div class="card p-3">
-                    <h5>Enable My Groups (includes Group Documents)</h5>
+                    <h5>Enable My Groups (includes Group Workspaces)</h5>
                     <p class="text-muted">
-                        Turn this on to allow access and management of group documents, as well as group collaboration.
+                        Turn this on to allow access and management of group workspaces, as well as group collaboration.
                     </p>
                     <div class="form-group form-check form-switch mb-3">
                         <input type="checkbox" 
                             class="form-check-input" 
-                            id="enable_group_documents"
-                            name="enable_group_documents"
-                            {% if settings.enable_group_documents %}checked{% endif %}>
-                        <label class="form-check-label ms-2" for="enable_group_documents">
-                            Enable My Groups (includes Group Documents)
+                            id="enable_group_workspaces"
+                            name="enable_group_workspaces"
+                            {% if settings.enable_group_workspaces %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_group_workspaces">
+                            Enable My Groups (includes Group Workspaces)
                         </label>
                     </div>
                 </div>
@@ -1122,6 +1157,67 @@
 {% endblock %}
 
 {% block scripts %}
+
+<script src="https://cdn.jsdelivr.net/npm/simplemde@1.11.2/dist/simplemde.min.js"></script>
+
+<script>
+    // We’ll store the SimpleMDE instance globally so we can destroy or read its content
+    let simplemde = null;
+
+    // Grab references to the toggle, the editor container, and the preview container
+    const toggleLandingPageEditor = document.getElementById("toggleLandingPageEditor");
+    const landingPageEditorContainer = document.getElementById("landingPageEditorContainer");
+    const landingPageMarkdownPreview = document.getElementById("landingPageMarkdownPreview");
+
+    function showEditor() {
+        // Show the text area container
+        landingPageEditorContainer.style.display = "block";
+        // Hide the preview container
+        landingPageMarkdownPreview.style.display = "none";
+
+        // If we haven't already created the editor, do so
+        if (!simplemde) {
+            simplemde = new SimpleMDE({
+                element: document.getElementById("landing_page_text_editor"),
+                // Optionally add any SimpleMDE config here:
+                // placeholder: "Enter your landing page markdown..."
+            });
+        }
+    }
+
+    function showPreview() {
+        // Hide the text area container
+        landingPageEditorContainer.style.display = "none";
+        // Show the preview container
+        landingPageMarkdownPreview.style.display = "block";
+
+        // Render the markdown inside the preview container
+        if (simplemde) {
+            landingPageMarkdownPreview.innerHTML = simplemde.markdown(simplemde.value());
+        } else {
+            // If for some reason simplemde is null (e.g., user never toggled on?), 
+            // just show raw text
+            landingPageMarkdownPreview.innerHTML = document.getElementById("landing_page_text_editor").value;
+        }
+    }
+
+    // Listen for changes on the toggle
+    toggleLandingPageEditor.addEventListener("change", () => {
+        if (toggleLandingPageEditor.checked) {
+            showEditor();
+        } else {
+            showPreview();
+        }
+    });
+
+    // On page load, decide which view to show, based on user’s stored setting
+    if (toggleLandingPageEditor.checked) {
+        showEditor();
+    } else {
+        showPreview();
+    }
+</script>
+
 <script>
     // Prepopulate model arrays from server
     window.gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}');
