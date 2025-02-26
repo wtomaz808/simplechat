@@ -1,6 +1,38 @@
 <!-- BEGIN RELEASE_NOTES.MD BLOCK -->
 
 # Feature Release
+## (v0.203.15)
+
+The update introduces "Workspaces," allowing users and groups to store both **documents** and **custom prompts** in a shared context. A new **prompt selection** feature enhances the chat workflow for a smoother experience. Additionally, admin configuration has been streamlined, and the landing page editor now supports improved Markdown formatting.
+
+#### 1. Renaming Documents to Workspaces
+
+- **Your Documents** → **Your Workspace**
+- **Group Documents** → **Group Workspaces**
+- All references, routes, and templates updated (`documents.html` → `workspace.html`, `group_documents.html` → `group_workspaces.html`).
+- New admin settings flags: `enable_user_workspace` and `enable_group_workspaces` replaced the old `enable_user_documents` / `enable_group_documents`.
+
+#### 2. Custom Prompt Support
+
+- User Prompts:
+  - New backend routes in `route_backend_prompts.py` (CRUD for user-specific prompts).
+- Group Prompts:
+  - New backend routes in `route_backend_group_prompts.py` (CRUD for group-shared prompts).
+
+#### 3. Chat Page Enhancements
+
+- Prompt Selection Dropdown:
+  - New button (“Prompts”) toggles a dropdown for selecting saved user/group prompts.
+  - Eliminates copy-paste; helps users insert larger or more complex prompts quickly.
+  - Lays groundwork for future workflow automation.
+- **Toast Notifications** for errors and status messages (replacing browser alerts).
+
+#### 4. Cosmos Containers
+
+- Added `prompts_container` and `group_prompts_container`.
+
+- **Simplified** or standardized the container creation logic in `config.py`.
+
 ## (v0.202.41)
 
 - **Azure Government Support**:
