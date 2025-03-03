@@ -12,7 +12,7 @@ def get_suggestions(query):
     if not bing_key:
         return []
 
-    autosuggest_url = f"{BING_SEARCH_ENDPOINT}/v7.0/suggestions"
+    autosuggest_url = f"{bing_search_endpoint}/v7.0/suggestions"
     headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query}
     response = requests.get(autosuggest_url, headers=headers, params=params)
@@ -29,7 +29,7 @@ def get_search_results(query, top_n=5):
     if not bing_key:
         return []
 
-    search_url = f"{BING_SEARCH_ENDPOINT}/v7.0/search"
+    search_url = f"{bing_search_endpoint}/v7.0/search"
     headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query, "count": top_n}
     response = requests.get(search_url, headers=headers, params=params)

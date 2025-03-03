@@ -25,6 +25,24 @@
   /* Dark grey text for better contrast */
 }
 
+/* Ensure the image bubble only takes up a bit more space than the image */
+.image-message .message-bubble {
+  display: inline-block;  /* Allow it to only wrap the content */
+  width: auto;
+  max-width: 200px;  /* Slightly larger than the image */
+  padding: 5px;  /* Reduce padding to keep it snug */
+  background-color: #f1f0f0; /* Keep background consistent */
+  border-radius: 10px;
+}
+
+/* Ensure the image is a fixed small size */
+.image-message .generated-image {
+  width: 170px;
+  height: 170px;
+  display: block; /* Ensures the bubble height matches */
+}
+
+
 /* Chatbox styling */
 #chatbox {
   padding: 15px;
@@ -258,11 +276,6 @@ a.citation-link:hover {
 /* AI messages aligned to the left */
 .ai-message {
   justify-content: flex-start;
-}
-
-.ai-message .message-text img.generated-image {
-  max-width: 25%;
-  height: auto;
 }
 
 /* Message bubble */

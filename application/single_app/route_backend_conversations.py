@@ -21,7 +21,12 @@ def register_route_backend_conversations(app):
                 item=conversation_id,
                 partition_key=conversation_id
             )
-            messages = conversation_item.get('messages', [])
+            # Then query the messages in messages_container
+            message_query = f"SELECT * FROM c WHERE c.conversation_id = '{conversation_id}' ORDER BY c.timestamp ASC"
+            messages = list(messages_container.query_items(
+                query=message_query,
+                partition_key=conversation_id
+            ))
             return jsonify({'messages': messages})
         except CosmosResourceNotFoundError:
             return jsonify({'messages': []})
@@ -37,7 +42,9 @@ def register_route_backend_conversations(app):
             return jsonify({'error': 'User not authenticated'}), 401
         query = f"SELECT c.id, c.title, c.last_updated FROM c WHERE c.user_id = '{user_id}' ORDER BY c.last_updated DESC"
         items = list(container.query_items(query=query, enable_cross_partition_query=True))
-        return jsonify({'conversations': items})
+        return jsonify({
+            'conversations': items
+        }), 200
 
 
     @app.route('/api/create_conversation', methods=['POST'])
@@ -58,7 +65,10 @@ def register_route_backend_conversations(app):
         }
         container.upsert_item(conversation_item)
 
-        return jsonify({'conversation_id': conversation_id}), 200
+        return jsonify({
+            'conversation_id': conversation_id,
+            'title': 'New Conversation'
+        }), 200
     
     @app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
     @login_required
@@ -71,37 +81,48 @@ def register_route_backend_conversations(app):
         archiving_enabled = settings.get('enable_conversation_archiving', False)
 
         try:
-            # 1) Fetch the conversation item
             conversation_item = container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
         except CosmosResourceNotFoundError:
-            return jsonify({"error": f"Conversation {conversation_id} not found."}), 404
+            return jsonify({
+                "error": f"Conversation {conversation_id} not found."
+            }), 404
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            return jsonify({
+                "error": str(e)
+            }), 500
 
         if archiving_enabled:
-            # 2) Copy conversation to archived_conversations
-            #    You can store a timestamp or other metadata if desired
-            archived_item = dict(conversation_item)  # shallow copy
+            archived_item = dict(conversation_item)
             archived_item["archived_at"] = datetime.utcnow().isoformat()
-            
-            # Make sure 'id' is still unique in the archived container.
-            # Usually it's the same ID, which is fine, but you can change if needed.
             archived_conversations_container.upsert_item(archived_item)
-            #print(f"Conversation {conversation_id} archived.")
+
+        message_query = f"SELECT * FROM c WHERE c.conversation_id = '{conversation_id}'"
+        results = list(messages_container.query_items(
+            query=message_query,
+            partition_key=conversation_id
+        ))
+
+        for doc in results:
+            if archiving_enabled:
+                archived_doc = dict(doc)
+                archived_doc["archived_at"] = datetime.utcnow().isoformat()
+                archived_messages_container.upsert_item(archived_doc)
+
+            messages_container.delete_item(doc['id'], partition_key=conversation_id)
         
-        # 3) Permanently remove from main 'conversations' container
         try:
             container.delete_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
-            #print(f"Conversation {conversation_id} deleted from active container.")
         except Exception as e:
-            # If archiving was enabled and we already inserted into archived container,
-            # you might choose to handle partial success/failure here.
-            return jsonify({"error": str(e)}), 500
+            return jsonify({
+                "error": str(e)
+            }), 500
 
-        return jsonify({"success": True}), 200
+        return jsonify({
+            "success": True
+        }), 200

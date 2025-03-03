@@ -18,34 +18,59 @@ def register_route_backend_documents(app):
 
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         if not conversation_id or not file_id:
-            return jsonify({'error': 'Missing conversation_id or file_id'}), 400
+            return jsonify({'error': 'Missing conversation_id or id'}), 400
 
         try:
-            conversation_item = container.read_item(
+            _ = container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
-            messages = conversation_item.get('messages', [])
-            for message in messages:
-                if message.get('role') == 'file' and message.get('file_id') == file_id:
-                    file_content = message.get('file_content')
-                    filename = message.get('filename')
-                    is_table = message.get('is_table', False)
-                    if file_content:
-                        return jsonify({
-                            'file_content': file_content,
-                            'filename': filename,
-                            'is_table': is_table
-                        }), 200
-                    else:
-                        return jsonify({'error': 'File content not found'}), 404
+        except CosmosResourceNotFoundError:
+            return jsonify({'error': 'Conversation not found'}), 404
+        except Exception as e:
+            return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
 
-            return jsonify({'error': 'File not found in conversation'}), 404
+        try:
+            query_str = """
+                SELECT * FROM c
+                WHERE c.conversation_id = @conversation_id
+                AND c.id = @file_id
+            """
+            items = list(messages_container.query_items(
+                query=query_str,
+                parameters=[
+                    {'name': '@conversation_id', 'value': conversation_id},
+                    {'name': '@file_id', 'value': file_id}
+                ],
+                partition_key=conversation_id
+            ))
+
+            if not items:
+                return jsonify({'error': 'File not found in conversation'}), 404
+
+            items_sorted = sorted(items, key=lambda x: x.get('chunk_index', 0))
+
+            filename = items_sorted[0].get('filename', 'Untitled')
+            is_table = items_sorted[0].get('is_table', False)
+
+            combined_parts = []
+            for it in items_sorted:
+                combined_parts.append(it.get('file_content', ''))
+            combined_content = ''.join(combined_parts)
+
+            if not combined_content:
+                return jsonify({'error': 'File content not found'}), 404
+
+            return jsonify({
+                'file_content': combined_content,
+                'filename': filename,
+                'is_table': is_table
+            }), 200
 
         except Exception as e:
-            return jsonify({'error': 'Error retrieving file content'}), 500
+            return jsonify({'error': f'Error retrieving file content: {str(e)}'}), 500
     
     @app.route('/api/documents/upload', methods=['POST'])
     @login_required
