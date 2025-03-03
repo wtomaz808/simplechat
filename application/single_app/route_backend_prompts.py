@@ -8,6 +8,7 @@ def register_route_backend_prompts(app):
     @app.route('/api/prompts', methods=['GET'])
     @login_required
     @user_required
+    @enabled_required("enable_user_workspace")
     def get_prompts():
         user_id = get_current_user_id()
         query = f"SELECT * FROM c WHERE c.user_id = '{user_id}' AND c.type = 'user_prompt'"
@@ -17,6 +18,7 @@ def register_route_backend_prompts(app):
     @app.route('/api/prompts', methods=['POST'])
     @login_required
     @user_required
+    @enabled_required("enable_user_workspace")
     def create_prompt():
         user_id = get_current_user_id()
         data = request.get_json()
@@ -45,6 +47,7 @@ def register_route_backend_prompts(app):
     @app.route('/api/prompts/<prompt_id>', methods=['GET'])
     @login_required
     @user_required
+    @enabled_required("enable_user_workspace")
     def get_prompt(prompt_id):
         user_id = get_current_user_id()
         # read by direct ID read if your partition key matches, or do a query
@@ -57,6 +60,7 @@ def register_route_backend_prompts(app):
     @app.route('/api/prompts/<prompt_id>', methods=['PATCH'])
     @login_required
     @user_required
+    @enabled_required("enable_user_workspace")
     def update_prompt(prompt_id):
         user_id = get_current_user_id()
         data = request.get_json()
@@ -80,6 +84,7 @@ def register_route_backend_prompts(app):
     @app.route('/api/prompts/<prompt_id>', methods=['DELETE'])
     @login_required
     @user_required
+    @enabled_required("enable_user_workspace")
     def delete_prompt(prompt_id):
         user_id = get_current_user_id()
         # same approach, find the doc, then delete by doc['id'] and partition key if needed
