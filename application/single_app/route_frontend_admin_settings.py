@@ -175,6 +175,22 @@ def register_route_frontend_admin_settings(app):
             azure_apim_document_intelligence_endpoint = request.form.get('azure_apim_document_intelligence_endpoint', '')
             azure_apim_document_intelligence_subscription_key = request.form.get('azure_apim_document_intelligence_subscription_key', '')
 
+            # Multimedia
+            enable_video_file_support = request.form.get('enable_video_file_support') == 'on'
+            enable_audio_file_support = request.form.get('enable_audio_file_support') == 'on'
+
+            # Enhanced Citations
+            enable_enhanced_citations = request.form.get('enable_enhanced_citations') == 'on'
+            office_docs_storage_account_url = request.form.get('office_docs_storage_account_url', '')
+            office_docs_authentication_type = request.form.get('office_docs_authentication_type', 'key')
+            office_docs_key = request.form.get('office_docs_key', '')
+            video_files_storage_account_url = request.form.get('video_files_storage_account_url', '')
+            video_files_authentication_type = request.form.get('video_files_authentication_type', 'key')
+            video_files_key = request.form.get('video_files_key', '')
+            audio_files_storage_account_url = request.form.get('audio_files_storage_account_url', '')
+            audio_files_authentication_type = request.form.get('audio_files_authentication_type', 'key')
+            audio_files_key = request.form.get('audio_files_key', '')
+
             try:
                 gpt_model_obj = json.loads(gpt_model_json) if gpt_model_json else {'selected': [], 'all': []}
             except:
@@ -291,6 +307,22 @@ def register_route_frontend_admin_settings(app):
                 'enable_document_intelligence_apim': enable_document_intelligence_apim,
                 'azure_apim_document_intelligence_endpoint': azure_apim_document_intelligence_endpoint,
                 'azure_apim_document_intelligence_subscription_key': azure_apim_document_intelligence_subscription_key,
+
+                # Multimedia
+                'enable_video_file_support': enable_video_file_support,
+                'enable_audio_file_support': enable_audio_file_support,
+
+                # Enhanced Citations
+                'enable_enhanced_citations': enable_enhanced_citations,
+                'office_docs_storage_account_url': office_docs_storage_account_url,
+                'office_docs_authentication_type': office_docs_authentication_type,
+                'office_docs_key': office_docs_key,
+                'video_files_storage_account_url': video_files_storage_account_url,
+                'video_files_authentication_type': video_files_authentication_type,
+                'video_files_key': video_files_key,
+                'audio_files_storage_account_url': audio_files_storage_account_url,
+                'audio_files_authentication_type': audio_files_authentication_type,
+                'audio_files_key': audio_files_key
  }
 
             update_settings(new_settings)

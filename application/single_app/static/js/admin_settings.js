@@ -27,6 +27,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup test-connection button logic
     setupTestButtons();
+
+    function activateTabFromHash() {
+        const hash = window.location.hash; // Get the URL fragment (e.g., #citation)
+        if (hash) {
+            const tabButton = document.querySelector(`button.nav-link[data-bs-target="${hash}"]`);
+            if (tabButton) {
+                const tab = new bootstrap.Tab(tabButton);
+                tab.show();
+            }
+        }
+    }
+
+    // Activate tab from URL on page load
+    activateTabFromHash();
+
+    // Update URL when a tab is clicked
+    document.querySelectorAll('.nav-link').forEach(tab => {
+        tab.addEventListener('click', function () {
+            history.pushState(null, null, this.getAttribute('data-bs-target')); // Update URL
+        });
+    });
+
+    // Handle browser back/forward navigation to activate correct tab
+    window.addEventListener("popstate", activateTabFromHash);
+
 });
 
 ////////////////////////////////////////////////////////////////////////////
@@ -288,6 +313,15 @@ function setupToggles() {
         });
     }
 
+    // Enhanced Citation: main toggle
+    const enableEnhancedCitation = document.getElementById('enable_enhanced_citations');
+    if (enableEnhancedCitation) {
+        toggleEnhancedCitation(enableEnhancedCitation.checked);
+        enableEnhancedCitation.addEventListener('change', function(){
+            toggleEnhancedCitation(this.checked);
+        });
+    }
+
     // Content Safety: main toggle
     const enableContentSafetyCheckbox = document.getElementById('enable_content_safety');
     if (enableContentSafetyCheckbox) {
@@ -391,6 +425,30 @@ function setupToggles() {
     if (docIntelAuthType) {
         docIntelAuthType.addEventListener('change', function () {
             document.getElementById('azure_document_intelligence_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
+
+    const officeAuthType = document.getElementById('office_docs_authentication_type');
+    if (officeAuthType) {
+        officeAuthType.addEventListener('change', function(){
+            document.getElementById('office_docs_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
+
+    const videoAuthType = document.getElementById('video_files_authentication_type');
+    if (videoAuthType) {
+        videoAuthType.addEventListener('change', function(){
+            document.getElementById('video_files_key_container').style.display =
+                (this.value === 'key') ? 'block' : 'none';
+        });
+    }
+
+    const audioAuthType = document.getElementById('audio_files_authentication_type');
+    if (audioAuthType) {
+        audioAuthType.addEventListener('change', function(){
+            document.getElementById('audio_files_key_container').style.display =
                 (this.value === 'key') ? 'block' : 'none';
         });
     }
@@ -764,6 +822,20 @@ function setupTestButtons() {
     }
 }
 
+function toggleEnhancedCitation(isEnabled) {
+    const container = document.getElementById('enhanced_citation_settings');
+    if (!container) return;
+    container.style.display = isEnabled ? 'block' : 'none';
+}
+
+
+function switchTab(event, tabButtonId) {
+    event.preventDefault(); // Prevent default anchor jump
+    const triggerEl = document.getElementById(tabButtonId); // e.g., "workspaces-tab"
+    const tabObj = new bootstrap.Tab(triggerEl);
+    tabObj.show();
+  }
+
 ////////////////////////////////////////////////////////////////////////////
 // SHOW/HIDE PASSWORD FIELDS
 ////////////////////////////////////////////////////////////////////////////
@@ -811,3 +883,9 @@ togglePassword('toggle_azure_apim_web_search_subscription_key', 'azure_apim_web_
 togglePassword('toggle_azure_apim_ai_search_subscription_key', 'azure_apim_ai_search_subscription_key');
 // Document Intelligence APIM Key
 togglePassword('toggle_azure_apim_document_intelligence_subscription_key', 'azure_apim_document_intelligence_subscription_key');
+// Office Docs Key
+togglePassword('toggle_office_docs_key', 'office_docs_key');
+// Video Files Key
+togglePassword('toggle_video_files_key', 'video_files_key');
+// Audio Files Key
+togglePassword('toggle_audio_files_key', 'audio_files_key');

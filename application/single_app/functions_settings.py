@@ -77,6 +77,22 @@ def get_settings():
             'enable_user_workspace': True,
             'enable_group_workspaces': True,
 
+            # Multimedia
+            'enable_video_file_support': False,
+            'enable_audio_file_support': False,
+
+            # Enhanced Citations
+            'enable_enhanced_citations': False,
+            'office_docs_storage_account_url': '',
+            'office_docs_authentication_type': 'key',
+            'office_docs_key': '',
+            'video_files_storage_account_url': '',
+            'video_files_authentication_type': 'key',
+            'video_files_key': '',
+            'audio_files_storage_account_url': '',
+            'audio_files_authentication_type': 'key',
+            'audio_files_key': '',
+
             # Safety (Content Safety) Settings
             'enable_content_safety': False,
             'content_safety_endpoint': '',
@@ -189,7 +205,6 @@ def enabled_required(setting_key):
         return wrapper
     return decorator
 
-import re
 
 def sanitize_settings_for_user(full_settings: dict) -> dict:
     keys_to_exclude = {
