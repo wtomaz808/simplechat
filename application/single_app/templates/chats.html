@@ -47,7 +47,7 @@
                         <span class="search-btn-text">Image</span>
                     </button>
                     {% endif %}
-                    {% if settings.enable_user_documents or settings.enable_group_documents %}
+                    {% if settings.enable_user_workspace or settings.enable_group_workspaces %}
                     <!-- Search Documents Button -->
                     <button
                         id="search-documents-btn"
@@ -99,7 +99,7 @@
                     </button>
 
                     <!-- Optionally, a "Select Prompt" button that toggles the prompt dropdown -->
-                    {% if settings.enable_user_documents or settings.enable_group_documents %}
+                    {% if settings.enable_user_workspace or settings.enable_group_workspaces %}
                     <button
                     id="search-prompts-btn"
                     class="btn btn-outline-secondary search-btn me-2"
@@ -132,7 +132,7 @@
                     />
 
                     <!-- Our prompt dropdown, which will REPLACE the user input when toggled -->
-                    {% if settings.enable_user_documents or settings.enable_group_documents %}
+                    {% if settings.enable_user_workspace or settings.enable_group_workspaces %}
                     <select class="form-select me-2" id="prompt-select" style="display: none; max-width: 70%;">
                         <!-- Prompt options will be populated dynamically -->
                     </select>

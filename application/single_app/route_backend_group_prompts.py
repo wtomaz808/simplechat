@@ -8,7 +8,7 @@ def register_route_backend_group_prompts(app):
     @app.route('/api/group_prompts', methods=['GET'])
     @login_required
     @user_required
-    @enabled_required("enable_group_documents")  # same gating as group docs
+    @enabled_required("enable_group_workspaces")  # same gating as group docs
     def get_group_prompts():
         user_id = get_current_user_id()
         # find user's active group
@@ -28,7 +28,7 @@ def register_route_backend_group_prompts(app):
     @app.route('/api/group_prompts', methods=['POST'])
     @login_required
     @user_required
-    @enabled_required("enable_group_documents")
+    @enabled_required("enable_group_workspaces")
     def create_group_prompt():
         user_id = get_current_user_id()
         data = request.get_json()
@@ -65,7 +65,7 @@ def register_route_backend_group_prompts(app):
     @app.route('/api/group_prompts/<prompt_id>', methods=['GET'])
     @login_required
     @user_required
-    @enabled_required("enable_group_documents")
+    @enabled_required("enable_group_workspaces")
     def get_group_prompt(prompt_id):
         user_id = get_current_user_id()
         user_settings = get_user_settings(user_id)
@@ -82,7 +82,7 @@ def register_route_backend_group_prompts(app):
     @app.route('/api/group_prompts/<prompt_id>', methods=['PATCH'])
     @login_required
     @user_required
-    @enabled_required("enable_group_documents")
+    @enabled_required("enable_group_workspaces")
     def update_group_prompt(prompt_id):
         user_id = get_current_user_id()
         data = request.get_json()
@@ -113,7 +113,7 @@ def register_route_backend_group_prompts(app):
     @app.route('/api/group_prompts/<prompt_id>', methods=['DELETE'])
     @login_required
     @user_required
-    @enabled_required("enable_group_documents")
+    @enabled_required("enable_group_workspaces")
     def delete_group_prompt(prompt_id):
         user_id = get_current_user_id()
         user_settings = get_user_settings(user_id)
