@@ -15,7 +15,9 @@ def register_route_backend_chats(app):
         data = request.get_json()
         user_id = get_current_user_id()
         if not user_id:
-            return jsonify({'error': 'User not authenticated'}), 401
+            return jsonify({
+                'error': 'User not authenticated'
+            }), 401
 
         # Extract from request
         user_message = data.get('message', '')
@@ -34,10 +36,13 @@ def register_route_backend_chats(app):
             hybrid_search_enabled = hybrid_search_enabled.lower() == 'true'
         if isinstance(bing_search_enabled, str):
             bing_search_enabled = bing_search_enabled.lower() == 'true'
+        if isinstance(image_gen_enabled, str):
+            image_gen_enabled = image_gen_enabled.lower() == 'true'
 
         # GPT & Image generation APIM or direct
         enable_gpt_apim = settings.get('enable_gpt_apim', False)
         enable_image_gen_apim = settings.get('enable_image_gen_apim', False)
+        max_file_content_length = 50000 # 50KB
 
         # ---------------------------------------------------------------------
         # 1) Load or create conversation
@@ -47,10 +52,10 @@ def register_route_backend_chats(app):
             conversation_item = {
                 'id': conversation_id,
                 'user_id': user_id,
-                'messages': [],
                 'last_updated': datetime.utcnow().isoformat(),
                 'title': 'New Conversation'
             }
+            container.upsert_item(conversation_item)
         else:
             try:
                 conversation_item = container.read_item(
@@ -62,23 +67,28 @@ def register_route_backend_chats(app):
                 conversation_item = {
                     'id': conversation_id,
                     'user_id': user_id,
-                    'messages': [],
                     'last_updated': datetime.utcnow().isoformat(),
                     'title': 'New Conversation'
                 }
+                container.upsert_item(conversation_item)
             except Exception as e:
-                return jsonify({'error': 'An error occurred'}), 500
+                return jsonify({
+                    'error': f'Error reading conversation: {str(e)}'
+                }), 500
 
         # ---------------------------------------------------------------------
         # 2) Append the user message to conversation immediately
         # ---------------------------------------------------------------------
         user_message_id = f"{conversation_id}_user_{int(time.time())}_{random.randint(1000,9999)}"
-        conversation_item['messages'].append({
+        user_message_doc = {
+            'id': user_message_id,
+            'conversation_id': conversation_id,
             'role': 'user',
             'content': user_message,
-            'model_deployment_name': None,
-            'message_id': user_message_id
-        })
+            'timestamp': datetime.utcnow().isoformat(),
+            'model_deployment_name': None
+        }
+        messages_container.upsert_item(user_message_doc)
 
         # Set conversation title if it's still the default
         if conversation_item.get('title', 'New Conversation') == 'New Conversation':
@@ -86,15 +96,12 @@ def register_route_backend_chats(app):
             conversation_item['title'] = new_title
 
         # If first message, optionally add default system prompt
-        if len(conversation_item['messages']) == 1 and settings.get('default_system_prompt'):
-            conversation_item['messages'].insert(0, {
-                'role': 'system',
-                'content': settings.get('default_system_prompt'),
-                'model_deployment_name': None
-            })
+        if conversation_item.get('title', 'New Conversation') == 'New Conversation':
+            short_title = (user_message[:30] + '...') if len(user_message) > 30 else user_message
+            conversation_item['title'] = short_title
 
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
-        container.upsert_item(body=conversation_item)
+        container.upsert_item(conversation_item)
 
         # ---------------------------------------------------------------------
         # 3) Check Content Safety (but DO NOT return 403).
@@ -135,7 +142,7 @@ def register_route_backend_chats(app):
                 if len(blocklist_matches) > 0:
                     blocked = True
                     block_reasons.append("Blocklist match")
-
+                
                 if blocked:
                     # Upsert to safety container
                     safety_item = {
@@ -169,18 +176,24 @@ def register_route_backend_chats(app):
 
                     # Insert a special "role": "safety" or "blocked"
                     safety_message_id = f"{conversation_id}_safety_{int(time.time())}_{random.randint(1000,9999)}"
-                    conversation_item['messages'].append({
+
+                    safety_doc = {
+                        'id': safety_message_id,
+                        'conversation_id': conversation_id,
                         'role': 'safety',
                         'content': blocked_msg_content.strip(),
-                        'model_deployment_name': None,
-                        'message_id': safety_message_id
-                    })
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'model_deployment_name': None
+                    }
+                    messages_container.upsert_item(safety_doc)
+
+                    # Update conversation's last_updated
                     conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                    container.upsert_item(body=conversation_item)
+                    container.upsert_item(conversation_item)
 
                     # Return a normal 200 with a special field: blocked=True
                     return jsonify({
-                        'reply': "Your message was blocked by content safety.",
+                        'reply': blocked_msg_content.strip(),
                         'blocked': True,
                         'triggered_categories': triggered_categories,
                         'blocklist_matches': blocklist_matches,
@@ -230,14 +243,19 @@ def register_route_backend_chats(app):
                 )
 
                 system_message_id = f"{conversation_id}_system_{int(time.time())}_{random.randint(1000,9999)}"
-                conversation_item['messages'].append({
+                system_doc = {
+                    'id': system_message_id,
+                    'conversation_id': conversation_id,
                     'role': 'system',
                     'content': system_prompt,
+                    'timestamp': datetime.utcnow().isoformat(),
                     'model_deployment_name': None,
-                    'message_id': system_message_id
-                })
+                }
+                messages_container.upsert_item(system_doc)
+
+                # Update conversation
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                container.upsert_item(body=conversation_item)
+                container.upsert_item(conversation_item)
 
         # Bing Search
         if bing_search_enabled:
@@ -261,15 +279,20 @@ def register_route_backend_chats(app):
                     "Assistant: The capital of France is Paris (Source: OfficialFrancePage) [https://url.com].\n\n"
                     f"{retrieved_content}"
                 )
-                system_message_id = f"{conversation_id}_system_{int(time.time())}_{random.randint(1000,9999)}"
-                conversation_item['messages'].append({
+                bind_search_message_id = f"{conversation_id}_bing_search_{int(time.time())}_{random.randint(1000,9999)}"
+                bing_search_doc = {
+                    'id': bind_search_message_id,
+                    'conversation_id': conversation_id,
                     'role': 'system',
                     'content': system_prompt,
+                    'timestamp': datetime.utcnow().isoformat(),
                     'model_deployment_name': None,
-                    'message_id': system_message_id
-                })
+                }
+                messages_container.upsert_item(bing_search_doc)
+
+                # Update conversation
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                container.upsert_item(body=conversation_item)
+                container.upsert_item(conversation_item)
 
         # Image Generation
         if image_gen_enabled:
@@ -313,20 +336,23 @@ def register_route_backend_chats(app):
                 generated_image_url = json.loads(image_response.model_dump_json())['data'][0]['url']
 
                 image_message_id = f"{conversation_id}_image_{int(time.time())}_{random.randint(1000,9999)}"
-                conversation_item['messages'].append({
+                image_doc = {
+                    'id': image_message_id,
+                    'conversation_id': conversation_id,
                     'role': 'image',
                     'content': generated_image_url,
                     'prompt': user_message,
                     'created_at': datetime.utcnow().isoformat(),
-                    'model_deployment_name': image_gen_model,
-                    'message_id': image_message_id
-                })
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'model_deployment_name': image_gen_model
+                }
+                messages_container.upsert_item(image_doc)
 
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                container.upsert_item(body=conversation_item)
+                container.upsert_item(conversation_item)
 
                 return jsonify({
-                    'reply': f"Here's your generated image: {generated_image_url}",
+                    'reply': "Image loading...",
                     'image_url': generated_image_url,
                     'conversation_id': conversation_id,
                     'conversation_title': conversation_item['title'],
@@ -334,35 +360,29 @@ def register_route_backend_chats(app):
                     'message_id': image_message_id
                 }), 200
             except Exception as e:
-                return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+                return jsonify({
+                    'error': f'Image generation failed: {str(e)}'
+                }), 500
+
+        # ---------------------------------------------------------------------
+        # 5) Prepare conversation history for GPT
+        # ---------------------------------------------------------------------
+        conversation_history_limit = settings.get('conversation_history_limit')
+        message_query = f"""
+                SELECT TOP {conversation_history_limit} * FROM c
+                WHERE c.conversation_id = '{conversation_id}'
+                ORDER BY c.timestamp DESC
+        """
+        latest_messages = list(messages_container.query_items(
+            query=message_query,
+            partition_key=conversation_id
+        ))
+        conversation_history = latest_messages
+
 
         # ---------------------------------------------------------------------
         # 5) GPT logic
         # ---------------------------------------------------------------------
-        conversation_history_limit = settings.get('conversation_history_limit', 10)
-        conversation_history = conversation_item['messages'][-conversation_history_limit:]
-
-        allowed_roles = ['system', 'assistant', 'user', 'function', 'tool']
-        conversation_history_for_api = []
-        for msg in conversation_history:
-            if msg['role'] in allowed_roles:
-                conversation_history_for_api.append(msg)
-            elif msg['role'] == 'file':
-                file_content = msg.get('file_content', '')
-                filename = msg.get('filename', 'uploaded_file')
-                max_file_content_length = 50000
-                if len(file_content) > max_file_content_length:
-                    file_content = file_content[:max_file_content_length] + '...'
-
-                system_message = {
-                    'role': 'system',
-                    'content': f"The user uploaded a file named '{filename}' with the following content:\n\n{file_content}\n\nPlease use this information to assist the user.",
-                    'model_deployment_name': None
-                }
-                conversation_history_for_api.append(system_message)
-            else:
-                # e.g. skip 'safety' messages from the prompt to GPT
-                continue
 
         # Decide GPT model
         if enable_gpt_apim:
@@ -395,6 +415,49 @@ def register_route_backend_chats(app):
                     selected_gpt_model = gpt_model_obj['selected'][0]
                     gpt_model = selected_gpt_model['deploymentName']
 
+
+        allowed_roles = ['system', 'assistant', 'user', 'function', 'tool']
+        translated_roles = ['file', 'image']
+        skipped_roles = ['safety', 'blocked']
+        conversation_history_for_api = []
+        for message in conversation_history:
+            if message['role'] in allowed_roles:
+                conversation_history_for_api.append(message)
+            elif message['role'] == 'file':
+                file_content = message.get('file_content', '')
+                filename = message.get('filename', 'uploaded_file')
+                if len(file_content) > max_file_content_length:
+                    summary_response = gpt_client.chat.completions.create(
+                        model=gpt_model,
+                        messages=[
+                            {
+                                'role': 'system',
+                                'content': (
+                                    "The user uploaded a file with the following content:\n\n"
+                                    f"{file_content}\n\n"
+                                    "Please summarize this content to fit within 50KB."
+                                )
+                            }
+                        ]
+                    )
+                    summarized_content = summary_response.choices[0].message.content
+
+                    system_message = {
+                        'role': 'system',
+                        'content': f"The user uploaded a file, larger than {max_file_content_length}, named '{filename}' with the following summarized content:\n\n{summarized_content}\n\nPlease use this information to assist the user.",
+                        'model_deployment_name': None
+                    }
+                    conversation_history_for_api.append(system_message)
+                else:
+                    system_message = {
+                        'role': 'system',
+                        'content': f"The user uploaded a file named '{filename}' with the following content:\n\n{file_content}\n\nPlease use this information to assist the user.",
+                        'model_deployment_name': None
+                    }
+                    conversation_history_for_api.append(system_message)
+            else:
+                continue
+
         try:
             response = gpt_client.chat.completions.create(
                 model=gpt_model,
@@ -403,18 +466,25 @@ def register_route_backend_chats(app):
             ai_message = response.choices[0].message.content
         except Exception as e:
             print(str(e))
-            return jsonify({'error': f'Error generating model response: {str(e)}'}), 500
+            return jsonify({
+                'error': f'Error generating model response: {str(e)}'
+            }), 500
 
         # 6) Save GPT response
         assistant_message_id = f"{conversation_id}_assistant_{int(time.time())}_{random.randint(1000,9999)}"
-        conversation_item['messages'].append({
+        assistant_doc = {
+            'id': assistant_message_id,
+            'conversation_id': conversation_id,
             'role': 'assistant',
             'content': ai_message,
-            'model_deployment_name': gpt_model,
-            'message_id': assistant_message_id
-        })
+            'timestamp': datetime.utcnow().isoformat(),
+            'model_deployment_name': gpt_model
+        }
+        messages_container.upsert_item(assistant_doc)
+
+        # Update conversation's last_updated
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
-        container.upsert_item(body=conversation_item)
+        container.upsert_item(conversation_item)
 
         # 7) Return final success
         return jsonify({

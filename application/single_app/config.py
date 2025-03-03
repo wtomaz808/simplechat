@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.203.15'
+app.config['VERSION'] = '0.206.4'
 Session(app)
 
 CLIENTS = {}
@@ -74,7 +74,7 @@ else:
     authority = AzureAuthorityHosts.AZURE_PUBLIC_CLOUD
     credential_scopes=[resource_manager + "/.default"]
 
-BING_SEARCH_ENDPOINT = os.getenv("BING_SEARCH_ENDPOINT")
+bing_search_endpoint = "https://api.bing.microsoft.com/"
 
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
@@ -93,6 +93,13 @@ container = database.create_container_if_not_exists(
     id=container_name,
     partition_key=PartitionKey(path="/id")
 )
+
+messages_container_name = "messages"
+messages_container = database.create_container_if_not_exists(
+    id=messages_container_name,
+    partition_key=PartitionKey(path="/conversation_id")
+)
+
 documents_container_name = "documents"
 documents_container = database.create_container_if_not_exists(
     id=documents_container_name,
@@ -139,6 +146,12 @@ archived_conversations_container_name = "archived_conversations"
 archived_conversations_container = database.create_container_if_not_exists(
     id=archived_conversations_container_name,
     partition_key=PartitionKey(path="/id")
+)
+
+archived_messages_container_name = "archived_messages"
+archived_messages_container = database.create_container_if_not_exists(
+    id=archived_messages_container_name,
+    partition_key=PartitionKey(path="/conversation_id")
 )
 
 prompts_container_name = "prompts"

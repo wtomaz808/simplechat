@@ -38,32 +38,36 @@ def register_route_frontend_chats(app):
         if not file.filename:
             return jsonify({'error': 'No selected file'}), 400
 
-        if not conversation_id or conversation_id.strip() == '':
+        if not conversation_id:
             conversation_id = str(uuid.uuid4())
             conversation_item = {
                 'id': conversation_id,
                 'user_id': user_id,
-                'messages': [],
-                'last_updated': datetime.utcnow().isoformat()
+                'last_updated': datetime.utcnow().isoformat(),
+                'title': 'New Conversation'
             }
+            container.upsert_item(conversation_item)
         else:
             try:
                 conversation_item = container.read_item(
                     item=conversation_id,
                     partition_key=conversation_id
                 )
-            except Exception:
+            except CosmosResourceNotFoundError:
                 conversation_id = str(uuid.uuid4())
                 conversation_item = {
                     'id': conversation_id,
                     'user_id': user_id,
-                    'messages': [],
-                    'last_updated': datetime.utcnow().isoformat()
+                    'last_updated': datetime.utcnow().isoformat(),
+                    'title': 'New Conversation'
                 }
+                container.upsert_item(conversation_item)
+            except Exception as e:
+                return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
         
         file.seek(0, os.SEEK_END)
         file_length = file.tell()
-        max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
+        max_file_size_bytes = settings.get('max_file_size_mb') * 1024 * 1024
         if file_length > max_file_size_bytes:
             return jsonify({'error': 'File size exceeds maximum allowed size'}), 400
         file.seek(0)
@@ -101,26 +105,29 @@ def register_route_frontend_chats(app):
             os.remove(temp_file_path)
 
         try:
+            file_message_id = f"{conversation_id}_file_{int(time.time())}_{random.randint(1000,9999)}"
             file_message = {
+                'id': file_message_id,
+                'conversation_id': conversation_id,
                 'role': 'file',
                 'filename': filename,
-                'file_id': str(uuid.uuid4()),
-                'timestamp': datetime.utcnow().isoformat(),
                 'file_content': extracted_content,
                 'is_table': is_table,
+                'timestamp': datetime.utcnow().isoformat(),
                 'model_deployment_name': None
             }
 
-            conversation_item['messages'].append(file_message)
+            messages_container.upsert_item(file_message)
+
             conversation_item['last_updated'] = datetime.utcnow().isoformat()
             container.upsert_item(conversation_item)
 
         except Exception as e:
-            return jsonify({'error': f'Error adding file to conversation: {str(e)}'}), 500
+            return jsonify({
+                'error': f'Error adding file to conversation: {str(e)}'
+            }), 500
 
-        response_data = {
+        return jsonify({
             'message': 'File added to the conversation successfully',
             'conversation_id': conversation_id
-        }
-
-        return jsonify(response_data), 200
+        }), 200

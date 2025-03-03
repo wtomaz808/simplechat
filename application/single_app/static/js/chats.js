@@ -430,7 +430,7 @@ function appendMessage(sender, messageContent, modelName = null, messageId = nul
         src="${messageContent}" 
         alt="Generated Image" 
         class="generated-image" 
-        style="width: 25%; cursor: pointer;"
+        style="width: 170px; height: 170px; cursor: pointer;"
         data-image-src="${messageContent}"
         onload="scrollChatToBottom()"
       />
@@ -461,7 +461,7 @@ function appendMessage(sender, messageContent, modelName = null, messageId = nul
     messageClass = "file-message";
     senderLabel = "File Added";
     const filename = messageContent.filename;
-    const fileId = messageContent.file_id;
+    const fileId = messageContent.id;
     messageContentHtml = `
       <a 
         href="#"
