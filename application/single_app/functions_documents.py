@@ -29,14 +29,9 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
     except Exception as e:
         raise e
     
-def process_document_and_store_chunks(extracted_content , file_name, user_id):
-    settings = get_settings()
-
-    chunks = chunk_text(extracted_content )
-
-    document_id = str(uuid.uuid4())
-    chunks = chunk_text(extracted_content )
-    num_chunks = len(chunks)
+def create_document(file_name, user_id, document_id, num_file_chunks, status):
+    current_time = datetime.now(timezone.utc)
+    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     existing_document_query = """
         SELECT c.version 
@@ -45,50 +40,255 @@ def process_document_and_store_chunks(extracted_content , file_name, user_id):
     """
     parameters = [{"name": "@file_name", "value": file_name}, {"name": "@user_id", "value": user_id}]
     
-    existing_document = list(documents_container.query_items(query=existing_document_query, parameters=parameters, enable_cross_partition_query=True))
+    try:
+        existing_document = list(documents_container.query_items(query=existing_document_query, parameters=parameters, enable_cross_partition_query=True))
+    except Exception as e:
+        print(f"Error querying existing document: {e}")
+        raise
 
     if existing_document:
         version = existing_document[0]['version'] + 1
     else:
         version = 1
 
-    current_time = datetime.now(timezone.utc)
+    try:
+        document_metadata = {
+            "id": document_id,
+            "file_name": file_name,
+            "user_id": user_id,
+            "num_chunks": 0,
+            "num_file_chunks": num_file_chunks,
+            "upload_date": formatted_time,
+            "last_updated": formatted_time,
+            "version": version,
+            "status": status,
+            "percentage_complete": 0,
+            "type": "document_metadata"
+        }
+        documents_container.upsert_item(document_metadata)
+    except Exception as e:
+        print(f"Error upserting document metadata: {e}")
+        raise
 
+def get_document_metadata(document_id, user_id):
+    try:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.user_id = @user_id AND c.id = @document_id
+        """
+        parameters = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@document_id", "value": document_id}
+        ]
+        
+        document_items = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+        
+        if not document_items:
+            return None
+        
+        return document_items[0]
+    except Exception as e:
+        print(f"Error retrieving document metadata: {e}")
+        return None
+    
+def update_document(**kwargs):
+    document_id     = kwargs.get('document_id')
+    user_id         = kwargs.get('user_id')
+    status          = kwargs.get('status')
+    author          = kwargs.get('author')
+    summary         = kwargs.get('summary')
+    keywords        = kwargs.get('keywords')
+    number_of_pages = kwargs.get('number_of_pages')
+    num_chunks      = kwargs.get('num_chunks')
+    version         = kwargs.get('version')
+    file_name       = kwargs.get('file_name')
+    title           = kwargs.get('title')
+    percentage_complete = kwargs.get('percentage_complete')
+
+    current_time = datetime.now(timezone.utc)
     formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    document_metadata = {
-        "id": document_id,
-        "num_chunks": num_chunks,
-        "file_name": file_name,
-        "user_id": user_id,
-        "upload_date": formatted_time,
-        "version": version,
-        "type": "document_metadata"
-    }
-    documents_container.upsert_item(document_metadata)
-    chunk_documents = []
+    try:
+        # Retrieve the existing document
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.user_id = @user_id AND c.id = @document_id
+        """
+        parameters = [
+            {"name": "@user_id", "value": user_id},
+            {"name": "@document_id", "value": document_id}
+        ]
+        
+        existing_documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
-    for idx, chunk_text_content in enumerate(chunks):
-        chunk_id = f"{document_id}_{idx}"
+        if not existing_documents:
+            raise CosmosResourceNotFoundError(f"Document {document_id} not found")
 
-        embedding = generate_embedding(chunk_text_content)
+        existing_document = existing_documents[0]
+
+        if status:
+            # Update the necessary fields
+            existing_document['status'] = status
+            existing_document['last_updated'] = formatted_time
+
+            if "Processing Complete" in status.lower():
+                existing_document['percentage_complete'] = 100
+            elif "failed" in status.lower():
+                existing_document['percentage_complete'] = 0
+            else:
+                if existing_document.get('percentage_complete', 0) >= 90:
+                    existing_document['percentage_complete'] = 90
+                else:
+                    existing_document['percentage_complete'] = existing_document.get('percentage_complete') + 1
+
+        if title:
+            existing_document['title'] = title
+
+        if author:
+            existing_document['author'] = author
+
+        if summary:
+            existing_document['summary'] = summary
+
+        if keywords:
+            existing_document['keywords'] = keywords
+        
+        if number_of_pages:
+            existing_document['number_of_pages'] = number_of_pages
+
+        if num_chunks:
+            existing_document['num_chunks'] = num_chunks
+
+        if version:
+            existing_document['version'] = version
+
+        if file_name:
+            existing_document['file_name'] = file_name
+
+        if percentage_complete:
+            existing_document['percentage_complete'] = percentage_complete
+
+
+        # Upsert the updated document
+        documents_container.upsert_item(existing_document)
+
+    except CosmosResourceNotFoundError as e:
+        print(f"Document {document_id} not found: {e}")
+        raise
+    except Exception as e:
+        print(f"Error updating document status for document {document_id}: {e}")
+        raise
+    
+def save_chunks(page_text_content, page_number, file_name, user_id, document_id):
+    """
+    Save a single chunk (one page) at a time:
+      - Generate embedding
+      - Build chunk metadata
+      - Upload to Search index
+    """
+    settings = get_settings()
+
+    current_time = datetime.now(timezone.utc)
+    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    try:
+        # Update document status
+        num_chunks = 1  # because we only have one chunk (page) here
+        status = f"Processing 1 chunk (page {page_number})"
+        update_document(document_id=document_id, user_id=user_id, status=status)
+
+        version = get_document_metadata(document_id, user_id)['version']
+        
+    except Exception as e:
+        print(f"Error updating document status or retrieving metadata for document {document_id}: {e}")
+        raise
+
+    # Generate embedding
+    try:
+        status = f"Generating embedding for page {page_number}"
+        update_document(document_id=document_id, user_id=user_id, status=status)
+        embedding = generate_embedding(page_text_content)
+    except Exception as e:
+        print(f"Error generating embedding for page {page_number} of document {document_id}: {e}")
+        raise
+
+    # Build chunk document
+    try:
+        chunk_id = f"{document_id}_{page_number}"
+        chunk_keywords = []
+        chunk_summary = ""
+        author = []
+        title = ""
 
         chunk_document = {
             "id": chunk_id,
             "document_id": document_id,
-            "chunk_id": str(idx),
-            "chunk_text": chunk_text_content,
+            "chunk_id": str(page_number),
+            "chunk_text": page_text_content,
             "embedding": embedding,
             "file_name": file_name,
             "user_id": user_id,
-            "chunk_sequence": idx,
+            "chunk_keywords": chunk_keywords,
+            "chunk_summary": chunk_summary,
+            "page_number": page_number,
+            "author": author,
+            "title": title,
+            "chunk_sequence": page_number,  # or you can keep an incremental idx
             "upload_date": formatted_time,
             "version": version
         }
-        chunk_documents.append(chunk_document)
+    except Exception as e:
+        print(f"Error creating chunk document for page {page_number} of document {document_id}: {e}")
+        raise
 
-    search_client_user = CLIENTS["search_client_user"]
-    search_client_user.upload_documents(documents=chunk_documents)
+    # Upload chunk document to Search
+    try:
+        status = f"Uploading page {page_number} of document {document_id} to index."
+        update_document(document_id=document_id, user_id=user_id, status=status)
+
+        search_client_user = CLIENTS["search_client_user"]
+        # Upload as a single-document list
+        search_client_user.upload_documents(documents=[chunk_document])
+    except Exception as e:
+        print(f"Error uploading chunk document for document {document_id}: {e}")
+        raise
+
+
+def get_pdf_page_count(pdf_path: str) -> int:
+    reader = PdfReader(pdf_path)
+    return len(reader.pages)
+
+def chunk_pdf(input_pdf_path: str, max_pages: int = 500) -> list:
+    """
+    Splits a PDF into multiple PDFs, each with up to `max_pages` pages.
+    Returns a list of file paths for the newly created chunks.
+    """
+    reader = PdfReader(input_pdf_path)
+    total_pages = len(reader.pages)
+    chunks = []
+    current_page = 0
+    chunk_index = 1
+
+    base_name, ext = os.path.splitext(input_pdf_path)
+
+    while current_page < total_pages:
+        writer = PdfWriter()
+        end_page = min(current_page + max_pages, total_pages)
+
+        for p in range(current_page, end_page):
+            writer.add_page(reader.pages[p])
+
+        chunk_pdf_path = f"{base_name}_chunk_{chunk_index}{ext}"
+        with open(chunk_pdf_path, "wb") as f:
+            writer.write(f)
+
+        chunks.append(chunk_pdf_path)
+        current_page = end_page
+        chunk_index += 1
+
+    return chunks
 
 def get_user_documents(user_id):
     try:

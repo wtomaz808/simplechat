@@ -13,6 +13,7 @@ import random
 import base64
 import markdown2
 import re
+import docx
 
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
 from werkzeug.utils import secure_filename
@@ -25,6 +26,8 @@ from threading import Thread
 from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
+from pypdf import PdfReader, PdfWriter
+
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -39,12 +42,13 @@ from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider, AzureAuthorityHosts
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
+from azure.storage.blob import BlobServiceClient
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.206.4'
+app.config['VERSION'] = '0.207.17'
 Session(app)
 
 CLIENTS = {}
@@ -75,6 +79,13 @@ else:
     credential_scopes=[resource_manager + "/.default"]
 
 bing_search_endpoint = "https://api.bing.microsoft.com/"
+
+user_documents_container_name = "user-documents"
+group_documents_container_name = "group-documents"
+user_video_files_container_name = "user-video-files"
+group_video_files_container_name = "group-video-files"
+user_audio_files_container_name = "user-audio-files"
+group_audio_files_container_name = "group-audio-files"
 
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
@@ -166,6 +177,12 @@ group_prompts_container = database.create_container_if_not_exists(
     partition_key=PartitionKey(path="/id")
 )
 
+file_processing_container_name = "file_processing"
+file_processing_container = database.create_container_if_not_exists(
+    id=file_processing_container_name,
+    partition_key=PartitionKey(path="/id")
+)
+
 def initialize_clients(settings):
     """
     Initialize/re-initialize all your clients based on the provided settings.
@@ -183,6 +200,10 @@ def initialize_clients(settings):
         enable_ai_search_apim = settings.get("enable_ai_search_apim")
         azure_apim_ai_search_endpoint = settings.get("azure_apim_ai_search_endpoint")
         azure_apim_ai_search_subscription_key = settings.get("azure_apim_ai_search_subscription_key")
+
+        enable_enhanced_citations = settings.get("enable_enhanced_citations")
+        enable_video_file_support = settings.get("enable_video_file_support")
+        enable_audio_file_support = settings.get("enable_audio_file_support")
 
         try:
             if enable_document_intelligence_apim:
@@ -279,3 +300,17 @@ def initialize_clients(settings):
         else:
             if "content_safety_client" in CLIENTS:
                 del CLIENTS["content_safety_client"]
+
+
+        try:
+            if enable_enhanced_citations:
+                office_docs_client = BlobServiceClient.from_connection_string(settings.get("office_docs_storage_account_url"))
+                CLIENTS["office_docs_client"] = office_docs_client
+                if enable_video_file_support:
+                    video_files_client = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
+                    CLIENTS["video_files_client"] = video_files_client
+                if enable_audio_file_support:
+                    audio_files_client = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
+                    CLIENTS["audio_files_client"] = audio_files_client
+        except Exception as e:
+            print(f"Failed to initialize Blob Storage clients: {e}")

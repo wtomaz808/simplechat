@@ -12,6 +12,10 @@ def extract_markdown_file(file_path):
         return f.read()
 
 def extract_content_with_azure_di(file_path):
+    """
+    Extracts text page-by-page using Azure Document Intelligence "prebuilt-read" 
+    and returns a list of dicts, each containing page_number and content.
+    """
     try:
         with open(file_path, "rb") as f:
             document_intelligence_client = CLIENTS['document_intelligence_client']
@@ -19,9 +23,10 @@ def extract_content_with_azure_di(file_path):
                 model_id="prebuilt-read",
                 document=f
             )
-        
+
         max_wait_time = 600
         start_time = time.time()
+        time.sleep(3)
 
         while True:
             status = poller.status()
@@ -29,23 +34,38 @@ def extract_content_with_azure_di(file_path):
                 break
             if time.time() - start_time > max_wait_time:
                 raise TimeoutError("Document analysis took too long.")
-            time.sleep(30)
+            time.sleep(10)
 
         result = poller.result()
-        extracted_content = ""
 
-        if result.content:
-            extracted_content = result.content
-        else:
+        # Build a list of pages. Each element is {"page_number": int, "content": str}
+        pages_data = []
+
+        if result.pages:
             for page in result.pages:
-                for line in page.lines:
-                    extracted_content += line.content + "\n"
-                extracted_content += "\n"
+                page_number = page.page_number
+                # Build text for this page by combining all lines
+                page_text = "\n".join(line.content for line in page.lines)
+                pages_data.append({
+                    "page_number": page_number,
+                    "content": page_text
+                })
+        else:
+            # Fallback if result.pages is empty but result.content is present
+            # This may happen if the doc is recognized as a single chunk
+            # or a scenario where lines/pages were not delineated
+            pages_data.append({
+                "page_number": 1,
+                "content": result.content if result.content else ""
+            })
 
-        return extracted_content
+        return pages_data
 
+    except HttpResponseError as e:
+        raise e
     except Exception as e:
-        raise
+        raise e
+
 
 def extract_table_file(file_path, file_ext):
     try:
@@ -61,13 +81,81 @@ def extract_table_file(file_path, file_ext):
     except Exception as e:
         raise
 
+def extract_pdf_metadata(pdf_path):
+    """
+    Returns a tuple (title, author) from the given PDF, using pypdf.
+    """
+    try:
+        reader = PdfReader(pdf_path)
+        meta = reader.metadata  # This is a DocumentInformation object
+        # Note: meta.title or meta.author could be None
+        pdf_title = meta.title or ""
+        pdf_author = meta.author or ""
+        return pdf_title, pdf_author
+    except Exception as e:
+        print(f"Error extracting PDF metadata: {e}")
+        return "", ""
+    
+def extract_docx_metadata(docx_path):
+    """
+    Returns a tuple (title, author) from the given DOCX, using python-docx.
+    """
+    try:
+        doc = docx.Document(docx_path)
+        core_props = doc.core_properties
+        doc_title = core_props.title or ''
+        doc_author = core_props.author or ''
+        return doc_title, doc_author
+    except Exception as e:
+        print(f"Error extracting DOCX metadata: {e}")
+        return '', ''
+
+def parse_authors(author_input):
+    """
+    Converts any input (None, string, list, comma-delimited, etc.)
+    into a list of author strings.
+    """
+    if not author_input:
+        # Covers None or empty string
+        return []
+
+    # If it's already a list, just return it (with stripping)
+    if isinstance(author_input, list):
+        return [a.strip() for a in author_input if a.strip()]
+
+    # Otherwise, assume it's a string and parse by common delimiters (comma, semicolon)
+    if isinstance(author_input, str):
+        # e.g. "John Doe, Jane Smith; Bob Brown"
+        authors = re.split(r'[;,]', author_input)
+        authors = [a.strip() for a in authors if a.strip()]
+        return authors
+
+    # If it's some other unexpected data type, fallback to empty
+    return []
+
+def convert_word_to_pdf(input_path: str, output_path: str):
+    """
+    Convert Word (.docx) file to PDF using the docx2pdf library.
+    """
+    try:
+        convert(input_path, output_path)
+        print(f"Successfully converted {input_path} to {output_path}")
+    except Exception as e:
+        print(f"Error converting {input_path} to PDF: {e}")
+        raise
+
 def chunk_text(text, chunk_size=2000, overlap=200):
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), chunk_size - overlap):
-        chunk = ' '.join(words[i:i + chunk_size])
-        chunks.append(chunk)
-    return chunks
+    try:
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), chunk_size - overlap):
+            chunk = ' '.join(words[i:i + chunk_size])
+            chunks.append(chunk)
+        return chunks
+    except Exception as e:
+        # Log the exception or handle it as needed
+        print(f"Error in chunk_text: {e}")
+        raise e  # Re-raise the exception to propagate it
 
 def generate_embedding(
     text,
