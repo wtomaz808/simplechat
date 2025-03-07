@@ -1,14 +1,11 @@
 <!-- templates/workspace.html -->
-{% extends "base.html" %}
-{% block title %}
-  Your Workspace - {{ app_settings.app_title }}
-{% endblock %}
-
-{% block head %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css">
-{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %} Your Workspace - {{
+app_settings.app_title }} {% endblock %} {% block head %}
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css"
+/>
+{% endblock %} {% block content %}
 
 <div class="container">
   <h2>Your Workspace</h2>
@@ -56,14 +53,14 @@
     >
       <div class="card p-3 my-3">
         <h5>Your Documents</h5>
-        <p class="text-muted">
-          Note: Only you can see documents you upload.
-        </p>
+        <p class="text-muted">Note: Only you can see documents you upload.</p>
 
         <!-- Document Upload Form -->
         <div class="mb-3">
           <input type="file" id="file-input" />
-          <button id="upload-btn" class="btn btn-primary">Upload Document</button>
+          <button id="upload-btn" class="btn btn-primary">
+            Upload Document
+          </button>
         </div>
 
         <!-- Documents List -->
@@ -93,11 +90,11 @@
     >
       <div class="card p-3 my-3">
         <h5>Your Prompts</h5>
-        <p class="text-muted">
-          Create and manage personal prompts here.
-        </p>
+        <p class="text-muted">Create and manage personal prompts here.</p>
         <div class="mb-3">
-          <button id="create-prompt-btn" class="btn btn-success">New Prompt</button>
+          <button id="create-prompt-btn" class="btn btn-success">
+            New Prompt
+          </button>
         </div>
 
         <table class="table table-striped" id="prompts-table">
@@ -146,7 +143,7 @@
   aria-hidden="true"
 >
   <!-- Use modal-xl and optionally a custom style for ~80% width -->
-  <div class="modal-dialog modal-xl" style="max-width: 80%;">
+  <div class="modal-dialog modal-xl" style="max-width: 80%">
     <form id="prompt-form">
       <div class="modal-content">
         <div class="modal-header">
@@ -171,7 +168,9 @@
             />
           </div>
           <div class="mb-3">
-            <label for="prompt-content" class="form-label">Prompt Content</label>
+            <label for="prompt-content" class="form-label"
+              >Prompt Content</label
+            >
             <textarea
               class="form-control"
               id="prompt-content"
@@ -190,9 +189,7 @@
   </div>
 </div>
 
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 
 <script>
@@ -200,7 +197,9 @@
   const fileInput = document.getElementById("file-input");
   const uploadBtn = document.getElementById("upload-btn");
   const documentsTableBody = document.querySelector("#documents-table tbody");
-  const loadingModal = new bootstrap.Modal(document.getElementById("loadingModal"));
+  const loadingModal = new bootstrap.Modal(
+    document.getElementById("loadingModal")
+  );
 
   function fetchUserDocuments() {
     fetch("/api/documents")
@@ -215,8 +214,12 @@
             <td>${doc.version}</td>
             <td>${doc.num_chunks}</td>
             <td>
-              <button class="btn btn-sm btn-danger" onclick="deleteDocument('${doc.id}')">Delete</button>
-              <button class="btn btn-sm btn-primary" onclick="redirectToChat('${doc.id}')">Search in Chat</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteDocument('${
+                doc.id
+              }')">Delete</button>
+              <button class="btn btn-sm btn-primary" onclick="redirectToChat('${
+                doc.id
+              }')">Search in Chat</button>
             </td>
           `;
           documentsTableBody.appendChild(row);
@@ -243,28 +246,44 @@
       method: "POST",
       body: formData,
     })
-      .then((response) => {
-        // Clone the response so we can parse errors safely
-        const cloned = response.clone();
-        return cloned.json().then((data) => {
-          if (!response.ok) {
-            alert("Error uploading document: " + (data.error || "Unknown error"));
-            throw new Error(data.error || "Upload failed");
-          }
-          return data;
-        });
-      })
+      .then((r) => r.json())
       .then((data) => {
-        alert(data.message);
-        fetchUserDocuments();
+        if (data.document_id) {
+          // Start polling for status
+          const docId = data.document_id;
+          pollDocumentStatus(docId);
+        }
       })
-      .catch((error) => {
-        console.error("Error uploading document:", error);
-      })
-      .finally(() => {
-        loadingModal.hide();
-        fileInput.value = "";
-      });
+      .catch(console.error);
+
+    function pollDocumentStatus(documentId) {
+      // e.g. poll every 3s
+      const pollInterval = setInterval(() => {
+        fetch(`/api/documents/${documentId}`)
+          .then((r) => r.json())
+          .then((doc) => {
+            if (doc.error) {
+              clearInterval(pollInterval);
+              alert("Error retrieving doc status: " + doc.error);
+              return;
+            }
+            console.log("Doc status:", doc.status, doc.percentage_complete);
+
+            if (
+              doc.status === "Processing complete" ||
+              doc.percentage_complete === 100
+            ) {
+              clearInterval(pollInterval);
+              alert("Upload complete!");
+              fetchUserDocuments();
+            }
+          })
+          .catch((err) => {
+            console.error(err);
+            clearInterval(pollInterval);
+          });
+      }, 3000);
+    }
   });
 
   function deleteDocument(documentId) {
@@ -299,7 +318,9 @@
 
   // -------------- Prompts --------------
   const promptsTableBody = document.querySelector("#prompts-table tbody");
-  const promptModalEl = new bootstrap.Modal(document.getElementById("promptModal"));
+  const promptModalEl = new bootstrap.Modal(
+    document.getElementById("promptModal")
+  );
   const promptForm = document.getElementById("prompt-form");
   const promptIdEl = document.getElementById("prompt-id");
   const promptNameEl = document.getElementById("prompt-name");

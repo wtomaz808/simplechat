@@ -27,6 +27,7 @@ from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
 from pypdf import PdfReader, PdfWriter
+from flask_executor import Executor
 
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
@@ -46,9 +47,14 @@ from azure.storage.blob import BlobServiceClient
 
 app = Flask(__name__)
 
+app.config['EXECUTOR_TYPE'] = 'thread'
+app.config['EXECUTOR_MAX_WORKERS'] = 30  # or whatever you need
+executor = Executor()
+executor.init_app(app)
+
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.17'
+app.config['VERSION'] = '0.207.18'
 Session(app)
 
 CLIENTS = {}
