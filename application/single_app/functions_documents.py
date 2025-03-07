@@ -681,6 +681,7 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
                     update_document(
                         document_id=document_id,
                         user_id=user_id,
+                        num_chunks=len(pages),
                         status=f"error: failed to extract {chunk_filename}, {file_chunk_index} of {num_file_chunks}. {str(e)}"
                     )
                     return jsonify({'error': f'Error extracting file: {str(e)}'}), 500
@@ -694,7 +695,6 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
                         update_document(
                             document_id=document_id,
                             user_id=user_id,
-                            num_chunks=pages,
                             status=f"Saving page {page_number} from {chunk_filename}, {file_chunk_index} of {num_file_chunks}."
                         )
                         
