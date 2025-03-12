@@ -308,14 +308,33 @@
         "name": "nexus-user-index-semantic-configuration",
         "prioritizedFields": {
           "titleField": {
-            "fieldName": "file_name"
+            "fieldName": "title"
           },
           "prioritizedContentFields": [
+            {
+              "fieldName": "file_name"
+            },
+            {
+              "fieldName": "title"
+            },
+            {
+              "fieldName": "chunk_summary"
+            },
+            {
+              "fieldName": "chunk_keywords"
+            },
+            {
+              "fieldName": "author"
+            },
             {
               "fieldName": "chunk_text"
             }
           ],
-          "prioritizedKeywordsFields": []
+          "prioritizedKeywordsFields": [
+            {
+              "fieldName": "chunk_keywords"
+            }
+          ]
         }
       }
     ]

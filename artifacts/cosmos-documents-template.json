@@ -2,7 +2,7 @@
     "id": "<unique-document-id>",
     "num_chunks": 0,
     "file_name": "<file-name>",
-    "user_id or group_id": "<unique-user-id> or <unique-group-id>",
+    "user_id": "<unique-user-id>",
     "upload_date": "<ISO-8601-upload-timestamp>",
     "version": 1,
     "author": [

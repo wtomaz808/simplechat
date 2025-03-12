@@ -3,6 +3,7 @@
 from config import *
 from functions_content import *
 from functions_settings import *
+from functions_search import *
 
 def allowed_file(filename, allowed_extensions=None):
     if not allowed_extensions:
@@ -28,6 +29,25 @@ def add_system_message_to_conversation(conversation_id, user_id, content):
 
     except Exception as e:
         raise e
+    
+
+def add_file_task_to_file_processing_log(document_id, user_id, content):
+    settings = get_settings()
+    enable_file_processing_log = settings.get('enable_file_processing_log', True)
+
+    if enable_file_processing_log:
+        try:
+            id_value = str(uuid.uuid4())
+            log_item = {
+                "id": id_value,
+                "document_id": document_id,
+                "user_id": user_id,
+                "log": content,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            file_processing_container.create_item(log_item)
+        except Exception as e:
+            raise e
     
 def create_document(file_name, user_id, document_id, num_file_chunks, status):
     current_time = datetime.now(timezone.utc)
@@ -66,6 +86,13 @@ def create_document(file_name, user_id, document_id, num_file_chunks, status):
             "type": "document_metadata"
         }
         documents_container.upsert_item(document_metadata)
+
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Document {file_name} created."
+        )
+
     except Exception as e:
         print(f"Error upserting document metadata: {e}")
         raise
@@ -93,19 +120,24 @@ def get_document_metadata(document_id, user_id):
         return None
     
 def update_document(**kwargs):
-    document_id     = kwargs.get('document_id')
-    user_id         = kwargs.get('user_id')
-    status          = kwargs.get('status')
-    author          = kwargs.get('author')
-    summary         = kwargs.get('summary')
-    keywords        = kwargs.get('keywords')
-    number_of_pages = kwargs.get('number_of_pages')
-    num_chunks      = kwargs.get('num_chunks')
-    version         = kwargs.get('version')
-    file_name       = kwargs.get('file_name')
-    title           = kwargs.get('title')
-    percentage_complete = kwargs.get('percentage_complete')
-    current_chunk   = kwargs.get('current_chunk')
+    document_id             = kwargs.get('document_id')
+    user_id                 = kwargs.get('user_id')
+    status                  = kwargs.get('status')
+    authors                 = kwargs.get('authors')
+    abstract                = kwargs.get('abstract')
+    keywords                = kwargs.get('keywords')
+    number_of_pages         = kwargs.get('number_of_pages')
+    num_chunks              = kwargs.get('num_chunks')
+    version                 = kwargs.get('version')
+    number_of_file_chunks   = kwargs.get('number_of_file_chunks')
+    file_name               = kwargs.get('file_name')
+    title                   = kwargs.get('title')
+    publication_date        = kwargs.get('publication_date')
+    percentage_complete     = kwargs.get('percentage_complete')
+    current_page            = kwargs.get('current_page')
+    current_file_chunk      = kwargs.get('current_file_chunk')
+    organization            = kwargs.get('organization')
+    enhanced_citations      = kwargs.get('enhanced_citations')
 
     current_time = datetime.now(timezone.utc)
     formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -147,11 +179,11 @@ def update_document(**kwargs):
         if title:
             existing_document['title'] = title
 
-        if author:
-            existing_document['author'] = author
+        if authors:
+            existing_document['authors'] = authors
 
-        if summary:
-            existing_document['summary'] = summary
+        if abstract:
+            existing_document['abstract'] = abstract
 
         if keywords:
             existing_document['keywords'] = keywords
@@ -171,6 +203,23 @@ def update_document(**kwargs):
         if percentage_complete:
             existing_document['percentage_complete'] = percentage_complete
 
+        if publication_date:
+            existing_document['publication_date'] = publication_date
+
+        if number_of_file_chunks:
+            existing_document['number_of_file_chunks'] = number_of_file_chunks
+
+        if current_page:
+            existing_document['current_page'] = current_page
+
+        if current_file_chunk:
+            existing_document['current_file_chunk'] = current_file_chunk
+
+        if enhanced_citations:
+            existing_document['enhanced_citations'] = enhanced_citations
+
+        if organization:
+            existing_document['organization'] = organization
 
         # Upsert the updated document
         documents_container.upsert_item(existing_document)
@@ -294,7 +343,7 @@ def chunk_pdf(input_pdf_path: str, max_pages: int = 500) -> list:
 def get_user_documents(user_id):
     try:
         query = """
-            SELECT c.file_name, c.id, c.upload_date, c.user_id, c.num_chunks ,c.version
+            SELECT *
             FROM c
             WHERE c.user_id = @user_id
         """
@@ -430,21 +479,60 @@ def delete_user_document_chunks(document_id):
     except Exception as e:
         raise
 
-def delete_user_document_version(user_id, document_id, version):
-    query = """
-        SELECT c.id 
-        FROM c 
-        WHERE c.id = @document_id AND c.user_id = @user_id AND c.version = @version
+def delete_user_document(user_id, document_id):
     """
-    parameters = [
-        {"name": "@document_id", "value": document_id},
-        {"name": "@user_id", "value": user_id},
-        {"name": "@version", "value": version}
-    ]
-    documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+    Delete a document from the user's documents in Cosmos DB
+    and remove any associated blobs in storage whose metadata
+    matches the user_id and document_id.
+    """
+    try:
+        # 1. Verify the document is owned by this user
+        document_item = documents_container.read_item(
+            item=document_id,
+            partition_key=document_id
+        )
+        if document_item.get('user_id') != user_id:
+            raise Exception("Unauthorized access to document")
 
-    for doc in documents:
-        documents_container.delete_item(doc['id'], partition_key=doc['user_id'])
+        # 2. Delete from Cosmos DB
+        documents_container.delete_item(
+            item=document_id,
+            partition_key=document_id
+        )
+
+        # 3. Delete matching blobs from Azure Storage
+        blob_service_client = CLIENTS.get("office_docs_client")
+        container_client = blob_service_client.get_container_client(
+            user_documents_container_name
+        )
+
+        # List only blobs in "user_id/" prefix:
+        prefix = f"{user_id}/"
+        blob_list = container_client.list_blobs(name_starts_with=prefix)
+
+        for blob_item in blob_list:
+            # We need to retrieve the blob’s metadata to check document_id
+            blob_client = container_client.get_blob_client(blob_item.name)
+            properties = blob_client.get_blob_properties()
+            blob_metadata = properties.metadata or {}
+
+            # Compare metadata for user_id and document_id
+            if (
+                blob_metadata.get('user_id') == str(user_id)
+                and blob_metadata.get('document_id') == str(document_id)
+            ):
+                # This blob belongs to the same doc & user => Delete
+                container_client.delete_blob(blob_item.name)
+
+        return {"message": "Document and associated blobs deleted successfully."}
+
+    except CosmosResourceNotFoundError:
+        raise Exception("Document not found")
+    except Exception as e:
+        # You can raise or return a custom JSON error
+        raise Exception(f"Error during delete: {str(e)}")
+
+
 
 def delete_user_document_version_chunks(document_id, version):
     search_client_user = CLIENTS["search_client_user"]
@@ -494,17 +582,312 @@ def detect_doc_type(document_id, user_id=None):
         if user_id and doc_item.get('user_id') != user_id:
             pass
         else:
-            return "user"
+            return "personal", doc_item['user_id']
     except:
         pass
 
     try:
         group_doc_item = group_documents_container.read_item(document_id, partition_key=document_id)
-        return "group"
+        return "group", group_doc_item['group_id']
     except:
         pass
 
     return None
+
+def extract_document_metadata(document_id, user_id):
+
+    settings = get_settings()
+    enable_gpt_apim = settings.get('enable_gpt_apim', False)
+    enable_user_workspace = settings.get('enable_user_workspace', False)
+    enable_group_workspaces = settings.get('enable_group_workspaces', False)
+
+    add_file_task_to_file_processing_log(
+        document_id, 
+        user_id, 
+        f"Querying metadata for document {document_id} and user {user_id}"
+    )
+    
+    # Example structure for reference
+    meta_data_example = {
+        "title": "Title here",
+        "authors": ["Author 1", "Author 2"],
+        "organization": "Organization or Unknown",
+        "publication_date": "MM/YYYY or N/A",
+        "keywords": ["keyword1", "keyword2"],
+        "abstract": "two sentence abstract"
+    }
+    
+    # Pre-initialize metadata dictionary
+    meta_data = {
+        "title": "",
+        "authors": [],
+        "organization": "",
+        "publication_date": "",
+        "keywords": [],
+        "abstract": ""
+    }
+
+    # --- Step 1: Retrieve document from Cosmos ---
+    try:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.id = @document_id AND c.user_id = @user_id
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@user_id", "value": user_id}
+        ]
+        document_items = list(documents_container.query_items(
+            query=query, 
+            parameters=parameters, 
+            enable_cross_partition_query=True
+        ))
+
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Retrieved document items for document {document_id}: {document_items}"
+        )
+    
+    except Exception as e:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Error querying document items for document {document_id}: {e}"
+        )
+        print(f"Error querying document items for document {document_id}: {e}")
+
+    if not document_items:
+        return None
+
+    document_metadata = document_items[0]
+    
+    # --- Step 2: Populate meta_data from DB ---
+    if "title" in document_metadata:
+        meta_data["title"] = document_metadata["title"]
+    if "authors" in document_metadata:
+        meta_data["authors"] = document_metadata["authors"]
+    if "organization" in document_metadata:
+        meta_data["organization"] = document_metadata["organization"]
+    if "publication_date" in document_metadata:
+        meta_data["publication_date"] = document_metadata["publication_date"]
+    if "keywords" in document_metadata:
+        meta_data["keywords"] = document_metadata["keywords"]
+    if "abstract" in document_metadata:
+        meta_data["abstract"] = document_metadata["abstract"]
+
+    add_file_task_to_file_processing_log(
+        document_id, 
+        user_id, 
+        f"Extracted metadata for document {document_id}, metadata: {meta_data}"
+    )
+
+    # --- Step 3: Content Safety Check (if enabled) ---
+    if settings.get('enable_content_safety') and "content_safety_client" in CLIENTS:
+        content_safety_client = CLIENTS["content_safety_client"]
+        blocked = False
+        block_reasons = []
+        triggered_categories = []
+        blocklist_matches = []
+
+        try:
+            # For demonstration, we only check 'title'. 
+            # Consider checking more fields if needed.
+            request_obj = AnalyzeTextOptions(text=json.dumps(meta_data))
+            cs_response = content_safety_client.analyze_text(request_obj)
+
+            max_severity = 0
+            for cat_result in cs_response.categories_analysis:
+                triggered_categories.append({
+                    "category": cat_result.category,
+                    "severity": cat_result.severity
+                })
+                if cat_result.severity > max_severity:
+                    max_severity = cat_result.severity
+
+            if cs_response.blocklists_match:
+                for match in cs_response.blocklists_match:
+                    blocklist_matches.append({
+                        "blocklistName": match.blocklist_name,
+                        "blocklistItemId": match.blocklist_item_id,
+                        "blocklistItemText": match.blocklist_item_text
+                    })
+
+            if max_severity >= 4:
+                blocked = True
+                block_reasons.append("Max severity >= 4")
+            if blocklist_matches:
+                blocked = True
+                block_reasons.append("Blocklist match")
+            
+            if blocked:
+                add_file_task_to_file_processing_log(
+                    document_id, 
+                    user_id, 
+                    f"Blocked document metadata: {document_metadata}, reasons: {block_reasons}"
+                )
+                # Log or handle blocked content
+                print(f"Blocked document metadata: {document_metadata}\nReasons: {block_reasons}")
+                return None
+
+        except Exception as e:
+            add_file_task_to_file_processing_log(
+                document_id, 
+                user_id, 
+                f"Error checking content safety for document metadata: {e}"
+            )
+            print(f"Error checking content safety for document metadata: {e}")
+
+    # --- Step 4: Optional Bing Search ---
+    try:
+        if enable_user_workspace or enable_group_workspaces:
+            add_file_task_to_file_processing_log(
+                document_id, 
+                user_id, 
+                f"Processing Hybrid search for document {document_id} using json dump of metadata {json.dumps(meta_data)}"
+            )
+
+            document_scope, id = detect_doc_type(document_id, user_id)
+            if document_scope == "personal":
+                search_results = hybrid_search(json.dumps(meta_data), user_id, document_id=document_id, top_n=10, doc_scope=document_scope)
+            elif document_scope == "group":
+                search_results = hybrid_search(json.dumps(meta_data), user_id, document_id=document_id, top_n=10, doc_scope=document_scope, active_group_id=id)
+            add_file_task_to_file_processing_log(
+                document_id, 
+                user_id, 
+                f"Hybrid search results for document {document_id}: {search_results}"
+            )
+        else:
+            search_results = "No Hybrid results"
+    except Exception as e:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Error processing Bing search for document {document_id}: {e}"
+        )
+        print(f"Error processing Bing search for document {document_id}: {e}")
+        bing_results = "No Bing results"
+
+    # --- Step 5: Prepare GPT Client ---
+    if enable_gpt_apim:
+        # Apim-based GPT client
+        gpt_model = settings.get('azure_apim_gpt_deployment')
+        gpt_client = AzureOpenAI(
+            api_version=settings.get('azure_apim_gpt_api_version'),
+            azure_endpoint=settings.get('azure_apim_gpt_endpoint'),
+            api_key=settings.get('azure_apim_gpt_subscription_key')
+        )
+    else:
+        # Standard Azure OpenAI approach
+        if settings.get('azure_openai_gpt_authentication_type') == 'managed_identity':
+            token_provider = get_bearer_token_provider(
+                DefaultAzureCredential(), 
+                "https://cognitiveservices.azure.com/.default"
+            )
+            gpt_client = AzureOpenAI(
+                api_version=settings.get('azure_openai_gpt_api_version'),
+                azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
+                azure_ad_token_provider=token_provider
+            )
+        else:
+            gpt_client = AzureOpenAI(
+                api_version=settings.get('azure_openai_gpt_api_version'),
+                azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
+                api_key=settings.get('azure_openai_gpt_key')
+            )
+
+        # Retrieve the selected deployment name if provided
+        gpt_model_obj = settings.get('gpt_model', {})
+        if gpt_model_obj and gpt_model_obj.get('selected'):
+            selected_gpt_model = gpt_model_obj['selected'][0]
+            gpt_model = selected_gpt_model['deploymentName']
+
+
+    # --- Step 6: GPT Prompt and JSON Parsing ---
+    # Construct messages in the recommended chat format
+    try:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id,
+            f"Processing GPT request for document {document_id}"
+        )
+        messages = [
+            {"role": "system", "content": "You are an AI assistant that extracts metadata. Return valid JSON."},
+            {
+                "role": "user", 
+                "content": (
+                f"Search results from AI search index:\n{search_results}\n\n"
+                f"Current known metadata:\n{json.dumps(meta_data, indent=2)}\n\n"
+                f"Desired metadata structure:\n{json.dumps(meta_data_example, indent=2)}\n\n"
+                "Please fill in any missing values. Return only JSON."
+                )
+            }
+        ]
+
+        response = gpt_client.chat.completions.create(model=gpt_model, messages=messages)
+        
+    except Exception as e:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Error processing GPT request for document {document_id}: {e}"
+        )
+        print(f"Error processing GPT request for document {document_id}: {e}")
+        return meta_data
+    
+    if not response:
+        return meta_data  # or None, depending on your logic
+
+    response_content = response.choices[0].message.content
+    add_file_task_to_file_processing_log(
+        document_id, 
+        user_id, 
+        f"GPT response for document {document_id}: {response_content}"
+    )
+    try:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id,
+            f"Decoding JSON from response for document {document_id}"
+        )
+        cleaned_output = clean_json_codeFence(response_content)
+        response_json = json.loads(cleaned_output)  
+    except json.JSONDecodeError as e:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id,   
+            f"Error decoding JSON from response for document {document_id}: {e}"
+        )
+        print(f"Error decoding JSON from response: {e}")
+        return meta_data  # or None
+
+    # --- Step 7: Merge GPT Output with Existing Metadata ---
+    meta_data["title"] = meta_data["title"] or response_json.get("title", "Unknown")
+    meta_data["authors"] = meta_data["authors"] or response_json.get("authors", []) or [meta_data["organization"]] or ["Unknown"]
+    meta_data["organization"] = meta_data["organization"] or response_json.get("organization", "Unknown")
+    meta_data["publication_date"] = meta_data["publication_date"] or response_json.get("publication_date", "Unknown")
+    meta_data["keywords"] = meta_data["keywords"] or response_json.get("keywords", [])
+    meta_data["abstract"] = meta_data["abstract"] or response_json.get("abstract", "")
+
+    add_file_task_to_file_processing_log(
+        document_id, 
+        user_id, 
+        f"Final metadata for document {document_id}: {meta_data}"
+    )
+
+    return meta_data
+
+def clean_json_codeFence(response_content: str) -> str:
+    """
+    Removes leading and trailing triple-backticks or code fences from a string 
+    so that it can be parsed as JSON.
+    """
+    # This regex looks for ``` or ```json followed by optional whitespace/newlines, 
+    # and removes them, as well as trailing ``` on its own line.
+    cleaned = re.sub(r"^```(?:json)?\s*", "", response_content.strip(), flags=re.IGNORECASE | re.MULTILINE)
+    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    return cleaned.strip()
 
 def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
     """
@@ -513,192 +896,242 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
     """
     settings = get_settings()
     enable_enhanced_citations = settings.get('enable_enhanced_citations')
+    enable_extract_meta_data = settings.get('enable_extract_meta_data')
     max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
     di_limit_bytes = 500 * 1024 * 1024
     di_page_limit = 2000
 
     file_ext = os.path.splitext(original_filename)[-1].lower()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-        doc_title = ''
-        doc_author = ''
+    # We'll read metadata from the temp file (for PDF, docx, etc.)
+    doc_title = ''
+    doc_author = ''
+    doc_subject = None
+    doc_keywords = None
 
-        if file_ext in ['.pdf', '.docx', '.xlsx', '.pptx', '.html', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif']:
+    try:
+        # Attempt to get some metadata if it's one of our known doc types
+        if file_ext in [
+            '.pdf', '.docx', '.doc', '.xlsx', '.pptx',
+            '.html', '.jpg', '.jpeg', '.png', '.bmp',
+            '.tiff', '.tif', '.heif'
+        ]:
+            # extract metadata
             if file_ext == '.pdf':
-                    doc_title, doc_author = extract_pdf_metadata(temp_file_path)
-                    doc_authors_list = parse_authors(doc_author)
-            
-            if file_ext == '.docx' or file_ext == '.doc':
-                    doc_title, doc_author = extract_docx_metadata(temp_file_path)
-                    doc_authors_list = parse_authors(doc_author)
+                doc_title, doc_author, doc_subject, doc_keywords = extract_pdf_metadata(temp_file_path)
+                doc_authors_list = parse_authors(doc_author)
 
-            try:
-                # Step 2: If it's PDF (or now a converted PDF), check pages
-                page_count = 0
-                file_size = os.path.getsize(temp_file_path)
-            except Exception as e:
-                return jsonify({'error': f'Error checking file size/page count: {str(e)}'}), 500
+            elif file_ext in ('.docx', '.doc'):
+                doc_title, doc_author = extract_docx_metadata(temp_file_path)
+                doc_authors_list = parse_authors(doc_author)
 
-            try:
-                if file_ext == '.pdf':
-                    page_count = get_pdf_page_count(temp_file_path)
-            except Exception as e:
-                return jsonify({'error': f'Error checking PDF page count: {str(e)}'}), 500
+            # Retrieve file size, (optionally) page count
+            page_count = 0
+            file_size = os.path.getsize(temp_file_path)
+            if file_ext == '.pdf':
+                page_count = get_pdf_page_count(temp_file_path)
 
-            # Step 3: Validate the file against "enhanced citations" logic
-            #         If false => must be <= 500MB, <= 2000 pages, <= max_file_size_bytes
-            if not enable_enhanced_citations:
-                try:
-                    if (file_size > di_limit_bytes or 
-                        page_count > di_page_limit or 
-                        file_size > max_file_size_bytes):
-                        # Not supported in non-enhanced mode
-                        return jsonify({
-                            'error': f'File exceeds non-enhanced citations limits (max 500MB/{di_page_limit} pages/{max_file_size_bytes} bytes).'
-                        }), 400
-                    
-                    # Otherwise, we send the entire file directly to DI
-                    # No chunking in this mode
-                    file_paths_to_process = [temp_file_path]
-                except Exception as e:
-                    return jsonify({'error': f'Error processing file that exceeds non-enhanced limits: {str(e)}'}), 500
-            
-            else:
-                # Enhanced citations enabled
-                # We can handle large files up to max_file_size_bytes
-                if file_size > max_file_size_bytes:
-                    return jsonify({
-                        'error': f'File exceeds maximum size of {max_file_size_bytes} bytes in enhanced mode.'
-                    }), 400
-                
-                # If the file is <= 500MB and <= 2000 pages, no chunk needed
-                if file_size <= di_limit_bytes and page_count <= di_page_limit:
-                    try:
-                        file_paths_to_process = [temp_file_path]
-                    except Exception as e:
-                        return jsonify({'error': f'Error processing file that does not need chunking: {str(e)}'}), 500
-                else:
-                    # If it's bigger than 500MB or more than 2000 pages, chunk it in 500-page slices.
-                    if file_ext == '.pdf':
-                        try:
-                            file_paths_to_process = chunk_pdf(temp_file_path, max_pages=500)
-                            # Clean up original big PDF if chunking is successful
-                            if os.path.exists(temp_file_path):
-                                os.remove(temp_file_path)
-                        except Exception as e:
-                            return jsonify({'error': f'Error chunking PDF that exceeds 500MB/2000 pages: {str(e)}'}), 500
-                    else:
-                        # If it's not PDF but somehow we got here—shouldn't happen if we always convert docx -> pdf
-                        return jsonify({'error': 'Only PDF chunking is supported.'}), 400
-        
-            
-            # Create or update the "parent" document metadata
-            # We'll store total chunk count for front-end to know
-            num_file_chunks = len(file_paths_to_process)
-            
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                num_file_chunks=num_file_chunks,
-                status=f"Processing {temp_file_path} with {num_file_chunks} chunk(s)"
-            )
-
+            # Update cosmos doc with known metadata
             if doc_title:
                 update_document(
                     document_id=document_id,
                     user_id=user_id,
                     title=doc_title
                 )
-
-            if doc_authors_list:
+            if doc_author:
                 update_document(
                     document_id=document_id,
                     user_id=user_id,
-                    authors=doc_authors_list
+                    authors=doc_author
                 )
-
-            # Now loop over each chunk (or single file if no chunking)
-            file_chunk_index = 1
-            for chunk_path in file_paths_to_process:
-
+            if doc_subject:
                 update_document(
                     document_id=document_id,
                     user_id=user_id,
-                    status=f"Processing file chunk {chunk_path}, chunk {file_chunk_index} of {num_file_chunks}"
+                    abstract=doc_subject
                 )
-                
-                try:
-                    # Build chunked document ID if multiple chunks
-                    if num_file_chunks > 1:
-                        chunk_document_id = f"{document_id}-chunk-{file_chunk_index}"
+            if doc_keywords:
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    keywords=doc_keywords
+                )
+
+            # ---------------------------
+            # Check Enhanced Citations?
+            # ---------------------------
+            if not enable_enhanced_citations:
+                # Non-enhanced mode: must be <= 500MB, <= 2000 pages, and <= max_file_size_bytes
+                if (file_size > di_limit_bytes or 
+                    page_count > di_page_limit or 
+                    file_size > max_file_size_bytes):
+                    # Not supported in non-enhanced mode
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status="Error: File exceeds non-enhanced citations limits."
+                    )
+                    # Cleanup temp file
+                    if os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                    return jsonify({
+                        'error': (
+                            f'File exceeds non-enhanced citations limits '
+                            f'(max {di_limit_bytes} bytes / {di_page_limit} pages / {max_file_size_bytes} bytes).'
+                        )
+                    }), 400
+
+                # No chunking for non-enhanced mode
+                file_paths_to_process = [temp_file_path]
+
+            else:
+                # Enhanced citations
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    enhanced_citations=True
+                )
+
+                # Still reject if file is bigger than your max or the pages are too high
+                if file_size > max_file_size_bytes:
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status="Error: File exceeds maximum size in enhanced mode."
+                    )
+                    if os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                    return jsonify({
+                        'error': f'File exceeds maximum size of {max_file_size_bytes} bytes in enhanced mode.'
+                    }), 400
+
+                # If the file is <= 500MB and <= 2000 pages => no chunk
+                if file_size <= di_limit_bytes and page_count <= di_page_limit:
+                    file_paths_to_process = [temp_file_path]
+                else:
+                    # If bigger than 500MB or more than 2000 pages => chunk it (PDF only)
+                    if file_ext == '.pdf':
+                        file_paths_to_process = chunk_pdf(temp_file_path, max_pages=500)
+                        # Clean up the original big PDF if chunking was successful
+                        if os.path.exists(temp_file_path):
+                            os.remove(temp_file_path)
                     else:
-                        chunk_document_id = document_id
-
-                    chunk_filename = os.path.basename(chunk_path)
-                    if num_file_chunks > 1:
-                        # rename chunk file for final storage (e.g. filename_chunk_01.pdf)
-                        base_name, ext = os.path.splitext(chunk_filename)
-                        chunk_filename = f"{base_name}_chunk_{file_chunk_index}{ext}"
-                except Exception as e:
-                    return jsonify({'error': f'Error getting chunk filename and id for {chunk_path}, chunk {file_chunk_index} of {num_file_chunks}: {str(e)}'}), 500
-
-                try:
-                    # Upload chunk to Blob Storage
-                    blob_path = f"{user_id}/{chunk_filename}"
-
-                    blob_service_client = CLIENTS.get("office_docs_client")
-                    blob_client = blob_service_client.get_blob_client(
-                        container=user_documents_container_name,
-                        blob=blob_path
-                    )
-                    with open(chunk_path, "rb") as f:
-                        blob_client.upload_blob(f, overwrite=True)
-                except Exception as e:
-                    return jsonify({'error': f'Error uploading chunk {chunk_path}, chunk {file_chunk_index} of {num_file_chunks} to Blob Storage: {str(e)}'}), 500
-
-                # Add chunk metadata into Cosmos if you want a separate record
-                # (Some choose to store only the "parent" doc in Cosmos. 
-                #  But to poll chunk statuses individually, you might create child records too.)
-
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    status=f"Sending chunk {file_chunk_index} of {num_file_chunks} to Azure Document Intelligence"
-                )
-
-                # Step 5: Send chunk to Azure Document Intelligence
-                try:
-                    pages = extract_content_with_azure_di(chunk_path)
-                    # Possibly update chunk's status in Cosmos: "processed" or "indexed"
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status=f"Extracted content from {chunk_filename}, {file_chunk_index} of {num_file_chunks}."
-                    )
-
-                except Exception as e:
-                    # Mark chunk as error, continue or break
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        num_chunks=len(pages),
-                        status=f"error: failed to extract {chunk_filename}, {file_chunk_index} of {num_file_chunks}. {str(e)}"
-                    )
-                    return jsonify({'error': f'Error extracting file: {str(e)}'}), 500
-                                    
-                try:
-                        # For each page, call save_chunks (which we’ll update to handle just one chunk)
-                    for page_data in pages:
-                        page_number = page_data["page_number"]
-                        page_content = page_data["content"]
-
                         update_document(
                             document_id=document_id,
                             user_id=user_id,
-                            status=f"Saving page {page_number} from {chunk_filename}, {file_chunk_index} of {num_file_chunks}."
+                            status="Error: Only PDF chunking is supported."
                         )
-                        
-                        # Save each page as one "chunk"
+                        if os.path.exists(temp_file_path):
+                            os.remove(temp_file_path)
+                        return jsonify({
+                            'error': 'Only PDF chunking is supported in this scenario.'
+                        }), 400
+
+            # Update doc with chunk count
+            num_file_chunks = len(file_paths_to_process)
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                num_file_chunks=num_file_chunks,
+                status=f"Processing {original_filename} with {num_file_chunks} chunk(s)"
+            )
+
+            # -----------------------------------
+            # Process each chunk (or single file)
+            # -----------------------------------
+            for idx, chunk_path in enumerate(file_paths_to_process, start=1):
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    status=f"Processing file chunk {idx} of {num_file_chunks}"
+                )
+
+                # Build chunk-based doc ID if multiple chunks
+                if num_file_chunks > 1:
+                    chunk_document_id = f"{document_id}-chunk-{idx}"
+                else:
+                    chunk_document_id = document_id
+
+                # Decide a chunk filename that includes original name + index
+                base_name, ext = os.path.splitext(original_filename)
+                if num_file_chunks > 1:
+                    # e.g. "mydoc_chunk_1.pdf"
+                    chunk_filename = f"{base_name}_chunk_{idx}{ext}"
+                else:
+                    chunk_filename = original_filename
+
+                # -------------------------------------------------
+                # If enhanced_citations, we also upload to Blob
+                # -------------------------------------------------
+                if enable_enhanced_citations:
+                    try:
+                        blob_path = f"{user_id}/{chunk_filename}"
+                        blob_service_client = CLIENTS.get("office_docs_client")
+                        blob_client = blob_service_client.get_blob_client(
+                            container=user_documents_container_name,
+                            blob=blob_path
+                        )
+                        # Add metadata fields for user_id and document_id
+                        blob_metadata = {
+                            "user_id": str(user_id),
+                            "document_id": str(document_id)
+                        }
+                        with open(chunk_path, "rb") as f:
+                            blob_client.upload_blob(f, overwrite=True, metadata=blob_metadata)
+                    except Exception as e:
+                        update_document(
+                            document_id=document_id,
+                            user_id=user_id,
+                            status=(
+                                f"Error uploading {chunk_filename} to Blob Storage: {str(e)}"
+                            )
+                        )
+                        if os.path.exists(chunk_path):
+                            os.remove(chunk_path)
+                        return jsonify({
+                            'error': f'Error uploading chunk {chunk_filename} to Blob Storage: {str(e)}'
+                        }), 500
+
+                # ----------------------
+                # Send chunk to Azure DI
+                # ----------------------
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    status=f"Sending {chunk_filename} (chunk {idx} of {num_file_chunks}) to Azure Document Intelligence"
+                )
+
+                try:
+                    pages = extract_content_with_azure_di(chunk_path)
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        number_of_pages=len(pages),
+                        status=f"Extracted content from {chunk_filename}."
+                    )
+                except Exception as e:
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status=f"Error extracting content from {chunk_filename}: {str(e)}"
+                    )
+                    if os.path.exists(chunk_path):
+                        os.remove(chunk_path)
+                    return jsonify({'error': f'Error extracting file: {str(e)}'}), 500
+
+                # ---------------------------------------------
+                # Save each page’s text content as a “chunk”
+                # ---------------------------------------------
+                try:
+                    for page_data in pages:
+                        page_number = page_data["page_number"]
+                        page_content = page_data["content"]
+                        update_document(
+                            document_id=document_id,
+                            user_id=user_id,
+                            status=f"Saving page {page_number} of {chunk_filename}..."
+                        )
+
                         save_chunks(
                             page_text_content=page_content,
                             page_number=page_number,
@@ -706,45 +1139,106 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
                             user_id=user_id,
                             document_id=chunk_document_id
                         )
-                except Exception as e:
-                    return jsonify({'error': f'Error saving extracted content: {str(e)}'}), 500
-                finally:
+
                     update_document(
                         document_id=document_id,
                         user_id=user_id,
-                        status=f"Saved extracted content from {chunk_filename}, {file_chunk_index} of {num_file_chunks}."
+                        status=f"Saved extracted content from {chunk_filename}."
                     )
-                    if chunk_path != temp_file_path and os.path.exists(chunk_path):
+                except Exception as e:
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status=f"Error saving extracted content from {chunk_filename}: {str(e)}"
+                    )
+                    if os.path.exists(chunk_path):
                         os.remove(chunk_path)
+                    return jsonify({'error': f'Error saving extracted content: {str(e)}'}), 500
 
-                file_chunk_index += 1
+                # Clean up local chunk file if not the same as original temp_file
+                if chunk_path != temp_file_path and os.path.exists(chunk_path):
+                    os.remove(chunk_path)
 
-            # Optionally update the parent doc status to done
+            # If metadata extraction is enabled
+            if enable_extract_meta_data:
+                try:
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status="Extracting final metadata..."
+                    )
+                    document_metadata = extract_document_metadata(document_id, user_id)
+
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        title=document_metadata.get('title'),
+                        authors=document_metadata.get('authors'),
+                        abstract=document_metadata.get('abstract'),
+                        keywords=document_metadata.get('keywords'),
+                        publication_date=document_metadata.get('publication_date'),
+                        organization=document_metadata.get('organization'),
+                    )
+                except Exception as e:
+                    update_document(
+                        document_id=document_id,
+                        user_id=user_id,
+                        status=f"Error extracting metadata: {str(e)}"
+                    )
+                    # Not critical enough to return error necessarily, do as you prefer.
+
+            # Mark the entire doc as complete
             update_document(
                 document_id=document_id,
                 user_id=user_id,
                 status="Processing complete",
                 percentage_complete=100
             )
-            
+
+            # Finally, remove the original temp file if it still exists
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
             return jsonify({'message': 'Document uploaded and processed successfully'}), 200
-        
+
+        # -------------------------------------------------------
+        # If it’s a .txt, .md, or .json, handle them differently
+        # -------------------------------------------------------
         elif file_ext == '.txt':
-            extracted_content  = extract_text_file(temp_file_path)
-            save_chunks(extracted_content , original_filename, user_id, document_id=document_id)
-            return jsonify({'message': 'Document uploaded and processed successfully'}), 200
+            extracted_content = extract_text_file(temp_file_path)
+            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            return jsonify({'message': 'TXT file processed successfully'}), 200
+
         elif file_ext == '.md':
-            extracted_content  = extract_markdown_file(temp_file_path)
-            save_chunks(extracted_content , original_filename, user_id, document_id=document_id)
-            return jsonify({'message': 'Document uploaded and processed successfully'}), 200
+            extracted_content = extract_markdown_file(temp_file_path)
+            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            return jsonify({'message': 'MD file processed successfully'}), 200
+
         elif file_ext == '.json':
             with open(temp_file_path, 'r', encoding='utf-8') as f:
-                extracted_content  = json.dumps(json.load(f))
-                save_chunks(extracted_content , original_filename, user_id, document_id=document_id)
-                return jsonify({'message': 'Document uploaded and processed successfully'}), 200
-        else:
-            return jsonify({'error': 'Unsupported file type'}), 400
-        
+                extracted_content = json.dumps(json.load(f))
+            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            return jsonify({'message': 'JSON file processed successfully'}), 200
 
-    if os.path.exists(temp_file_path):
-        os.remove(temp_file_path)
+        else:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            return jsonify({'error': 'Unsupported file type'}), 400
+
+    except Exception as e:
+        # In case of any unexpected error
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            status=f"Processing failed: {str(e)}"
+        )
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+

@@ -94,6 +94,8 @@ def register_route_frontend_admin_settings(app):
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_workspace = request.form.get('enable_user_workspace') == 'on'
             enable_group_workspaces = request.form.get('enable_group_workspaces') == 'on'
+            enable_extract_meta_data = request.form.get('enable_extract_meta_data') == 'on'
+            enable_file_processing_logs = request.form.get('enable_file_processing_logs') == 'on'
             enable_content_safety = request.form.get('enable_content_safety') == 'on'
             enable_user_feedback = request.form.get('enable_user_feedback') == 'on'
             content_safety_endpoint = request.form.get('content_safety_endpoint', '')
@@ -229,6 +231,8 @@ def register_route_frontend_admin_settings(app):
                 'landing_page_text': landing_page_text,
                 'enable_user_workspace': enable_user_workspace,
                 'enable_group_workspaces': enable_group_workspaces,
+                'enable_extract_meta_data': enable_extract_meta_data,
+                'enable_file_processing_logs': enable_file_processing_logs,
                 'azure_ai_search_endpoint': azure_ai_search_endpoint.strip(),
                 'azure_ai_search_key': azure_ai_search_key.strip(),
                 'azure_ai_search_authentication_type': azure_ai_search_authentication_type,

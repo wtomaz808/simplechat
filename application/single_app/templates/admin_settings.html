@@ -304,8 +304,7 @@
                                     Key
                                 </option>
                                 <option value="managed_identity" {% if
-                                    settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{%
-                                    endif %}>
+                                    settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
                                     Managed Identity
                                 </option>
                             </select>
@@ -607,7 +606,7 @@
                     </div>
                 </div>
 
-                <div class="card mb-3 p-3">
+                <div class="card mb-3 p-3" {% if not settings.enable_user_workspace or not settings.enable_group_workspaces %}style="display: none;" {% endif %}>
                     <h5>Multimedia Support</h5>
                     <p class="text-muted mb-2">
                         Support video and audio file upload for transcription, indexing, and embedding.
@@ -649,6 +648,48 @@
                              will dramatically improve the citation experience for video and audio files.
                         </small>
                     </p>
+                </div>
+
+                <div class="card mb-3 p-3" {% if not settings.enable_user_workspace or not settings.enable_group_workspaces %}style="display: none;" {% endif %}>
+                    <h5>Metadata Support</h5>
+                    <p class="text-muted mb-2">
+                        Enable automatic metadata (title, author, organization, publication date, keywords, abstract) extraction for documents.
+                    </p>
+
+                    <!-- Metadata Extraction -->
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_extract_meta_data"
+                            name="enable_extract_meta_data"
+                            {% if settings.enable_extract_meta_data %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_extract_meta_data">
+                            Enable Metadata Extraction
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card mb-3 p-3">
+                    <h5>File Processing Logs</h5>
+                    <p class="text-muted mb-2">
+                        Enable logging of file processing events for debugging and auditing purposes. Logs are stored in the file_processing container in cosmos.
+                    </p>
+
+                    <!-- File Processing Logs -->
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_file_processing_logs"
+                            name="enable_file_processing_logs"
+                            {% if settings.enable_file_processing_logs %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_file_processing_logs">
+                            Enable File Processing Logs
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -887,7 +928,6 @@
                     </div>
                 </div>
             </div>
-
 
             <!-- SAFETY TAB -->
             <div class="tab-pane fade" id="safety" role="tabpanel" aria-labelledby="safety-tab">

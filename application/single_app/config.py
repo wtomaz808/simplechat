@@ -54,7 +54,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.19'
+app.config['VERSION'] = '0.207.61'
 Session(app)
 
 CLIENTS = {}
@@ -186,7 +186,7 @@ group_prompts_container = database.create_container_if_not_exists(
 file_processing_container_name = "file_processing"
 file_processing_container = database.create_container_if_not_exists(
     id=file_processing_container_name,
-    partition_key=PartitionKey(path="/id")
+    partition_key=PartitionKey(path="/document_id")
 )
 
 def initialize_clients(settings):

@@ -154,6 +154,76 @@ def register_route_backend_documents(app):
         
         return get_user_document(user_id, document_id)
 
+    @app.route('/api/documents/<document_id>', methods=['PATCH'])
+    @login_required
+    @user_required
+    @enabled_required("enable_user_workspace")
+    def api_patch_user_document(document_id):
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        data = request.get_json()  # new metadata values from the client
+
+        # Update allowed fields
+        # You can decide which fields can be updated from the client
+        if 'title' in data:
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                title=data['title']
+            )
+        if 'abstract' in data:
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                abstract=data['abstract']
+            )
+        if 'keywords' in data:
+            # Expect a list or a comma-delimited string
+            if isinstance(data['keywords'], list):
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    keywords=data['keywords']
+                )
+            else:
+                # if client sends a comma-separated string of keywords
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    keywords=[kw.strip() for kw in data['keywords'].split(',')]
+                )
+        if 'publication_date' in data:
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                publication_date=data['publication_date']
+            )
+        # Add authors if you want to allow editing that
+        if 'authors' in data:
+            # if you want a list, or just store a string
+            # here is one approach:
+            if isinstance(data['authors'], list):
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    authors=data['authors']
+                )
+            else:
+                update_document(
+                    document_id=document_id,
+                    user_id=user_id,
+                    authors=[data['authors']]
+                )
+
+        # Save updates back to Cosmos
+        try:
+            return jsonify({'message': 'Document metadata updated successfully'}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
     @app.route('/api/documents/<document_id>', methods=['DELETE'])
     @login_required
     @user_required

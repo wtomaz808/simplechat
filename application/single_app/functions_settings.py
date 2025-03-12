@@ -76,6 +76,8 @@ def get_settings():
             # Workspaces
             'enable_user_workspace': True,
             'enable_group_workspaces': True,
+            'enable_extract_meta_data': True, #title, authors, publication date, keywords, summary
+            'enable_file_processing_logs': True,
 
             # Multimedia
             'enable_video_file_support': False,

@@ -87,11 +87,12 @@ def extract_pdf_metadata(pdf_path):
     """
     try:
         reader = PdfReader(pdf_path)
-        meta = reader.metadata  # This is a DocumentInformation object
-        # Note: meta.title or meta.author could be None
+        meta = reader.metadata
         pdf_title = meta.title or ""
         pdf_author = meta.author or ""
-        return pdf_title, pdf_author
+        pdf_subject = meta.subject or ""
+        pdf_keywords = meta.keywords or ""
+        return pdf_title, pdf_author, pdf_subject, pdf_keywords
     except Exception as e:
         print(f"Error extracting PDF metadata: {e}")
         return "", ""
