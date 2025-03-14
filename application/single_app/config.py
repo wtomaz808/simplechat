@@ -14,10 +14,11 @@ import base64
 import markdown2
 import re
 import docx
+import fitz # PyMuPDF
 
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
 from werkzeug.utils import secure_filename
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 from msal import ConfidentialClientApplication
 from flask_session import Session
@@ -26,8 +27,8 @@ from threading import Thread
 from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
-from pypdf import PdfReader, PdfWriter
 from flask_executor import Executor
+from io import BytesIO
 
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
@@ -43,18 +44,18 @@ from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider, AzureAuthorityHosts
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
 
 app = Flask(__name__)
 
 app.config['EXECUTOR_TYPE'] = 'thread'
-app.config['EXECUTOR_MAX_WORKERS'] = 30  # or whatever you need
+app.config['EXECUTOR_MAX_WORKERS'] = 30
 executor = Executor()
 executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.61'
+app.config['VERSION'] = '0.207.94'
 Session(app)
 
 CLIENTS = {}

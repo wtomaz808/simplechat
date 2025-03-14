@@ -83,6 +83,7 @@ def create_document(file_name, user_id, document_id, num_file_chunks, status):
             "version": version,
             "status": status,
             "percentage_complete": 0,
+            "document_classification": "TBD",
             "type": "document_metadata"
         }
         documents_container.upsert_item(document_metadata)
@@ -138,9 +139,16 @@ def update_document(**kwargs):
     current_file_chunk      = kwargs.get('current_file_chunk')
     organization            = kwargs.get('organization')
     enhanced_citations      = kwargs.get('enhanced_citations')
+    document_classification = kwargs.get('document_classification')
 
     current_time = datetime.now(timezone.utc)
     formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    add_file_task_to_file_processing_log(
+        document_id, 
+        user_id, 
+        f"Updating document {document_id} for user {user_id} with all fields: {kwargs}"
+    )
 
     try:
         # Retrieve the existing document
@@ -175,12 +183,17 @@ def update_document(**kwargs):
                     existing_document['percentage_complete'] = 90
                 else:
                     existing_document['percentage_complete'] = existing_document.get('percentage_complete') + 1
+       
 
         if title:
             existing_document['title'] = title
+            for chunk in get_all_chunks(document_id, user_id):
+                update_chunk_metadata(chunk['id'], user_id, document_id, title=title)
 
         if authors:
             existing_document['authors'] = authors
+            for chunk in get_all_chunks(document_id, user_id):
+                update_chunk_metadata(chunk['id'], user_id, document_id, author=authors)
 
         if abstract:
             existing_document['abstract'] = abstract
@@ -199,6 +212,8 @@ def update_document(**kwargs):
 
         if file_name:
             existing_document['file_name'] = file_name
+            for chunk in get_all_chunks(document_id, user_id):
+                update_chunk_metadata(chunk['id'], user_id, document_id, file_name=file_name)
 
         if percentage_complete:
             existing_document['percentage_complete'] = percentage_complete
@@ -220,6 +235,23 @@ def update_document(**kwargs):
 
         if organization:
             existing_document['organization'] = organization
+        
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Attempting to update document {document_id} with document_classification: {document_classification}"
+        )
+
+        if document_classification:
+            add_file_task_to_file_processing_log(
+                document_id, 
+                user_id, 
+                f"Updating document classification for document {document_id} to {document_classification}"
+            )
+            existing_document['document_classification'] = document_classification
+            for chunk in get_all_chunks(document_id, user_id):
+                update_chunk_metadata(chunk['id'], user_id, document_id, document_classification=document_classification)
+
 
         # Upsert the updated document
         documents_container.upsert_item(existing_document)
@@ -230,7 +262,7 @@ def update_document(**kwargs):
     except Exception as e:
         print(f"Error updating document status for document {document_id}: {e}")
         raise
-    
+
 def save_chunks(page_text_content, page_number, file_name, user_id, document_id):
     """
     Save a single chunk (one page) at a time:
@@ -285,6 +317,7 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
             "page_number": page_number,
             "author": author,
             "title": title,
+            "document_classification": "TBD",
             "chunk_sequence": page_number,  # or you can keep an incremental idx
             "upload_date": formatted_time,
             "version": version
@@ -305,38 +338,99 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
         print(f"Error uploading chunk document for document {document_id}: {e}")
         raise
 
+def get_all_chunks(document_id, user_id):
+    try:
+        search_client_user = CLIENTS["search_client_user"]
+        results = search_client_user.search(
+            search_text="*",
+            filter=f"document_id eq '{document_id}' and user_id eq '{user_id}'",
+            select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+        )
+        return results
+    except Exception as e:
+        print(f"Error retrieving chunks for document {document_id}: {e}")
+        raise
+
+def update_chunk_metadata(chunk_id, user_id, document_id, **kwargs):
+    try:
+        search_client_user = CLIENTS["search_client_user"]
+        chunk_item = search_client_user.get_document(chunk_id)
+
+        if not chunk_item:
+            raise Exception("Chunk not found")
+        
+        if chunk_item['user_id'] != user_id:
+            raise Exception("Unauthorized access to chunk")
+        
+        if chunk_item['document_id'] != document_id:
+            raise Exception("Chunk does not belong to document")
+        
+        if 'chunk_keywords' in kwargs:
+            chunk_item['chunk_keywords'] = kwargs['chunk_keywords']
+
+        if 'chunk_summary' in kwargs:
+            chunk_item['chunk_summary'] = kwargs['chunk_summary']
+
+        if 'author' in kwargs:
+            chunk_item['author'] = kwargs['author']
+
+        if 'title' in kwargs:
+            chunk_item['title'] = kwargs['title']
+
+        if 'document_classification' in kwargs:
+            chunk_item['document_classification'] = kwargs['document_classification']
+
+        search_client_user.upload_documents(documents=[chunk_item])
+    except Exception as e:
+        print(f"Error updating chunk metadata for chunk {chunk_id}: {e}")
+        raise
 
 def get_pdf_page_count(pdf_path: str) -> int:
-    reader = PdfReader(pdf_path)
-    return len(reader.pages)
+    """
+    Returns the total number of pages in the given PDF using PyMuPDF.
+    """
+    try:
+        with fitz.open(pdf_path) as doc:
+            return doc.page_count
+    except Exception as e:
+        print(f"Error reading PDF page count: {e}")
+        return 0
 
 def chunk_pdf(input_pdf_path: str, max_pages: int = 500) -> list:
     """
-    Splits a PDF into multiple PDFs, each with up to `max_pages` pages.
-    Returns a list of file paths for the newly created chunks.
+    Splits a PDF into multiple PDFs, each with up to `max_pages` pages,
+    using PyMuPDF. Returns a list of file paths for the newly created chunks.
     """
-    reader = PdfReader(input_pdf_path)
-    total_pages = len(reader.pages)
     chunks = []
-    current_page = 0
-    chunk_index = 1
+    try:
+        with fitz.open(input_pdf_path) as doc:
+            total_pages = doc.page_count
+            current_page = 0
+            chunk_index = 1
+            
+            base_name, ext = os.path.splitext(input_pdf_path)
+            
+            # Loop through the PDF in increments of `max_pages`
+            while current_page < total_pages:
+                end_page = min(current_page + max_pages, total_pages)
+                
+                # Create a new, empty document for this chunk
+                chunk_doc = fitz.open()
+                
+                # Insert the range of pages in one go
+                chunk_doc.insert_pdf(doc, from_page=current_page, to_page=end_page - 1)
+                
+                chunk_pdf_path = f"{base_name}_chunk_{chunk_index}{ext}"
+                chunk_doc.save(chunk_pdf_path)
+                chunk_doc.close()
+                
+                chunks.append(chunk_pdf_path)
+                
+                current_page = end_page
+                chunk_index += 1
 
-    base_name, ext = os.path.splitext(input_pdf_path)
-
-    while current_page < total_pages:
-        writer = PdfWriter()
-        end_page = min(current_page + max_pages, total_pages)
-
-        for p in range(current_page, end_page):
-            writer.add_page(reader.pages[p])
-
-        chunk_pdf_path = f"{base_name}_chunk_{chunk_index}{ext}"
-        with open(chunk_pdf_path, "wb") as f:
-            writer.write(f)
-
-        chunks.append(chunk_pdf_path)
-        current_page = end_page
-        chunk_index += 1
+    except Exception as e:
+        print(f"Error chunking PDF: {e}")
 
     return chunks
 

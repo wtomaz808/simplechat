@@ -11,9 +11,13 @@ def register_route_frontend_workspace(app):
     @enabled_required("enable_user_workspace")
     def workspace():
         user_id = get_current_user_id()
-        
+        settings = get_settings()
+        public_settings = sanitize_settings_for_user(settings)
+        enable_document_classification = settings.get('enable_document_classification', False)
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
                 
-        return render_template('workspace.html')
+        return render_template('workspace.html', settings=public_settings, enable_document_classification=enable_document_classification)
+
+    

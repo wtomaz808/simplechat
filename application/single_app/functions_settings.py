@@ -76,12 +76,16 @@ def get_settings():
             # Workspaces
             'enable_user_workspace': True,
             'enable_group_workspaces': True,
-            'enable_extract_meta_data': True, #title, authors, publication date, keywords, summary
             'enable_file_processing_logs': True,
 
             # Multimedia
             'enable_video_file_support': False,
             'enable_audio_file_support': False,
+
+            # Metadata Extraction
+            # title, authors, publication date, keywords, summary
+            'enable_document_classification': False,
+            'document_classification_categories': ["TBD", "Unknown"],
 
             # Enhanced Citations
             'enable_enhanced_citations': False,
@@ -219,6 +223,14 @@ def sanitize_settings_for_user(full_settings: dict) -> dict:
         'azure_apim_gpt_subscription_key',
         'azure_apim_embedding_subscription_key',
         'azure_apim_image_gen_subscription_key',
+        'azure_apim_web_search_subscription_key',
+        'azure_apim_ai_search_subscription_key',
+        'azure_apim_document_intelligence_subscription_key',
+        'azure_apim_content_safety_subscription_key',
+        'content_safety_key',
+        'office_docs_key',
+        'video_files_key',
+        'audio_files_key'
         # any others that are secrets
     }
     return {k:v for k,v in full_settings.items() if k not in keys_to_exclude}

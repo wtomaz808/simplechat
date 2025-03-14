@@ -94,7 +94,6 @@ def register_route_frontend_admin_settings(app):
             show_logo = request.form.get('show_logo') == 'on'
             enable_user_workspace = request.form.get('enable_user_workspace') == 'on'
             enable_group_workspaces = request.form.get('enable_group_workspaces') == 'on'
-            enable_extract_meta_data = request.form.get('enable_extract_meta_data') == 'on'
             enable_file_processing_logs = request.form.get('enable_file_processing_logs') == 'on'
             enable_content_safety = request.form.get('enable_content_safety') == 'on'
             enable_user_feedback = request.form.get('enable_user_feedback') == 'on'
@@ -181,6 +180,11 @@ def register_route_frontend_admin_settings(app):
             enable_video_file_support = request.form.get('enable_video_file_support') == 'on'
             enable_audio_file_support = request.form.get('enable_audio_file_support') == 'on'
 
+            # Metadata
+            enable_extract_meta_data = request.form.get('enable_extract_meta_data') == 'on'
+            enable_document_classification = request.form.get('enable_document_classification') == 'on'
+            document_classification_categories_str = request.form.get("document_classification_categories", "")
+
             # Enhanced Citations
             enable_enhanced_citations = request.form.get('enable_enhanced_citations') == 'on'
             office_docs_storage_account_url = request.form.get('office_docs_storage_account_url', '')
@@ -208,6 +212,17 @@ def register_route_frontend_admin_settings(app):
             except:
                 image_gen_model_obj = {'selected': [], 'all': []}
 
+            try:
+                document_classification_categories = [
+                    c.strip() for c in document_classification_categories_str.split(",") 
+                    if c.strip()
+                ]
+
+                if not document_classification_categories:
+                    document_classification_categories = ["TBD", "Unknown"]
+            except:
+                document_classification_categories = []
+
             logo_path_relative = settings.get('logo_path', 'images/logo.svg')
 
             logo_file = request.files.get('logo_file')
@@ -231,7 +246,6 @@ def register_route_frontend_admin_settings(app):
                 'landing_page_text': landing_page_text,
                 'enable_user_workspace': enable_user_workspace,
                 'enable_group_workspaces': enable_group_workspaces,
-                'enable_extract_meta_data': enable_extract_meta_data,
                 'enable_file_processing_logs': enable_file_processing_logs,
                 'azure_ai_search_endpoint': azure_ai_search_endpoint.strip(),
                 'azure_ai_search_key': azure_ai_search_key.strip(),
@@ -315,6 +329,11 @@ def register_route_frontend_admin_settings(app):
                 # Multimedia
                 'enable_video_file_support': enable_video_file_support,
                 'enable_audio_file_support': enable_audio_file_support,
+
+                # Metadata
+                'enable_extract_meta_data': enable_extract_meta_data,
+                'enable_document_classification': enable_document_classification,
+                'document_classification_categories': document_classification_categories,
 
                 # Enhanced Citations
                 'enable_enhanced_citations': enable_enhanced_citations,

@@ -200,6 +200,12 @@ def register_route_backend_documents(app):
                 user_id=user_id,
                 publication_date=data['publication_date']
             )
+        if 'document_classification' in data:
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                document_classification=data['document_classification']
+            )
         # Add authors if you want to allow editing that
         if 'authors' in data:
             # if you want a list, or just store a string
@@ -285,3 +291,58 @@ def register_route_backend_documents(app):
 
         except Exception as e:
             return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+        
+    @app.route("/api/get_signed_pdf_url", methods=["GET"])
+    @login_required
+    @user_required
+    @enabled_required("enable_user_workspace")
+    def get_signed_pdf_url():
+        doc_id = request.args.get("doc_id")
+        page = request.args.get("page", default=1, type=int)
+        settings = get_settings()
+
+        user_id = get_current_user_id()
+
+        if not user_id:
+            return jsonify({"error": "User not authenticated"}), 401
+
+        # 2) Lookup the stored blob filename. E.g. "user_id/filename.pdf"
+        #    You should have a DB or metadata that maps doc_id -> user_id, filename
+        doc_response, status_code = get_user_document(user_id, doc_id)
+
+        if status_code != 200:
+            return doc_response, status_code
+
+        raw_doc = doc_response.get_json()
+
+        blob_name = f"{raw_doc['user_id']}/{raw_doc['file_name']}"
+
+        blob_service_client = CLIENTS.get("office_docs_client")
+        container_client = blob_service_client.get_container_client(
+            user_documents_container_name
+        )
+
+        # 3) Generate a short-lived read-only SAS token
+        sas_token = generate_blob_sas(
+            account_name=blob_service_client.account_name,
+            container_name=container_client.container_name,
+            blob_name=blob_name,
+            account_key=settings.get("office_docs_key"),
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.utcnow() + timedelta(minutes=5)  # 5 minutes
+        )
+        
+        # 4) Construct the full blob URL + SAS
+        #    e.g. https://<account>.blob.core.windows.net/<container>/<blobName>?<sas_token>
+        signed_url = (
+            f"https://{blob_service_client.account_name}.blob.core.windows.net"
+            f"/{container_client.container_name}/{blob_name}?{sas_token}"
+            # Then append &response-content-disposition=inline
+            # (If you also want to force content-type, add &response-content-type=application/pdf)
+            f"&response-content-disposition=inline"
+        )
+        # Return JSON with the ephemeral URL (and optionally the requested page)
+        return jsonify({
+            "signedUrl": signed_url,
+            "page": page
+        })

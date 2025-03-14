@@ -606,6 +606,44 @@
                     </div>
                 </div>
 
+                <div class="card mb-3 p-3">
+                    <h5>Document Classification</h5>
+                    <p class="text-muted mb-2">
+                        Enable document classification for documents uploaded to workspaces.
+                    </p>
+
+                    <!-- Enable Document Classification -->
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_document_classification"
+                            name="enable_document_classification"
+                            {% if settings.enable_document_classification %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_document_classification">
+                            Enable Document Classification
+                        </label>
+                    </div>
+
+                    <!-- Document Classification Categories -->
+                    <div class="mb-3" {% if not settings.enable_document_classification %}style="display: none;" {% endif %}>
+                        <label for="document_classification_categories" class="form-label">
+                            Document Classification Categories
+                        </label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="document_classification_categories"
+                            name="document_classification_categories"
+                            value="{{ settings.document_classification_categories | join(', ') }}"
+                        >
+                        <small class="text-muted">
+                            Enter a comma-separated list of categories for document classification.
+                        </small>
+                    </div>
+                </div>
+
                 <div class="card mb-3 p-3" {% if not settings.enable_user_workspace or not settings.enable_group_workspaces %}style="display: none;" {% endif %}>
                     <h5>Multimedia Support</h5>
                     <p class="text-muted mb-2">

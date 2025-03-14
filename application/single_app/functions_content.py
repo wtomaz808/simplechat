@@ -83,19 +83,21 @@ def extract_table_file(file_path, file_ext):
 
 def extract_pdf_metadata(pdf_path):
     """
-    Returns a tuple (title, author) from the given PDF, using pypdf.
+    Returns a tuple (title, author, subject, keywords) from the given PDF, using PyMuPDF.
     """
     try:
-        reader = PdfReader(pdf_path)
-        meta = reader.metadata
-        pdf_title = meta.title or ""
-        pdf_author = meta.author or ""
-        pdf_subject = meta.subject or ""
-        pdf_keywords = meta.keywords or ""
-        return pdf_title, pdf_author, pdf_subject, pdf_keywords
+        with fitz.open(pdf_path) as doc:
+            meta = doc.metadata
+            pdf_title = meta.get("title", "")
+            pdf_author = meta.get("author", "")
+            pdf_subject = meta.get("subject", "")
+            pdf_keywords = meta.get("keywords", "")
+
+            return pdf_title, pdf_author, pdf_subject, pdf_keywords
+
     except Exception as e:
         print(f"Error extracting PDF metadata: {e}")
-        return "", ""
+        return "", "", "", ""
     
 def extract_docx_metadata(docx_path):
     """

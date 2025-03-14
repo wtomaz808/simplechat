@@ -529,9 +529,33 @@ function loadMessages(conversationId) {
 /*************************************************
  *  CITATION PARSING
  *************************************************/
+function parseDocIdAndPage(citationId) {
+  // E.g. citationId = "d0d27492-f2e4-48be-beec-d0fe8073bc02_17"
+  // last underscore separates docId from page
+  const underscoreIndex = citationId.lastIndexOf("_");
+  if (underscoreIndex === -1) {
+    // fallback if for some reason it doesn't match
+    return { docId: null, pageNumber: null };
+  }
+  const docId = citationId.substring(0, underscoreIndex);
+  const pageNumber = citationId.substring(underscoreIndex + 1);
+  return { docId, pageNumber };
+}
+
 function parseCitations(message) {
-  const citationRegex = /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#\S+?\]\s*)+)/g;
+  // Matches something like:
+  //   (Source: FILENAME, Pages: 6)
+  //   (Source: FILENAME, Pages: 28-29)
+  //   (Source: FILENAME, Pages: 7, 9)
+  // followed by bracketed references, e.g. [#someId_7; #someId_9]
+  //
+  // 1) "filename" is captured by ([^,]+)
+  // 2) "pages"   is captured by ([^)]+)
+  // 3) The bracket section is captured by ((?:\[#.*?\]\s*)+)
+  const citationRegex = /\(Source:\s*([^,]+),\s*Page(?:s)?:\s*([^)]+)\)\s*((?:\[#.*?\]\s*)+)/gi;
+
   return message.replace(citationRegex, (whole, filename, pages, bracketSection) => {
+    // 1) Build the filename piece, possibly a clickable link
     let filenameHtml;
     if (/^https?:\/\/.+/i.test(filename.trim())) {
       filenameHtml = `<a href="${filename.trim()}" target="_blank" rel="noopener noreferrer">${filename.trim()}</a>`;
@@ -539,28 +563,69 @@ function parseCitations(message) {
       filenameHtml = filename.trim();
     }
 
-    const idMatches = bracketSection.match(/\[#([^\]]+)\]/g);
-    if (!idMatches) {
-      return `(Source: ${filenameHtml}, Pages: ${pages})`;
-    }
+    // 2) Extract bracketed references (e.g. [#doc_28; #doc_29])
+    //    and build a map of pageNumber => citationId
+    const bracketMatches = bracketSection.match(/\[#.*?\]/g) || [];
+    const pageToRefMap = {};
 
-    const citationLinks = idMatches
-      .map((m) => {
-        const rawId = m.slice(2, -1);
-        const pageNumber = rawId.split("_").pop();
-        return `
-          <a href="#"
-             class="citation-link"
-             data-citation-id="${rawId}"
-             target="_blank"
-             rel="noopener noreferrer"
-          >[Page ${pageNumber}]</a>
-        `;
-      })
-      .join(" ");
+    bracketMatches.forEach((match) => {
+      // match looks like "[#doc_28; #doc_29]" or "[#doc_28]"
+      // remove "[#" at start and "]" at end
+      let inner = match.slice(2, -1).trim(); 
+      // split on comma or semicolon
+      const refs = inner.split(/[;,]/);
+      refs.forEach((r) => {
+        let ref = r.trim();
+        // remove leading '#' if present
+        if (ref.startsWith('#')) {
+          ref = ref.slice(1);
+        }
+        // e.g. "doc_28" => pageNumber = "28"
+        const pageNumber = ref.split('_').pop();
+        // store this ref in the map so we can link the correct page
+        // if multiple references come in for the same page, you could store in an array
+        // but typically there's a 1:1 reference -> page
+        pageToRefMap[pageNumber] = ref;
+      });
+    });
 
-    return `(Source: ${filenameHtml}, Pages: ${pages}) ${citationLinks}`;
+    // 3) Convert the "Pages: ..." text into anchors for each page or range
+    //    We'll tokenize by commas first, then handle any dash ranges inside each token
+    const pagesTokens = pages.split(/,/).map(tok => tok.trim()); // e.g. ["7", "9"] or ["28-29"]
+    
+    const linkedPages = pagesTokens.map(token => {
+      // If something like "28-29" => we may want to produce separate links "28" and "29"
+      const dashParts = token.split('-').map(p => p.trim());
+      
+      if (dashParts.length === 2 && dashParts[0] && dashParts[1]) {
+        // e.g. "28-29"
+        const [start, end] = dashParts;
+        const startAnchor = buildAnchorIfExists(start, pageToRefMap[start]);
+        const endAnchor   = buildAnchorIfExists(end,   pageToRefMap[end]);
+        // Rebuild with a dash in between
+        return `${startAnchor}-${endAnchor}`;
+      } else {
+        // Single page
+        return buildAnchorIfExists(token, pageToRefMap[token]);
+      }
+    });
+
+    // join them back with ", " if multiple tokens
+    const linkedPagesText = linkedPages.join(', ');
+
+    return `(Source: ${filenameHtml}, Pages: ${linkedPagesText})`;
   });
+}
+
+/**
+ * Helper that returns an <a> if we have a ref, otherwise plain text.
+ */
+function buildAnchorIfExists(pageStr, citationId) {
+  if (!citationId) {
+    // no bracket reference for this page => leave it as plain text
+    return pageStr;
+  }
+  return `<a href="#" class="citation-link" data-citation-id="${citationId}" target="_blank" rel="noopener noreferrer">${pageStr}</a>`;
 }
 
 /*************************************************
@@ -1072,6 +1137,81 @@ function uploadFileToConversation(file) {
     });
 }
 
+function showPdfModal(docId, pageNumber) {
+  // Build the base URL (no #page anchor here, because we'll set that in code)
+  const fetchUrl = `/view_pdf?doc_id=${encodeURIComponent(docId)}&page=${encodeURIComponent(pageNumber)}`;
+
+  // Create or re-use a modal container
+  let pdfModal = document.getElementById("pdf-modal");
+  if (!pdfModal) {
+    pdfModal = document.createElement("div");
+    pdfModal.id = "pdf-modal";
+    pdfModal.classList.add("modal", "fade");
+    pdfModal.tabIndex = -1;
+    pdfModal.setAttribute("aria-hidden", "true");
+    pdfModal.innerHTML = `
+      <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">PDF Preview</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" style="height:80vh;">
+            <iframe
+              id="pdf-iframe"
+              src=""
+              style="width:100%; height:100%; border:none;"
+            ></iframe>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(pdfModal);
+  }
+
+  // Optional: Show a loading spinner while we fetch
+  showLoadingIndicator();
+
+  fetch(fetchUrl)
+    .then(async (resp) => {
+      hideLoadingIndicator();
+
+      if (!resp.ok) {
+        // If server returned an error or 4xx/5xx
+        throw new Error(`Failed to load PDF. Status: ${resp.status}`);
+      }
+
+      // 1) Get the adjusted page number from the custom header
+      //    (or default to 1 if the header is missing)
+      const newPage = resp.headers.get("X-Sub-PDF-Page") || "1";
+
+      // 2) Read the response body as a Blob
+      const blob = await resp.blob();
+
+      // 3) Create an object URL from the Blob
+      const pdfBlobUrl = URL.createObjectURL(blob);
+
+      // 4) Append #page=newPage, so the PDF viewer will jump to that page
+      const iframeSrc = pdfBlobUrl + `#page=${newPage}`;
+
+      // 5) Set the iframe source
+      const iframe = pdfModal.querySelector("#pdf-iframe");
+      if (iframe) {
+        iframe.src = iframeSrc;
+      }
+
+      // 6) Show the modal
+      const modalInstance = new bootstrap.Modal(pdfModal);
+      modalInstance.show();
+    })
+    .catch((error) => {
+      hideLoadingIndicator();
+      console.error("Error fetching PDF:", error);
+      showToast(`Error fetching PDF: ${error.message}`, "danger");
+    });
+}
+
+
 /*************************************************
  *  CITATION LINKS & FILE LINKS
  *************************************************/
@@ -1081,7 +1221,17 @@ if (chatboxEl) {
     if (event.target && event.target.matches("a.citation-link")) {
       event.preventDefault();
       const citationId = event.target.getAttribute("data-citation-id");
-      fetchCitedText(citationId);
+
+      const { docId, pageNumber } = parseDocIdAndPage(citationId);
+
+      // Decide logic based on whether enhanced citations is on
+      if (toBoolean(window.enableEnhancedCitations)) {
+        // Enhanced citations => show PDF in a modal
+        showPdfModal(docId, pageNumber);
+      } else {
+        // Existing logic => fetch raw text excerpt
+        fetchCitedText(citationId);
+      }
     } else if (event.target && event.target.matches("a.file-link")) {
       event.preventDefault();
       const fileId = event.target.getAttribute("data-file-id");
