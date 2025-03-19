@@ -17,10 +17,13 @@ def register_route_frontend_chats(app):
         public_settings = sanitize_settings_for_user(settings)
         enable_user_feedback = public_settings.get("enable_user_feedback", False)
         enable_enhanced_citations = public_settings.get("enable_enhanced_citations", False)
+        enable_document_classification = public_settings.get("enable_document_classification", False)
         active_group_id = user_settings["settings"].get("activeGroupOid", "")
+        categories_list = public_settings.get("document_classification_categories","")
+        
         if not user_id:
             return redirect(url_for('login'))
-        return render_template('chats.html', settings=public_settings, enable_user_feedback=enable_user_feedback, active_group_id=active_group_id, enable_enhanced_citations=enable_enhanced_citations)
+        return render_template('chats.html', settings=public_settings, enable_user_feedback=enable_user_feedback, active_group_id=active_group_id, enable_enhanced_citations=enable_enhanced_citations, enable_document_classification=enable_document_classification, document_classification_categories=categories_list)
     
     @app.route('/upload', methods=['POST'])
     @login_required
@@ -85,7 +88,7 @@ def register_route_frontend_chats(app):
         is_table = False 
 
         try:
-            if file_ext in ['.pdf', '.docx', '.xlsx', '.pptx', '.html', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif']:
+            if file_ext in ['.pdf', '.docx', '.pptx', '.html', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif']:
                 extracted_content  = extract_content_with_azure_di(temp_file_path)
             elif file_ext == '.txt':
                 extracted_content  = extract_text_file(temp_file_path)
@@ -195,47 +198,65 @@ def register_route_frontend_chats(app):
         temp_pdf_path = f"temp_file_{random_uuid}.pdf"
 
         try:
-            # Download PDF
-            response = requests.get(signed_url, timeout=30)
-            response.raise_for_status()
+            # Download the PDF
+            r = requests.get(signed_url, timeout=30)
+            r.raise_for_status()
             with open(temp_pdf_path, "wb") as f:
-                f.write(response.content)
+                f.write(r.content)
 
-            # 4) Extract the relevant pages
+            # 3) Extract up to three pages: (page-1, page, page+1)
             pdf_document = fitz.open(temp_pdf_path)
             total_pages = pdf_document.page_count
+            current_idx = page_number - 1  # zero-based
 
-            # Convert 1-based page_number to 0-based index
-            current_idx = page_number - 1  
             if current_idx < 0 or current_idx >= total_pages:
                 pdf_document.close()
                 os.remove(temp_pdf_path)
-                return jsonify({"error": "Requested page is out of range"}), 400
+                return jsonify({"error": "Requested page out of range"}), 400
 
-            # Default to extracting ONLY the current page
+            # Default to just the current page
             start_idx = current_idx
             end_idx = current_idx
 
-            # If there's a page before, include it
+            # If a previous page exists, include it
             if current_idx > 0:
                 start_idx = current_idx - 1
 
-            # If there's a page after, include it
+            # If a next page exists, include it
             if current_idx < total_pages - 1:
                 end_idx = current_idx + 1
 
-            # Create a new PDF with the subset of pages
+            # 4) Create new PDF with only start_idx..end_idx
             extracted_pdf = fitz.open()
             extracted_pdf.insert_pdf(pdf_document, from_page=start_idx, to_page=end_idx)
-
-            # Overwrite the temp file with the smaller PDF
             extracted_pdf.save(temp_pdf_path, garbage=4, deflate=True)
             extracted_pdf.close()
             pdf_document.close()
 
-            # 5) Return the trimmed PDF
-            # The front-end can point to: /view_pdf?doc_id=XXX&page=2#page=2
-            return send_file(temp_pdf_path, as_attachment=False)
+            # 5) Determine new_page_number (within the sub-document)
+            extracted_count = end_idx - start_idx + 1
+            
+            if extracted_count == 1:
+                # Only current page
+                new_page_number = 1
+            elif extracted_count == 3:
+                # current page is in the middle
+                new_page_number = 2
+            else:
+                # Exactly 2 pages
+                # If start_idx == current_idx, the user is on the first page
+                # If current_idx == end_idx, the user is on the second page
+                if start_idx == current_idx:
+                    # e.g. pages = [current, next]
+                    new_page_number = 1
+                else:
+                    # e.g. pages = [previous, current]
+                    new_page_number = 2
+
+            # 6) Return the sub-PDF, attaching a custom header with new_page_number
+            response = send_file(temp_pdf_path, as_attachment=False)
+            response.headers["X-Sub-PDF-Page"] = str(new_page_number)
+            return response
 
         except Exception as e:
             # Clean up on error

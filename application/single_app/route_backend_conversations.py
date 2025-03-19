@@ -40,7 +40,7 @@ def register_route_backend_conversations(app):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        query = f"SELECT c.id, c.title, c.last_updated FROM c WHERE c.user_id = '{user_id}' ORDER BY c.last_updated DESC"
+        query = f"SELECT * FROM c WHERE c.user_id = '{user_id}' ORDER BY c.last_updated DESC"
         items = list(container.query_items(query=query, enable_cross_partition_query=True))
         return jsonify({
             'conversations': items
@@ -59,7 +59,6 @@ def register_route_backend_conversations(app):
         conversation_item = {
             'id': conversation_id,
             'user_id': user_id,
-            'messages': [],
             'last_updated': datetime.utcnow().isoformat(),
             'title': 'New Conversation'
         }

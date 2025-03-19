@@ -57,27 +57,13 @@
   height: 100%;
 }
 
-/* Show the delete button only on hover */
-.conversation-item .delete-btn {
-  display: none;
+.classification-container {
+  margin-top: 4px;
 }
 
-.conversation-item:hover .delete-btn {
-  display: inline-block;
+.classification-container .badge {
+  font-size: 0.75rem; /* slightly smaller if you want */
 }
-
-/* Position the delete button to the right */
-.conversation-item {
-  position: relative;
-}
-
-.conversation-item .delete-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
 /* Style for the cited text content */
 #cited-text-content {
   white-space: pre-wrap;
@@ -333,6 +319,7 @@ a.citation-link:hover {
   text-decoration: none;
 }
 
+
 /* Reset margins for paragraphs */
 .message-text p {
   margin-top: 0;
@@ -416,4 +403,90 @@ ol {
 .feedback-btn.clicked.fade-back {
   color: #6c757d;  /* original text-muted color */
   transform: scale(1.0);
+}
+
+.field-label {
+  font-size: 0.8em;
+  color: gray;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Style the read-only text in document-meta mode */
+.doc-meta-value {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 6px;
+  background-color: #f9f9f9;
+  min-height: 1.8em;
+  cursor: default;
+}
+.doc-meta-value:hover {
+  background-color: #f1f1f1;
+}
+
+/* Classification “drop-down” that shows checkboxes in filter mode */
+.classification-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.classification-dropdown-btn {
+  width: 150px;
+  text-align: left;
+  background-color: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+}
+.classification-dropdown-btn:after {
+  content: " \25BC"; /* down arrow */
+  float: right;
+  color: #999;
+}
+.classification-dropdown-content {
+  display: none; /* hidden by default */
+  position: absolute;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-top: 2px;
+  padding: 8px;
+  z-index: 9999;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 150px;
+}
+.classification-dropdown-content.show {
+  display: block;
+}
+.classification-dropdown-content label {
+  display: block;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+.classification-dropdown-content input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+/* Make the classification text in doc-meta mode also smaller gray label for consistency */
+.classification-text-readonly {
+  font-size: 0.9em;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 6px;
+  background-color: #f9f9f9;
+  cursor: default;
+}
+.classification-text-readonly:hover {
+  background-color: #f1f1f1;
+}
+
+/* For convenience, tooltips on doc-meta */
+.doc-meta-value[data-bs-toggle="tooltip"],
+.classification-text-readonly[data-bs-toggle="tooltip"] {
+  text-overflow: ellipsis; 
+  overflow: hidden; 
+  white-space: nowrap; 
 }

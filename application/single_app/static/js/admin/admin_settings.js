@@ -1,6 +1,5 @@
-// js/admin_settings.js
+// admin_settings.js
 
-// Use the already-defined window.* vars (if they exist) or default to empty arrays
 let gptSelected = window.gptSelected || [];
 let gptAll      = window.gptAll || [];
 
@@ -11,25 +10,20 @@ let imageSelected = window.imageSelected || [];
 let imageAll      = window.imageAll || [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Render any models we already have in memory
     renderGPTModels();
     renderEmbeddingModels();
     renderImageModels();
 
-    // Update hidden inputs right away so if user saves without refetching,
-    // the “selected/all” data is correctly submitted
     updateGptHiddenInput();
     updateEmbeddingHiddenInput();
     updateImageHiddenInput();
 
-    // Setup toggles for APIM / key-based, etc.
     setupToggles();
 
-    // Setup test-connection button logic
     setupTestButtons();
 
     function activateTabFromHash() {
-        const hash = window.location.hash; // Get the URL fragment (e.g., #citation)
+        const hash = window.location.hash;
         if (hash) {
             const tabButton = document.querySelector(`button.nav-link[data-bs-target="${hash}"]`);
             if (tabButton) {
@@ -39,24 +33,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Activate tab from URL on page load
     activateTabFromHash();
 
-    // Update URL when a tab is clicked
     document.querySelectorAll('.nav-link').forEach(tab => {
         tab.addEventListener('click', function () {
-            history.pushState(null, null, this.getAttribute('data-bs-target')); // Update URL
+            history.pushState(null, null, this.getAttribute('data-bs-target'));
         });
     });
 
-    // Handle browser back/forward navigation to activate correct tab
     window.addEventListener("popstate", activateTabFromHash);
 
 });
 
-////////////////////////////////////////////////////////////////////////////
-// MODEL RENDERING
-////////////////////////////////////////////////////////////////////////////
 function renderGPTModels() {
     const listDiv = document.getElementById('gpt_models_list');
     if (!listDiv) return;
@@ -150,9 +138,6 @@ function renderImageModels() {
     listDiv.innerHTML = html;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// GPT: FETCH & SELECT
-////////////////////////////////////////////////////////////////////////////
 const fetchGptBtn = document.getElementById('fetch_gpt_models_btn');
 if (fetchGptBtn) {
     fetchGptBtn.addEventListener('click', async () => {
@@ -192,9 +177,6 @@ function updateGptHiddenInput() {
     gptInput.value = JSON.stringify(payload);
 }
 
-////////////////////////////////////////////////////////////////////////////
-// EMBEDDINGS: FETCH & SELECT
-////////////////////////////////////////////////////////////////////////////
 const fetchEmbeddingBtn = document.getElementById('fetch_embedding_models_btn');
 if (fetchEmbeddingBtn) {
     fetchEmbeddingBtn.addEventListener('click', async () => {
@@ -233,9 +215,6 @@ function updateEmbeddingHiddenInput() {
     embInput.value = JSON.stringify(payload);
 }
 
-////////////////////////////////////////////////////////////////////////////
-// IMAGE GEN: FETCH & SELECT
-////////////////////////////////////////////////////////////////////////////
 const fetchImageBtn = document.getElementById('fetch_image_models_btn');
 if (fetchImageBtn) {
     fetchImageBtn.addEventListener('click', async () => {
@@ -274,11 +253,8 @@ function updateImageHiddenInput() {
     imgInput.value = JSON.stringify(payload);
 }
 
-////////////////////////////////////////////////////////////////////////////
-// TOGGLES & COLLAPSING FIELDS
-////////////////////////////////////////////////////////////////////////////
+
 function setupToggles() {
-    // GPT: APIM vs. non-APIM
     const enableGptApim = document.getElementById('enable_gpt_apim');
     if (enableGptApim) {
         enableGptApim.addEventListener('change', function () {
@@ -287,7 +263,6 @@ function setupToggles() {
         });
     }
 
-    // Embeddings: APIM vs. non-APIM
     const enableEmbeddingApim = document.getElementById('enable_embedding_apim');
     if (enableEmbeddingApim) {
         enableEmbeddingApim.addEventListener('change', function () {
@@ -296,7 +271,6 @@ function setupToggles() {
         });
     }
 
-    // Image Generation: main toggle
     const enableImageGen = document.getElementById('enable_image_generation');
     if (enableImageGen) {
         enableImageGen.addEventListener('change', function () {
@@ -304,7 +278,6 @@ function setupToggles() {
         });
     }
 
-    // Image Generation: APIM vs. non-APIM
     const enableImageGenApim = document.getElementById('enable_image_gen_apim');
     if (enableImageGenApim) {
         enableImageGenApim.addEventListener('change', function () {
@@ -313,7 +286,6 @@ function setupToggles() {
         });
     }
 
-    // Enhanced Citation: main toggle
     const enableEnhancedCitation = document.getElementById('enable_enhanced_citations');
     if (enableEnhancedCitation) {
         toggleEnhancedCitation(enableEnhancedCitation.checked);
@@ -322,7 +294,6 @@ function setupToggles() {
         });
     }
 
-    // Content Safety: main toggle
     const enableContentSafetyCheckbox = document.getElementById('enable_content_safety');
     if (enableContentSafetyCheckbox) {
         enableContentSafetyCheckbox.addEventListener('change', function() {
@@ -331,7 +302,6 @@ function setupToggles() {
         });
     }
 
-    // Content Safety: APIM vs non-APIM
     const enableContentSafetyApim = document.getElementById('enable_content_safety_apim');
     if (enableContentSafetyApim) {
         enableContentSafetyApim.addEventListener('change', function() {
@@ -340,7 +310,6 @@ function setupToggles() {
         });
     }
 
-    // Web Search: main toggle
     const enableWebSearch = document.getElementById('enable_web_search');
     if (enableWebSearch) {
         enableWebSearch.addEventListener('change', function () {
@@ -348,7 +317,6 @@ function setupToggles() {
         });
     }
 
-    // Web Search: APIM vs. non-APIM
     const enableWebSearchApim = document.getElementById('enable_web_search_apim');
     if (enableWebSearchApim) {
         enableWebSearchApim.addEventListener('change', function () {
@@ -357,7 +325,6 @@ function setupToggles() {
         });
     }
 
-    // AI Search: APIM vs. non-APIM
     const enableAiSearchApim = document.getElementById('enable_ai_search_apim');
     if (enableAiSearchApim) {
         enableAiSearchApim.addEventListener('change', function () {
@@ -366,7 +333,6 @@ function setupToggles() {
         });
     }
 
-    // Document Intelligence: APIM vs. non-APIM
     const enableDocumentIntelligenceApim = document.getElementById('enable_document_intelligence_apim');
     if (enableDocumentIntelligenceApim) {
         enableDocumentIntelligenceApim.addEventListener('change', function () {
@@ -375,7 +341,6 @@ function setupToggles() {
         });
     }
 
-    // GPT Auth Type
     const gptAuthType = document.getElementById('azure_openai_gpt_authentication_type');
     if (gptAuthType) {
         gptAuthType.addEventListener('change', function () {
@@ -384,7 +349,6 @@ function setupToggles() {
         });
     }
 
-    // Embeddings Auth Type
     const embeddingAuthType = document.getElementById('azure_openai_embedding_authentication_type');
     if (embeddingAuthType) {
         embeddingAuthType.addEventListener('change', function () {
@@ -393,7 +357,6 @@ function setupToggles() {
         });
     }
 
-    // Image Auth Type
     const imgAuthType = document.getElementById('azure_openai_image_gen_authentication_type');
     if (imgAuthType) {
         imgAuthType.addEventListener('change', function () {
@@ -402,7 +365,6 @@ function setupToggles() {
         });
     }
 
-    // Content Safety Auth Type
     const contentSafetyAuthType = document.getElementById('content_safety_authentication_type');
     if (contentSafetyAuthType) {
         contentSafetyAuthType.addEventListener('change', function () {
@@ -411,7 +373,6 @@ function setupToggles() {
         });
     }
 
-    // AI Search Auth Type
     const aiSearchAuthType = document.getElementById('azure_ai_search_authentication_type');
     if (aiSearchAuthType) {
         aiSearchAuthType.addEventListener('change', function () {
@@ -420,7 +381,6 @@ function setupToggles() {
         });
     }
 
-    // Document Intelligence Auth Type
     const docIntelAuthType = document.getElementById('azure_document_intelligence_authentication_type');
     if (docIntelAuthType) {
         docIntelAuthType.addEventListener('change', function () {
@@ -454,32 +414,23 @@ function setupToggles() {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////
-// TEST BUTTONS (calls to /api/admin/settings/test_connection with ephemeral data)
-////////////////////////////////////////////////////////////////////////////
 function setupTestButtons() {
 
-    // ---------------------------
-    // GPT TEST with ephemeral data
-    // ---------------------------
     const testGptBtn = document.getElementById('test_gpt_button');
     if (testGptBtn) {
         testGptBtn.addEventListener('click', async () => {
             const resultDiv = document.getElementById('test_gpt_result');
             resultDiv.innerHTML = 'Testing GPT...';
 
-            // Gather ephemeral GPT data
             const enableApim = document.getElementById('enable_gpt_apim').checked;
             
             const payload = {
                 test_type: 'gpt',
                 enable_apim: enableApim,
-                // The currently "selected" GPT model from the UI
                 selected_model: gptSelected[0] || null
             };
 
             if (enableApim) {
-                // APIM fields
                 payload.apim = {
                     endpoint: document.getElementById('azure_apim_gpt_endpoint').value,
                     api_version: document.getElementById('azure_apim_gpt_api_version').value,
@@ -487,7 +438,6 @@ function setupTestButtons() {
                     subscription_key: document.getElementById('azure_apim_gpt_subscription_key').value
                 };
             } else {
-                // Direct fields
                 payload.direct = {
                     endpoint: document.getElementById('azure_openai_gpt_endpoint').value,
                     auth_type: document.getElementById('azure_openai_gpt_authentication_type').value,
@@ -516,9 +466,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // EMBEDDINGS TEST (ephemeral)
-    // ---------------------------
     const testEmbeddingBtn = document.getElementById('test_embedding_button');
     if (testEmbeddingBtn) {
         testEmbeddingBtn.addEventListener('click', async () => {
@@ -534,7 +481,6 @@ function setupTestButtons() {
             };
 
             if (enableApim) {
-                // APIM fields
                 payload.apim = {
                     endpoint: document.getElementById('azure_apim_embedding_endpoint').value,
                     api_version: document.getElementById('azure_apim_embedding_api_version').value,
@@ -542,7 +488,6 @@ function setupTestButtons() {
                     subscription_key: document.getElementById('azure_apim_embedding_subscription_key').value
                 };
             } else {
-                // Direct fields
                 payload.direct = {
                     endpoint: document.getElementById('azure_openai_embedding_endpoint').value,
                     auth_type: document.getElementById('azure_openai_embedding_authentication_type').value,
@@ -570,9 +515,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // IMAGE GEN TEST (ephemeral)
-    // ---------------------------
     const testImageBtn = document.getElementById('test_image_button');
     if (testImageBtn) {
         testImageBtn.addEventListener('click', async () => {
@@ -623,9 +565,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // SAFETY TEST (EPHEMERAL NOW)
-    // ---------------------------
     const testSafetyBtn = document.getElementById('test_safety_button');
     if (testSafetyBtn) {
         testSafetyBtn.addEventListener('click', async () => {
@@ -674,9 +613,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // BING WEB SEARCH TEST (EPHEMERAL)
-    // ---------------------------
     const testWebSearchBtn = document.getElementById('test_web_search_button');
     if (testWebSearchBtn) {
         testWebSearchBtn.addEventListener('click', async () => {
@@ -723,9 +659,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // AZURE AI SEARCH TEST (EPHEMERAL)
-    // ---------------------------
     const testAzureSearchBtn = document.getElementById('test_azure_ai_search_button');
     if (testAzureSearchBtn) {
         testAzureSearchBtn.addEventListener('click', async () => {
@@ -772,9 +705,6 @@ function setupTestButtons() {
         });
     }
 
-    // ---------------------------
-    // DOCUMENT INTELLIGENCE TEST (EPHEMERAL)
-    // ---------------------------
     const testDocIntelBtn = document.getElementById('test_azure_doc_intelligence_button');
     if (testDocIntelBtn) {
         testDocIntelBtn.addEventListener('click', async () => {
@@ -830,15 +760,12 @@ function toggleEnhancedCitation(isEnabled) {
 
 
 function switchTab(event, tabButtonId) {
-    event.preventDefault(); // Prevent default anchor jump
-    const triggerEl = document.getElementById(tabButtonId); // e.g., "workspaces-tab"
+    event.preventDefault();
+    const triggerEl = document.getElementById(tabButtonId);
     const tabObj = new bootstrap.Tab(triggerEl);
     tabObj.show();
   }
 
-////////////////////////////////////////////////////////////////////////////
-// SHOW/HIDE PASSWORD FIELDS
-////////////////////////////////////////////////////////////////////////////
 function togglePassword(btnId, inputId) {
     const btn = document.getElementById(btnId);
     const inp = document.getElementById(inputId);
@@ -855,37 +782,20 @@ function togglePassword(btnId, inputId) {
     }
 }
 
-// GPT Key
 togglePassword('toggle_gpt_key', 'azure_openai_gpt_key');
-// Embedding Key
 togglePassword('toggle_embedding_key', 'azure_openai_embedding_key');
-// Image Gen Key
 togglePassword('toggle_image_gen_key', 'azure_openai_image_gen_key');
-// Content Safety Key
 togglePassword('toggle_content_safety_key', 'content_safety_key');
-// Bing Key
 togglePassword('toggle_bing_search_key', 'bing_search_key');
-// Azure AI Search Key
 togglePassword('toggle_search_key', 'azure_ai_search_key');
-// Doc Intel Key
 togglePassword('toggle_docintel_key', 'azure_document_intelligence_key');
-// GPT APIM Key
 togglePassword('toggle_azure_apim_gpt_subscription_key', 'azure_apim_gpt_subscription_key');
-// Embedding APIM Key
 togglePassword('toggle_azure_apim_embedding_subscription_key', 'azure_apim_embedding_subscription_key');
-// Image Gen APIM Key
 togglePassword('toggle_azure_apim_image_gen_subscription_key', 'azure_apim_image_gen_subscription_key');
-// Content Safety APIM Key
 togglePassword('toggle_azure_apim_content_safety_subscription_key', 'azure_apim_content_safety_subscription_key');
-// Web Search APIM Key
 togglePassword('toggle_azure_apim_web_search_subscription_key', 'azure_apim_web_search_subscription_key');
-// AI Search APIM Key
 togglePassword('toggle_azure_apim_ai_search_subscription_key', 'azure_apim_ai_search_subscription_key');
-// Document Intelligence APIM Key
 togglePassword('toggle_azure_apim_document_intelligence_subscription_key', 'azure_apim_document_intelligence_subscription_key');
-// Office Docs Key
 togglePassword('toggle_office_docs_key', 'office_docs_key');
-// Video Files Key
 togglePassword('toggle_video_files_key', 'video_files_key');
-// Audio Files Key
 togglePassword('toggle_audio_files_key', 'audio_files_key');

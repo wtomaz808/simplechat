@@ -156,7 +156,7 @@ def process_group_document_upload(file, group_id, user_id):
 
     try:
         if file_ext in ['.pdf', '.docx', '.xlsx', '.pptx', '.html',
-                        '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif']:
+                        '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif', '.csv']:
             extracted = extract_content_with_azure_di(temp_file_path)
         elif file_ext == '.txt':
             extracted = extract_text_file(temp_file_path)

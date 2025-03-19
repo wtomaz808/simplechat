@@ -31,6 +31,33 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def feedback_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = session.get('user', {})
+        # If 'roles' is not in user or 'FeedbackAdmin' is not part of roles, block access
+        if 'roles' not in user or 'FeedbackAdmin' not in user['roles']:
+            return "Unauthorized", 403  # or redirect somewhere else if you prefer
+        return f(*args, **kwargs)
+    
+def safety_violation_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = session.get('user', {})
+        # If 'roles' is not in user or 'SafetyViolationAdmin' is not part of roles, block access
+        if 'roles' not in user or 'SafetyViolationAdmin' not in user['roles']:
+            return "Unauthorized", 403  # or redirect somewhere else if you prefer
+        return f(*args, **kwargs)
+    
+def create_groups(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = session.get('user', {})
+        # If 'roles' is not in user or 'CreateGroups' is not part of roles, block access
+        if 'roles' not in user or 'CreateGroups' not in user['roles']:
+            return "Unauthorized", 403  # or redirect somewhere else if you prefer
+        return f(*args, **kwargs)
+
 def get_current_user_id():
     user = session.get('user')
     if user:

@@ -1,4 +1,5 @@
-// js/manage_group.js
+// manage_group.js
+
 let currentUserRole = null;
 
 $(document).ready(function () {
@@ -132,7 +133,6 @@ $(document).ready(function () {
   });
 });
 
-/* ------------------ Group Info ------------------ */
 function loadGroupInfo(doneCallback) {
   $.get(`/api/groups/${groupId}`, function (group) {
     const ownerName = group.owner?.displayName || "N/A";
@@ -227,7 +227,6 @@ function updateGroupInfo() {
   });
 }
 
-/* ------------------ Membership Table ------------------ */
 function loadMembers(searchTerm, roleFilter) {
   let url = `/api/groups/${groupId}/members`;
 
@@ -329,7 +328,6 @@ function removeMember(userId) {
   });
 }
 
-/* ------------------ Pending Requests ------------------ */
 function loadPendingRequests() {
   $.get(`/api/groups/${groupId}/requests`, function (pending) {
     let rows = "";
@@ -388,7 +386,6 @@ function rejectRequest(requestId) {
   });
 }
 
-/* ------------------ Add Member (Search & Submit) ------------------ */
 function searchUsers() {
   const term = $("#userSearchTerm").val().trim();
   if (!term) {

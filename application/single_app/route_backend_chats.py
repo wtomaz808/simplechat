@@ -219,15 +219,26 @@ def register_route_backend_chats(app):
                 search_results = hybrid_search(user_message, user_id, top_n=5, doc_scope=document_scope, active_group_id=active_group_id)
             if search_results:
                 retrieved_texts = []
+                combined_documents = []
+
                 for doc in search_results:
-                    chunk_text = doc['chunk_text']
+                    classification = doc.get('document_classification')
+                    chunk_text = doc.get('chunk_text')
                     file_name = doc['file_name']
                     version = doc['version']
                     chunk_sequence = doc['chunk_sequence']
-                    page_number = doc.get('page_number') or chunk_sequence
+                    page_number = doc['page_number'] or chunk_sequence
                     citation_id = doc['id']
                     citation = f"(Source: {file_name}, Page: {page_number}) [#{citation_id}]"
                     retrieved_texts.append(f"{chunk_text}\n{citation}")
+                    combined_documents.append({
+                        "file_name": file_name,
+                        "citation_id": citation_id,
+                        "page_number": page_number,
+                        "version": version,
+                        "classification": classification,
+                        "chunk_text": chunk_text
+                    })
 
                 retrieved_content = "\n\n".join(retrieved_texts)
                 system_prompt = (
@@ -247,14 +258,23 @@ def register_route_backend_chats(app):
                     'id': system_message_id,
                     'conversation_id': conversation_id,
                     'role': 'system',
+                    'documents': combined_documents,
                     'content': system_prompt,
                     'timestamp': datetime.utcnow().isoformat(),
                     'model_deployment_name': None,
                 }
                 messages_container.upsert_item(system_doc)
 
-                # Update conversation
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
+
+                if 'classification' not in conversation_item:
+                    conversation_item['classification'] = []
+
+                for doc in combined_documents:
+                    classification = doc.get('classification')
+                    if classification and classification not in conversation_item['classification']:
+                        conversation_item['classification'].append(classification)
+                        
                 container.upsert_item(conversation_item)
 
         # Bing Search

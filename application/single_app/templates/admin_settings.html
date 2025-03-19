@@ -116,7 +116,7 @@
                             {% if settings.enable_landing_page_editor %}checked{% endif %}
                         >
                         <label class="form-check-label ms-2" for="toggleLandingPageEditor">
-                            Enable Markdown Editor
+                            Edit with Markdown
                         </label>
                     </div>
 
@@ -1592,5 +1592,5 @@
     window.imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}');
     window.imageAll = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}');
 </script>
-<script src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/admin_settings.js') }}"></script>
 {% endblock %}

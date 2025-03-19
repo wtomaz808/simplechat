@@ -1008,7 +1008,7 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
         if file_ext in [
             '.pdf', '.docx', '.doc', '.xlsx', '.pptx',
             '.html', '.jpg', '.jpeg', '.png', '.bmp',
-            '.tiff', '.tif', '.heif'
+            '.tiff', '.tif', '.heif', '.csv'
         ]:
             # extract metadata
             if file_ext == '.pdf':
