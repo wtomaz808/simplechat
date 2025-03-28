@@ -203,7 +203,7 @@ def register_route_backend_groups(app):
         if not role:
             return jsonify({"error": "You are not a member of this group"}), 403
 
-        update_active_group_for_user(user_id, group_id)
+        update_active_group_for_user(group_id)
 
         return jsonify({"message": f"Active group set to {group_id}"}), 200
 

@@ -14,10 +14,16 @@ def register_route_frontend_workspace(app):
         settings = get_settings()
         public_settings = sanitize_settings_for_user(settings)
         enable_document_classification = settings.get('enable_document_classification', False)
+        enable_extract_meta_data = settings.get('enable_extract_meta_data', False)
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
                 
-        return render_template('workspace.html', settings=public_settings, enable_document_classification=enable_document_classification)
+        return render_template(
+            'workspace.html', 
+            settings=public_settings, 
+            enable_document_classification=enable_document_classification, 
+            enable_extract_meta_data=enable_extract_meta_data
+        )
 
     

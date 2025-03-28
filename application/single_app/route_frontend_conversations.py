@@ -49,46 +49,6 @@ def register_route_frontend_conversations(app):
             partition_key=conversation_id
         ))
         return render_template('chat.html', conversation_id=conversation_id, messages=messages)
-
-    @app.route('/api/conversations/<conversation_id>', methods=['PUT'])
-    @login_required
-    @user_required
-    def update_conversation_title(conversation_id):
-        user_id = get_current_user_id()
-        if not user_id:
-            return jsonify({'error': 'User not authenticated'}), 401
-
-        # Parse the new title from the request body
-        data = request.get_json()
-        new_title = data.get('title', '').strip()
-        if not new_title:
-            return jsonify({'error': 'Title is required'}), 400
-
-        try:
-            # Retrieve the conversation
-            conversation_item = container.read_item(
-                item=conversation_id,
-                partition_key=conversation_id
-            )
-
-            # Ensure that the conversation belongs to the current user
-            if conversation_item.get('user_id') != user_id:
-                return jsonify({'error': 'Forbidden'}), 403
-
-            # Update the title
-            conversation_item['title'] = new_title
-
-            # Optionally update the last_updated time
-            from datetime import datetime
-            conversation_item['last_updated'] = datetime.utcnow().isoformat()
-
-            # Write back to Cosmos DB
-            container.upsert_item(conversation_item)
-
-            return jsonify({'message': 'Conversation updated', 'title': new_title})
-        except Exception as e:
-            print(e)
-            return jsonify({'error': 'Failed to update conversation'}), 500
     
     @app.route('/conversation/<conversation_id>/messages', methods=['GET'])
     @login_required

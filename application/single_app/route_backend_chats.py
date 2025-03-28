@@ -26,10 +26,23 @@ def register_route_backend_chats(app):
         selected_document_id = data.get('selected_document_id')
         bing_search_enabled = data.get('bing_search')
         image_gen_enabled = data.get('image_generation')
-        gpt_model = ""
-        image_gen_model = ""
         document_scope = data.get('doc_scope')
         active_group_id = data.get('active_group_id')
+
+        # --- Configuration ---
+        # History / Summarization Settings
+        raw_conversation_history_limit = settings.get('conversation_history_limit', 6)
+        # Round up to nearest even number
+        conversation_history_limit = math.ceil(raw_conversation_history_limit)
+        if conversation_history_limit % 2 != 0:
+            conversation_history_limit += 1
+        summarize_content_history_beyond_limit = settings.get('summarize_older_history', True) # Use a dedicated setting if possible
+
+        # Search Summarization Settings (kept separate)
+        summarize_content_history_for_search = True # Or get from settings/request
+        summarize_content_history_for_search_limit = 5 # Or get from settings/request
+
+        max_file_content_length = 50000 # 50KB
 
         # Convert toggles from string -> bool if needed
         if isinstance(hybrid_search_enabled, str):
@@ -40,9 +53,56 @@ def register_route_backend_chats(app):
             image_gen_enabled = image_gen_enabled.lower() == 'true'
 
         # GPT & Image generation APIM or direct
+        gpt_model = ""
+        gpt_client = None
         enable_gpt_apim = settings.get('enable_gpt_apim', False)
         enable_image_gen_apim = settings.get('enable_image_gen_apim', False)
-        max_file_content_length = 50000 # 50KB
+
+        try:
+            if enable_gpt_apim:
+                gpt_model = settings.get('azure_apim_gpt_deployment')
+                if not gpt_model: raise ValueError("APIM GPT deployment name not configured.")
+                gpt_client = AzureOpenAI(
+                    api_version=settings.get('azure_apim_gpt_api_version'),
+                    azure_endpoint=settings.get('azure_apim_gpt_endpoint'),
+                    api_key=settings.get('azure_apim_gpt_subscription_key')
+                )
+            else:
+                auth_type = settings.get('azure_openai_gpt_authentication_type')
+                endpoint = settings.get('azure_openai_gpt_endpoint')
+                api_version = settings.get('azure_openai_gpt_api_version')
+                gpt_model_obj = settings.get('gpt_model', {})
+
+                if gpt_model_obj and gpt_model_obj.get('selected'):
+                    selected_gpt_model = gpt_model_obj['selected'][0]
+                    gpt_model = selected_gpt_model['deploymentName']
+                else:
+                    # Fallback or raise error if no model selected/configured
+                    raise ValueError("No GPT model selected or configured.")
+
+                if auth_type == 'managed_identity':
+                    token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+                    gpt_client = AzureOpenAI(
+                        api_version=api_version,
+                        azure_endpoint=endpoint,
+                        azure_ad_token_provider=token_provider
+                    )
+                else: # Default to API Key
+                    api_key = settings.get('azure_openai_gpt_key')
+                    if not api_key: raise ValueError("Azure OpenAI API Key not configured.")
+                    gpt_client = AzureOpenAI(
+                        api_version=api_version,
+                        azure_endpoint=endpoint,
+                        api_key=api_key
+                    )
+
+            if not gpt_client or not gpt_model:
+                 raise ValueError("GPT Client or Model could not be initialized.")
+
+        except Exception as e:
+             print(f"Error initializing GPT client/model: {e}")
+             # Handle error appropriately - maybe return 500 or default behavior
+             return jsonify({'error': f'Failed to initialize AI model: {str(e)}'}), 500
 
         # ---------------------------------------------------------------------
         # 1) Load or create conversation
@@ -58,23 +118,22 @@ def register_route_backend_chats(app):
             container.upsert_item(conversation_item)
         else:
             try:
-                conversation_item = container.read_item(
-                    item=conversation_id,
-                    partition_key=conversation_id
-                )
+                conversation_item = container.read_item(item=conversation_id, partition_key=conversation_id)
             except CosmosResourceNotFoundError:
-                conversation_id = str(uuid.uuid4())
+                # If conversation ID is provided but not found, create a new one with that ID
+                # Or decide if you want to return an error instead
                 conversation_item = {
-                    'id': conversation_id,
+                    'id': conversation_id, # Keep the provided ID if needed for linking
                     'user_id': user_id,
                     'last_updated': datetime.utcnow().isoformat(),
-                    'title': 'New Conversation'
+                    'title': 'New Conversation' # Or maybe fetch title differently?
                 }
+                # Optionally log that a conversation was expected but not found
+                print(f"Warning: Conversation ID {conversation_id} not found, creating new.")
                 container.upsert_item(conversation_item)
             except Exception as e:
-                return jsonify({
-                    'error': f'Error reading conversation: {str(e)}'
-                }), 500
+                print(f"Error reading conversation {conversation_id}: {e}")
+                return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
 
         # ---------------------------------------------------------------------
         # 2) Append the user message to conversation immediately
@@ -86,22 +145,17 @@ def register_route_backend_chats(app):
             'role': 'user',
             'content': user_message,
             'timestamp': datetime.utcnow().isoformat(),
-            'model_deployment_name': None
+            'model_deployment_name': None # Model not used for user message
         }
         messages_container.upsert_item(user_message_doc)
 
         # Set conversation title if it's still the default
-        if conversation_item.get('title', 'New Conversation') == 'New Conversation':
+        if conversation_item.get('title', 'New Conversation') == 'New Conversation' and user_message:
             new_title = (user_message[:30] + '...') if len(user_message) > 30 else user_message
             conversation_item['title'] = new_title
 
-        # If first message, optionally add default system prompt
-        if conversation_item.get('title', 'New Conversation') == 'New Conversation':
-            short_title = (user_message[:30] + '...') if len(user_message) > 30 else user_message
-            conversation_item['title'] = short_title
-
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
-        container.upsert_item(conversation_item)
+        container.upsert_item(conversation_item) # Update timestamp and potentially title
 
         # ---------------------------------------------------------------------
         # 3) Check Content Safety (but DO NOT return 403).
@@ -208,111 +262,149 @@ def register_route_backend_chats(app):
                 print(f"[Content Safety] Unexpected error: {ex}")
 
         # ---------------------------------------------------------------------
-        # 4) If not blocked, continue your normal logic (hybrid search, Bing, etc.)
+        # 4) Augmentation (Search, Bing, etc.) - Run *before* final history prep
         # ---------------------------------------------------------------------
+        system_messages_for_augmentation = [] # Collect system messages from search/bing
 
         # Hybrid Search
         if hybrid_search_enabled:
-            if selected_document_id:
-                search_results = hybrid_search(user_message, user_id, document_id=selected_document_id, top_n=5, doc_scope=document_scope, active_group_id=active_group_id)
-            else:
-                search_results = hybrid_search(user_message, user_id, top_n=5, doc_scope=document_scope, active_group_id=active_group_id)
+            search_query = user_message
+            # Optional: Summarize recent history *for search* (uses its own limit)
+            if summarize_content_history_for_search:
+                # Fetch last N messages for search context
+                limit_n_search = summarize_content_history_for_search_limit * 2
+                query_search = f"SELECT TOP {limit_n_search} * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp DESC"
+                params_search = [{"name": "@conv_id", "value": conversation_id}]
+                try:
+                    last_messages_desc = list(messages_container.query_items(
+                        query=query_search, parameters=params_search, partition_key=conversation_id, enable_cross_partition_query=True
+                    ))
+                    last_messages_asc = list(reversed(last_messages_desc))
+
+                    if last_messages_asc:
+                        summary_prompt_search = "Please summarize the key topics or questions from this recent conversation history in 50 words or less:\n\n"
+                        message_texts_search = [f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}" for msg in last_messages_asc]
+                        summary_prompt_search += "\n".join(message_texts_search)
+
+                        try:
+                            # Use the already initialized gpt_client and gpt_model
+                            summary_response_search = gpt_client.chat.completions.create(
+                                model=gpt_model,
+                                messages=[{"role": "system", "content": summary_prompt_search}],
+                                max_tokens=100 # Keep summary short
+                            )
+                            summary_for_search = summary_response_search.choices[0].message.content.strip()
+                            if summary_for_search:
+                                search_query = f"Based on the recent conversation about: '{summary_for_search}', the user is now asking: {user_message}"
+                        except Exception as e:
+                            print(f"Error summarizing conversation for search: {e}")
+                            # Proceed with original user_message as search_query
+                except Exception as e:
+                    print(f"Error fetching messages for search summarization: {e}")
+
+
+            # Perform the search
+            search_results = []
+            try:
+                search_args = {
+                    "query": search_query,
+                    "user_id": user_id,
+                    "top_n": 20,
+                    "doc_scope": document_scope,
+                    "active_group_id": active_group_id
+                }
+                if selected_document_id:
+                    search_args["document_id"] = selected_document_id
+
+                search_results = hybrid_search(**search_args) # Assuming hybrid_search handles None document_id
+            except Exception as e:
+                 print(f"Error during hybrid search: {e}")
+                 # Optionally inform the user or just proceed without search results
+
             if search_results:
                 retrieved_texts = []
                 combined_documents = []
+                classifications_found = set(conversation_item.get('classification', [])) # Load existing
 
                 for doc in search_results:
+                    # ... (your existing doc processing logic) ...
+                    chunk_text = doc.get('chunk_text', '')
+                    file_name = doc.get('file_name', 'Unknown')
+                    version = doc.get('version', 'N/A') # Add default
+                    chunk_sequence = doc.get('chunk_sequence', 0) # Add default
+                    page_number = doc.get('page_number') or chunk_sequence or 1 # Ensure a fallback page
+                    citation_id = doc.get('id', str(uuid.uuid4())) # Ensure ID exists
                     classification = doc.get('document_classification')
-                    chunk_text = doc.get('chunk_text')
-                    file_name = doc['file_name']
-                    version = doc['version']
-                    chunk_sequence = doc['chunk_sequence']
-                    page_number = doc['page_number'] or chunk_sequence
-                    citation_id = doc['id']
+
                     citation = f"(Source: {file_name}, Page: {page_number}) [#{citation_id}]"
                     retrieved_texts.append(f"{chunk_text}\n{citation}")
                     combined_documents.append({
-                        "file_name": file_name,
-                        "citation_id": citation_id,
-                        "page_number": page_number,
-                        "version": version,
-                        "classification": classification,
-                        "chunk_text": chunk_text
+                        "file_name": file_name, "citation_id": citation_id, "page_number": page_number,
+                        "version": version, "classification": classification, "chunk_text": chunk_text
                     })
+                    if classification:
+                        classifications_found.add(classification)
 
                 retrieved_content = "\n\n".join(retrieved_texts)
-                system_prompt = (
-                    "You are an AI assistant provided with the following document excerpts and their sources.\n"
-                    "When you answer the user's question, please cite the sources by including the citations provided after each excerpt.\n"
-                    "Use the format (Source: filename, Page: page number) [#ID] for citations, where ID is the unique identifier provided.\n"
-                    "Ensure your response is informative and includes citations using this format.\n\n"
-                    "For example:\n"
-                    "User: What is the policy on double dipping?\n"
-                    "Assistant: The policy prohibits entities from using federal funds received through one program to apply for additional \n"
-                    "funds through another program, commonly known as 'double dipping' (Source: PolicyDocument.pdf, Page: 12) [#123abc].\n\n"
-                    f"{retrieved_content}"
-                )
+                # Construct system prompt for search results
+                system_prompt_search = f"""You are an AI assistant. Use the following retrieved document excerpts to answer the user's question. Cite sources using the format (Source: filename, Page: page number) [#ID].
 
-                system_message_id = f"{conversation_id}_system_{int(time.time())}_{random.randint(1000,9999)}"
-                system_doc = {
-                    'id': system_message_id,
-                    'conversation_id': conversation_id,
+                    Retrieved Excerpts:
+                    {retrieved_content}
+
+                    Based *only* on the information provided above, answer the user's query. If the answer isn't in the excerpts, say so.
+
+                    Example
+                    User: What is the policy on double dipping?
+                    Assistant: The policy prohibits entities from using federal funds received through one program to apply for additional funds through another program, commonly known as 'double dipping' (Source: PolicyDocument.pdf, Page: 12) [#123abc]
+                    """
+                # Add this to a temporary list, don't save to DB yet
+                system_messages_for_augmentation.append({
                     'role': 'system',
-                    'documents': combined_documents,
-                    'content': system_prompt,
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'model_deployment_name': None,
-                }
-                messages_container.upsert_item(system_doc)
+                    'content': system_prompt_search,
+                    'documents': combined_documents # Keep track of docs used
+                })
 
-                conversation_item['last_updated'] = datetime.utcnow().isoformat()
-
-                if 'classification' not in conversation_item:
-                    conversation_item['classification'] = []
-
-                for doc in combined_documents:
-                    classification = doc.get('classification')
-                    if classification and classification not in conversation_item['classification']:
-                        conversation_item['classification'].append(classification)
-                        
-                container.upsert_item(conversation_item)
+                # Update conversation classifications if new ones were found
+                if list(classifications_found) != conversation_item.get('classification', []):
+                     conversation_item['classification'] = list(classifications_found)
+                     # No need to upsert item here, will be updated later
 
         # Bing Search
         if bing_search_enabled:
-            bing_results = process_query_with_bing_and_llm(user_message)
+            bing_results = []
+            try:
+                bing_results = process_query_with_bing_and_llm(user_message) # Assuming this function exists and works
+            except Exception as e:
+                 print(f"Error during Bing search: {e}")
+                 # Optionally inform user or proceed
+
             if bing_results:
-                retrieved_texts = []
+                retrieved_texts_bing = []
                 for r in bing_results:
-                    title = r["name"]
-                    snippet = r["snippet"]
-                    url = r["url"]
+                    title = r.get("name", "Untitled")
+                    snippet = r.get("snippet", "No snippet available.")
+                    url = r.get("url", "#")
                     citation = f"(Source: {title}) [{url}]"
-                    retrieved_texts.append(f"{snippet}\n{citation}")
+                    retrieved_texts_bing.append(f"{snippet}\n{citation}")
 
-                retrieved_content = "\n\n".join(retrieved_texts)
-                system_prompt = (
-                    "You are an AI assistant provided with the following web search results.\n"
-                    "When you answer the user's question, cite the sources by including the citations:\n"
-                    "Use the format (Source: page_title) [url].\n\n"
-                    "For example:\n"
-                    "User: What is the capital of France?\n"
-                    "Assistant: The capital of France is Paris (Source: OfficialFrancePage) [https://url.com].\n\n"
-                    f"{retrieved_content}"
-                )
-                bind_search_message_id = f"{conversation_id}_bing_search_{int(time.time())}_{random.randint(1000,9999)}"
-                bing_search_doc = {
-                    'id': bind_search_message_id,
-                    'conversation_id': conversation_id,
+                retrieved_content_bing = "\n\n".join(retrieved_texts_bing)
+                system_prompt_bing = f"""You are an AI assistant. Use the following web search results to answer the user's question. Cite sources using the format (Source: page_title) [url].
+
+                    Web Search Results:
+                    {retrieved_content_bing}
+
+                    Based *only* on the information provided above, answer the user's query. If the answer isn't in the results, say so.
+
+                    Example:
+                    User: What is the capital of France?
+                    Assistant: The capital of France is Paris (Source: OfficialFrancePage) [https://url.com]
+                    """
+                # Add to the temporary list
+                system_messages_for_augmentation.append({
                     'role': 'system',
-                    'content': system_prompt,
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'model_deployment_name': None,
-                }
-                messages_container.upsert_item(bing_search_doc)
-
-                # Update conversation
-                conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                container.upsert_item(conversation_item)
+                    'content': system_prompt_bing
+                })
 
         # Image Generation
         if image_gen_enabled:
@@ -385,132 +477,206 @@ def register_route_backend_chats(app):
                 }), 500
 
         # ---------------------------------------------------------------------
-        # 5) Prepare conversation history for GPT
+        # 5) Prepare FINAL conversation history for GPT (including summarization)
         # ---------------------------------------------------------------------
-        conversation_history_limit = settings.get('conversation_history_limit')
-        message_query = f"""
-                SELECT TOP {conversation_history_limit} * FROM c
-                WHERE c.conversation_id = '{conversation_id}'
-                ORDER BY c.timestamp DESC
-        """
-        latest_messages = list(messages_container.query_items(
-            query=message_query,
-            partition_key=conversation_id
-        ))
-        conversation_history = latest_messages
-
-
-        # ---------------------------------------------------------------------
-        # 5) GPT logic
-        # ---------------------------------------------------------------------
-
-        # Decide GPT model
-        if enable_gpt_apim:
-            gpt_model = settings.get('azure_apim_gpt_deployment')
-            gpt_client = AzureOpenAI(
-                api_version=settings.get('azure_apim_gpt_api_version'),
-                azure_endpoint=settings.get('azure_apim_gpt_endpoint'),
-                api_key=settings.get('azure_apim_gpt_subscription_key')
-            )
-        else:
-            if (settings.get('azure_openai_gpt_authentication_type') == 'managed_identity'):
-                token_provider = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
-                gpt_client = AzureOpenAI(
-                    api_version=settings.get('azure_openai_gpt_api_version'),
-                    azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
-                    azure_ad_token_provider=token_provider
-                )
-                gpt_model_obj = settings.get('gpt_model', {})
-                if gpt_model_obj and gpt_model_obj.get('selected'):
-                    selected_gpt_model = gpt_model_obj['selected'][0]
-                    gpt_model = selected_gpt_model['deploymentName']
-            else:
-                gpt_client = AzureOpenAI(
-                    api_version=settings.get('azure_openai_gpt_api_version'),
-                    azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
-                    api_key=settings.get('azure_openai_gpt_key')
-                )
-                gpt_model_obj = settings.get('gpt_model', {})
-                if gpt_model_obj and gpt_model_obj.get('selected'):
-                    selected_gpt_model = gpt_model_obj['selected'][0]
-                    gpt_model = selected_gpt_model['deploymentName']
-
-
-        allowed_roles = ['system', 'assistant', 'user', 'function', 'tool']
-        translated_roles = ['file', 'image']
-        skipped_roles = ['safety', 'blocked']
         conversation_history_for_api = []
-        for message in conversation_history:
-            if message['role'] in allowed_roles:
-                conversation_history_for_api.append(message)
-            elif message['role'] == 'file':
-                file_content = message.get('file_content', '')
-                filename = message.get('filename', 'uploaded_file')
-                if len(file_content) > max_file_content_length:
-                    summary_response = gpt_client.chat.completions.create(
-                        model=gpt_model,
-                        messages=[
-                            {
-                                'role': 'system',
-                                'content': (
-                                    "The user uploaded a file with the following content:\n\n"
-                                    f"{file_content}\n\n"
-                                    "Please summarize this content to fit within 50KB."
-                                )
-                            }
-                        ]
-                    )
-                    summarized_content = summary_response.choices[0].message.content
-
-                    system_message = {
-                        'role': 'system',
-                        'content': f"The user uploaded a file, larger than {max_file_content_length}, named '{filename}' with the following summarized content:\n\n{summarized_content}\n\nPlease use this information to assist the user.",
-                        'model_deployment_name': None
-                    }
-                    conversation_history_for_api.append(system_message)
-                else:
-                    system_message = {
-                        'role': 'system',
-                        'content': f"The user uploaded a file named '{filename}' with the following content:\n\n{file_content}\n\nPlease use this information to assist the user.",
-                        'model_deployment_name': None
-                    }
-                    conversation_history_for_api.append(system_message)
-            else:
-                continue
+        summary_of_older = ""
 
         try:
+            # Fetch ALL messages for potential summarization, sorted OLD->NEW
+            all_messages_query = "SELECT * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp ASC"
+            params_all = [{"name": "@conv_id", "value": conversation_id}]
+            all_messages = list(messages_container.query_items(
+                query=all_messages_query, parameters=params_all, partition_key=conversation_id, enable_cross_partition_query=True
+            ))
+
+            total_messages = len(all_messages)
+
+            # Determine which messages are "recent" and which are "older"
+            # `conversation_history_limit` includes the *current* user message
+            num_recent_messages = min(total_messages, conversation_history_limit)
+            num_older_messages = total_messages - num_recent_messages
+
+            recent_messages = all_messages[-num_recent_messages:] # Last N messages
+            older_messages_to_summarize = all_messages[:num_older_messages] # Messages before the recent ones
+
+            # Summarize older messages if needed and present
+            if summarize_content_history_beyond_limit and older_messages_to_summarize:
+                print(f"Summarizing {len(older_messages_to_summarize)} older messages for conversation {conversation_id}")
+                summary_prompt_older = (
+                    "Summarize the following conversation history concisely (around 50-100 words), "
+                    "focusing on key facts, decisions, or context that might be relevant for future turns. "
+                    "Do not add any introductory phrases like 'Here is a summary'.\n\n"
+                    "Conversation History:\n"
+                )
+                message_texts_older = []
+                for msg in older_messages_to_summarize:
+                    role = msg.get('role', 'user')
+                    # Skip roles that shouldn't be in summary (adjust as needed)
+                    if role in ['system', 'safety', 'blocked', 'image', 'file']: continue
+                    content = msg.get('content', '')
+                    message_texts_older.append(f"{role.upper()}: {content}")
+
+                if message_texts_older: # Only summarize if there's content to summarize
+                    summary_prompt_older += "\n".join(message_texts_older)
+                    try:
+                        # Use the already initialized client and model
+                        summary_response_older = gpt_client.chat.completions.create(
+                            model=gpt_model,
+                            messages=[{"role": "system", "content": summary_prompt_older}],
+                            max_tokens=150, # Adjust token limit for summary
+                            temperature=0.3 # Lower temp for factual summary
+                        )
+                        summary_of_older = summary_response_older.choices[0].message.content.strip()
+                        print(f"Generated summary: {summary_of_older}")
+                    except Exception as e:
+                        print(f"Error summarizing older conversation history: {e}")
+                        summary_of_older = "" # Failed, proceed without summary
+                else:
+                    print("No summarizable content found in older messages.")
+
+
+            # Construct the final history for the API call
+            # Start with the summary if available
+            if summary_of_older:
+                conversation_history_for_api.append({
+                    "role": "system",
+                    "content": f"<Summary of previous conversation context>\n{summary_of_older}\n</Summary of previous conversation context>"
+                })
+
+            # Add augmentation system messages (search, bing) next
+            # **Important**: Decide if you want these saved. If so, you need to upsert them now.
+            # For simplicity here, we're just adding them to the API call context.
+            for aug_msg in system_messages_for_augmentation:
+                 # Optionally save these system messages to DB if you want them persisted
+                 # system_message_id = f"{conversation_id}_system_aug_{int(time.time())}_{random.randint(1000,9999)}"
+                 # system_doc = { 'id': system_message_id, 'conversation_id': conversation_id, **aug_msg, 'timestamp': datetime.utcnow().isoformat() }
+                 # messages_container.upsert_item(system_doc)
+                 conversation_history_for_api.append(aug_msg) # Add to API context
+
+
+            # Add the recent messages (user, assistant, relevant system/file messages)
+            allowed_roles_in_history = ['user', 'assistant'] # Add 'system' if you PERSIST general system messages not related to augmentation
+            max_file_content_length_in_history = 1000 # Limit file content directly in history
+
+            for message in recent_messages:
+                role = message.get('role')
+                content = message.get('content')
+
+                if role in allowed_roles_in_history:
+                    conversation_history_for_api.append({"role": role, "content": content})
+                elif role == 'file': # Handle file content inclusion (simplified)
+                     filename = message.get('filename', 'uploaded_file')
+                     file_content = message.get('file_content', '') # Assuming file content is stored
+                     display_content = file_content[:max_file_content_length_in_history]
+                     if len(file_content) > max_file_content_length_in_history:
+                         display_content += "..."
+                     conversation_history_for_api.append({
+                         'role': 'system', # Represent file as system info
+                         'content': f"[User uploaded a file named '{filename}'. Content preview:\n{display_content}]\nUse this file context if relevant."
+                     })
+                # elif role == 'image': # If you want to represent image generation prompts/results
+                #     prompt = message.get('prompt', 'User generated an image.')
+                #     img_url = message.get('content', '') # URL is in content
+                #     conversation_history_for_api.append({
+                #         'role': 'system',
+                #         'content': f"[Assistant generated an image based on the prompt: '{prompt}'. Image URL: {img_url}]"
+                #     })
+
+                # Ignored roles: 'safety', 'blocked', 'system' (if they are only for augmentation/summary)
+
+            # Ensure the very last message is the current user's message (it should be if fetched correctly)
+            if not conversation_history_for_api or conversation_history_for_api[-1]['role'] != 'user':
+                 print("Warning: Last message in history is not the user's current message. Appending.")
+                 # This might happen if 'recent_messages' somehow didn't include the latest user message saved in step 2
+                 # Or if the last message had an ignored role. Find the actual user message:
+                 user_msg_found = False
+                 for msg in reversed(recent_messages):
+                     if msg['role'] == 'user' and msg['id'] == user_message_id:
+                         conversation_history_for_api.append({"role": "user", "content": msg['content']})
+                         user_msg_found = True
+                         break
+                 if not user_msg_found: # Still not found? Append the original input as fallback
+                     conversation_history_for_api.append({"role": "user", "content": user_message})
+
+
+        except Exception as e:
+            print(f"Error preparing conversation history: {e}")
+            return jsonify({'error': f'Error preparing conversation history: {str(e)}'}), 500
+
+        # ---------------------------------------------------------------------
+        # 6) Final GPT Call
+        # ---------------------------------------------------------------------
+        ai_message = "Sorry, I encountered an error." # Default error message
+        final_model_used = gpt_model # Track model used for the response
+
+        if not conversation_history_for_api:
+             return jsonify({'error': 'Cannot generate response: No conversation history available.'}), 500
+        if conversation_history_for_api[-1].get('role') != 'user':
+             print(f"Error: Last message role is not user: {conversation_history_for_api[-1].get('role')}")
+             return jsonify({'error': 'Internal error: Conversation history improperly formed.'}), 500
+
+        try:
+            print(f"--- Sending to GPT ({final_model_used}) ---")
+            # print(json.dumps(conversation_history_for_api, indent=2)) # DEBUG: Log the exact history sent
+            print(f"Total messages in API call: {len(conversation_history_for_api)}")
+            # Calculate rough token estimate if needed for debugging
+
             response = gpt_client.chat.completions.create(
-                model=gpt_model,
-                messages=conversation_history_for_api
+                model=final_model_used,
+                messages=conversation_history_for_api,
+                # Add other parameters like temperature, max_tokens if needed
             )
             ai_message = response.choices[0].message.content
-        except Exception as e:
-            print(str(e))
-            return jsonify({
-                'error': f'Error generating model response: {str(e)}'
-            }), 500
 
-        # 6) Save GPT response
+            # Optional: Log token usage
+            # print(f"Completion Tokens: {response.usage.completion_tokens}")
+            # print(f"Prompt Tokens: {response.usage.prompt_tokens}")
+            # print(f"Total Tokens: {response.usage.total_tokens}")
+
+        except Exception as e:
+            print(f"Error during final GPT completion: {str(e)}")
+            # Keep the default error message 'ai_message'
+            # Optionally, set a more specific error message based on exception type
+            if "context length" in str(e).lower():
+                 ai_message = "Sorry, the conversation history is too long even after summarization. Please start a new conversation or try a shorter message."
+            else:
+                 ai_message = f"Sorry, I encountered an error generating the response. Details: {str(e)}"
+            # Return 500 but include the error message for the user
+            # Save the error message as the assistant response? Or just return error?
+            # Let's save the error as the response for now.
+            pass # Fallthrough to save the error message
+
+
+        # ---------------------------------------------------------------------
+        # 7) Save GPT response (or error message)
+        # ---------------------------------------------------------------------
         assistant_message_id = f"{conversation_id}_assistant_{int(time.time())}_{random.randint(1000,9999)}"
         assistant_doc = {
             'id': assistant_message_id,
             'conversation_id': conversation_id,
             'role': 'assistant',
-            'content': ai_message,
+            'content': ai_message, # Save the actual response or the error message
             'timestamp': datetime.utcnow().isoformat(),
-            'model_deployment_name': gpt_model
+            'model_deployment_name': final_model_used # Log the model attempted/used
+            # Optionally add token usage: 'usage': response.usage.dict() if response and response.usage else None
         }
         messages_container.upsert_item(assistant_doc)
 
-        # Update conversation's last_updated
+        # Update conversation's last_updated timestamp one last time
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
+        # Add any other final updates to conversation_item if needed (like classifications if not done earlier)
         container.upsert_item(conversation_item)
 
-        # 7) Return final success
+        # ---------------------------------------------------------------------
+        # 8) Return final success (even if AI generated an error message)
+        # ---------------------------------------------------------------------
         return jsonify({
-            'reply': ai_message,
+            'reply': ai_message, # Send the AI's response (or the error message) back
             'conversation_id': conversation_id,
-            'conversation_title': conversation_item['title'],
-            'model_deployment_name': gpt_model,
-            'message_id': assistant_message_id
+            'conversation_title': conversation_item['title'], # Send updated title
+            'classification': conversation_item.get('classification', []), # Send classifications if any
+            'model_deployment_name': final_model_used,
+            'message_id': assistant_message_id,
+            'blocked': False # Explicitly false if we got this far
         }), 200

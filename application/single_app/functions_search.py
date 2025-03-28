@@ -4,7 +4,7 @@ from config import *
 from functions_content import *
 from functions_documents import *
 
-def hybrid_search(query, user_id, document_id=None, top_n=3, doc_scope="all", active_group_id=None):
+def hybrid_search(query, user_id, document_id=None, top_n=20, doc_scope="all", active_group_id=None):
     """
     Hybrid search that queries the user doc index or the group doc index
     depending on doc type.

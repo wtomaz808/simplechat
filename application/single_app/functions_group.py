@@ -103,7 +103,8 @@ def find_group_by_id(group_id):
     except exceptions.CosmosResourceNotFoundError:
         return None
 
-def update_active_group_for_user(user_id, group_id):
+def update_active_group_for_user(group_id):
+    user_id = get_current_user_id()
     new_settings = {
         "settings": {
             "activeGroupOid": group_id

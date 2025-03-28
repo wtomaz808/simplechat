@@ -83,9 +83,23 @@ def get_settings():
             'enable_audio_file_support': False,
 
             # Metadata Extraction
+            'enable_extract_meta_data': False,
             # title, authors, publication date, keywords, summary
             'enable_document_classification': False,
-            'document_classification_categories': ["TBD", "Unknown"],
+            'document_classification_categories': [
+                {
+                    "label": "None",
+                    "color": "#808080"
+                },
+                {
+                    "label": "N/A",
+                    "color": "#808080"
+                },
+                {
+                    "label": "Pending",
+                    "color": "#0000FF"
+                }
+            ],
 
             # Enhanced Citations
             'enable_enhanced_citations': False,
@@ -174,30 +188,79 @@ def decrypt_key(encrypted_key):
         return None
 
 def get_user_settings(user_id):
-    doc_id = str(user_id)
+    """Fetches the user settings document from Cosmos DB."""
     try:
-        return user_settings_container.read_item(item=doc_id, partition_key=doc_id)
+        doc = user_settings_container.read_item(item=user_id, partition_key=user_id)
+        # Ensure the settings key exists for consistency downstream
+        if 'settings' not in doc:
+            doc['settings'] = {}
+        return doc
     except exceptions.CosmosResourceNotFoundError:
-        return {
-            "id": user_id,
-            "settings": {
-                "activeGroupOid": ""
-            },
-            "lastUpdated": None
-        }
+        # Return a default structure if the user has no settings saved yet
+        return {"id": user_id, "settings": {}}
+    except Exception as e:
+        print(f"Error in get_user_settings for {user_id}: {e}")
+        raise # Re-raise the exception to be handled by the route
     
-def update_user_settings(user_id, new_settings):
-    doc_id = str(user_id)
+def update_user_settings(user_id, settings_to_update):
+    """
+    Updates or creates user settings in Cosmos DB, merging new settings
+    into the existing 'settings' sub-dictionary and updating 'lastUpdated'.
+
+    Args:
+        user_id (str): The ID of the user.
+        settings_to_update (dict): A dictionary containing the specific
+                                   settings key/value pairs to update.
+
+    Returns:
+        bool: True if the update was successful, False otherwise.
+    """
+    log_prefix = f"User settings update for {user_id}:"
+
+
     try:
-        doc = user_settings_container.read_item(item=doc_id, partition_key=doc_id)
-        doc.update(new_settings)
-        user_settings_container.upsert_item(doc)
-    except exceptions.CosmosResourceNotFoundError:
-        doc = {
-            "id": doc_id,
-            **new_settings
-        }
-        user_settings_container.upsert_item(doc)
+        # Try to read the existing document
+        try:
+            doc = user_settings_container.read_item(item=user_id, partition_key=user_id)
+
+            # Ensure the 'settings' key exists and is a dictionary
+            if 'settings' not in doc or not isinstance(doc.get('settings'), dict):
+                doc['settings'] = {}
+
+
+        except exceptions.CosmosResourceNotFoundError:
+
+            # Document doesn't exist, create the basic structure
+            doc = {
+                "id": user_id,
+                "settings": {} # Initialize the settings dictionary
+                # Add any other default top-level fields if needed
+            }
+
+        # --- Merge the new settings into the 'settings' sub-dictionary ---
+        doc['settings'].update(settings_to_update)
+
+        # --- Update the timestamp ---
+        # Use timezone-aware UTC time
+        doc['lastUpdated'] = datetime.now(timezone.utc).isoformat()
+
+
+
+        # Upsert the modified document
+        user_settings_container.upsert_item(body=doc) # Use body=doc for clarity
+
+
+        return True
+
+    except exceptions.CosmosHttpResponseError as e:
+        print(f"{log_prefix} Cosmos DB HTTP error: {e}")
+
+        return False
+    except Exception as e:
+        # Catch any other unexpected errors during the update process
+        print(f"{log_prefix} Unexpected error during update: {e}")
+
+        return False
 
 def enabled_required(setting_key):
     def decorator(f):

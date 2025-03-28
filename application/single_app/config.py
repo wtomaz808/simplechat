@@ -15,8 +15,9 @@ import markdown2
 import re
 import docx
 import fitz # PyMuPDF
+import math
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
+from flask import Flask, flash, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
 from functools import wraps
@@ -55,7 +56,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.137'
+app.config['VERSION'] = '0.207.251'
 Session(app)
 
 CLIENTS = {}
@@ -64,6 +65,7 @@ CLIENTS_LOCK = threading.Lock()
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
 }
+ALLOWED_EXTENSIONS_IMG = {'png', 'jpg', 'jpeg'}
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
 # Azure AD Configuration

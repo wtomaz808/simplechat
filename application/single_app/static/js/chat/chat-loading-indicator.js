@@ -51,3 +51,34 @@ export function hideLoadingIndicatorInChatbox() {
     loadingIndicator.remove();
   }
 }
+
+export function showFileUploadingMessage() {
+  const chatbox = document.getElementById("chatbox");
+  if (!chatbox) return null;
+
+  // Create a wrapper for the system message
+  const msgWrapper = document.createElement("div");
+  msgWrapper.classList.add("chat-message", "system-message", "file-uploading-msg");
+  // You might have your own classes like "ai-message" or "system-message"
+
+  // You can style this similarly to how you show "AI is typing..."
+  msgWrapper.innerHTML = `
+    <div class="message-content">
+      <div class="spinner-border text-primary" role="status" style="margin-right: 8px;">
+        <span class="visually-hidden">Uploading file to chat...</span>
+      </div>
+      <span>Uploading file to chat...</span>
+    </div>
+  `;
+
+  chatbox.appendChild(msgWrapper);
+  chatbox.scrollTop = chatbox.scrollHeight;
+  
+  return msgWrapper;
+}
+
+export function hideFileUploadingMessage(uploadingMsgEl) {
+  if (uploadingMsgEl && uploadingMsgEl.parentNode) {
+    uploadingMsgEl.parentNode.removeChild(uploadingMsgEl);
+  }
+}

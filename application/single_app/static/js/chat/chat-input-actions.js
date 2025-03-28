@@ -2,31 +2,49 @@
 
 import { showToast } from "./chat-toast.js";
 import { createNewConversation } from "./chat-conversations.js";
+import { 
+  showFileUploadingMessage, 
+  hideFileUploadingMessage, 
+  showLoadingIndicator, 
+  hideLoadingIndicator  
+} from "./chat-loading-indicator.js";
+import { loadMessages } from "./chat-messages.js";
 
 const imageGenBtn = document.getElementById("image-generate-btn");
 const webSearchBtn = document.getElementById("search-web-btn");
 const chooseFileBtn = document.getElementById("choose-file-btn");
 const fileInputEl = document.getElementById("file-input");
 const uploadBtn = document.getElementById("upload-btn");
+const cancelFileSelection = document.getElementById("cancel-file-selection");
 
 export function resetFileButton() {
   const fileInputEl = document.getElementById("file-input");
+  const fileBtn = document.getElementById("choose-file-btn");
+  const uploadBtn = document.getElementById("upload-btn");
+  const cancelFileSelection = document.getElementById("cancel-file-selection");
+
   if (fileInputEl) {
     fileInputEl.value = "";
   }
-  const fileBtn = document.getElementById("choose-file-btn");
+  
   if (fileBtn) {
     fileBtn.classList.remove("active");
     fileBtn.querySelector(".file-btn-text").textContent = "";
   }
-  const uploadBtn = document.getElementById("upload-btn");
+  
   if (uploadBtn) {
     uploadBtn.style.display = "none";
+  }
+
+  if (cancelFileSelection) {
+    cancelFileSelection.style.display = "none";
   }
 }
 
 
 export function uploadFileToConversation(file) {
+  const uploadingIndicatorEl = showFileUploadingMessage();
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("conversation_id", currentConversationId);
@@ -36,6 +54,8 @@ export function uploadFileToConversation(file) {
     body: formData,
   })
     .then((response) => {
+      hideFileUploadingMessage(uploadingIndicatorEl);
+
       let clonedResponse = response.clone();
       return response.json().then((data) => {
         if (!response.ok) {
@@ -50,6 +70,7 @@ export function uploadFileToConversation(file) {
       if (data.conversation_id) {
         currentConversationId = data.conversation_id;
         loadMessages(currentConversationId);
+        loadConversations();
       } else {
         console.error("No conversation_id returned from server.");
         showToast("Error: No conversation ID returned from server.", "danger");
@@ -60,6 +81,7 @@ export function uploadFileToConversation(file) {
       console.error("Error:", error);
       showToast("Error uploading file: " + error.message, "danger");
       resetFileButton();
+      hideFileUploadingMessage(uploadingIndicatorEl);
     });
 }
 
@@ -219,9 +241,18 @@ if (fileInputEl) {
       fileBtn.classList.add("active");
       fileBtn.querySelector(".file-btn-text").textContent = file.name;
       uploadBtn.style.display = "block";
+      cancelFileSelection.style.display = "inline";
     } else {
       resetFileButton();
     }
+  });
+}
+
+if (cancelFileSelection) {
+  // Prevent the click from also triggering the "choose file" flow.
+  cancelFileSelection.addEventListener("click", (event) => {
+    event.stopPropagation();
+    resetFileButton();
   });
 }
 

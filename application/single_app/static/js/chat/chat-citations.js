@@ -233,7 +233,6 @@ export function showPdfModal(docId, pageNumber) {
     pdfModal.id = "pdf-modal";
     pdfModal.classList.add("modal", "fade");
     pdfModal.tabIndex = -1;
-    pdfModal.setAttribute("aria-hidden", "true");
     pdfModal.innerHTML = `
       <div class="modal-dialog modal-dialog-scrollable modal-xl modal-fullscreen-sm-down">
         <div class="modal-content">

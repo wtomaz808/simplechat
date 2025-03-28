@@ -18,12 +18,22 @@ def register_route_frontend_chats(app):
         enable_user_feedback = public_settings.get("enable_user_feedback", False)
         enable_enhanced_citations = public_settings.get("enable_enhanced_citations", False)
         enable_document_classification = public_settings.get("enable_document_classification", False)
+        enable_extract_meta_data = public_settings.get("enable_extract_meta_data", False)
         active_group_id = user_settings["settings"].get("activeGroupOid", "")
         categories_list = public_settings.get("document_classification_categories","")
         
         if not user_id:
             return redirect(url_for('login'))
-        return render_template('chats.html', settings=public_settings, enable_user_feedback=enable_user_feedback, active_group_id=active_group_id, enable_enhanced_citations=enable_enhanced_citations, enable_document_classification=enable_document_classification, document_classification_categories=categories_list)
+        return render_template(
+            'chats.html', 
+            settings=public_settings, 
+            enable_user_feedback=enable_user_feedback, 
+            active_group_id=active_group_id, 
+            enable_enhanced_citations=enable_enhanced_citations, 
+            enable_document_classification=enable_document_classification, 
+            document_classification_categories=categories_list, 
+            enable_extract_meta_data=enable_extract_meta_data
+        )
     
     @app.route('/upload', methods=['POST'])
     @login_required

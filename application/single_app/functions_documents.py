@@ -77,13 +77,15 @@ def create_document(file_name, user_id, document_id, num_file_chunks, status):
             "file_name": file_name,
             "user_id": user_id,
             "num_chunks": 0,
+            "number_of_pages": 0,
+            "current_file_chunk": 0,
             "num_file_chunks": num_file_chunks,
             "upload_date": formatted_time,
             "last_updated": formatted_time,
             "version": version,
             "status": status,
             "percentage_complete": 0,
-            "document_classification": "TBD",
+            "document_classification": "Pending",
             "type": "document_metadata"
         }
         documents_container.upsert_item(document_metadata)
@@ -119,39 +121,123 @@ def get_document_metadata(document_id, user_id):
     except Exception as e:
         print(f"Error retrieving document metadata: {e}")
         return None
-    
+
+def calculate_processing_percentage(doc_metadata):
+    """
+    Calculates a simpler, step-based processing percentage based on status
+    and page saving progress.
+
+    Args:
+        doc_metadata (dict): The current document metadata dictionary.
+
+    Returns:
+        int: The calculated percentage (0-100).
+    """
+    status = doc_metadata.get('status', '').lower()
+    current_pct = doc_metadata.get('percentage_complete', 0)
+    estimated_pages = doc_metadata.get('number_of_pages', 0)
+    total_chunks_saved = doc_metadata.get('current_file_chunk', 0)
+
+    # --- Final States ---
+    if "processing complete" in status or current_pct == 100:
+        # Ensure it stays 100 if it ever reached it
+        return 100
+    if "error" in status or "failed" in status:
+        # Keep the last known percentage on error/failure
+        return current_pct
+
+    # --- Calculate percentage based on phase/status ---
+    calculated_pct = 0
+
+    # Phase 1: Initial steps up to sending to DI
+    if "queued" in status.lower():
+        calculated_pct = 0
+
+    elif "sending" in status.lower():
+        # Explicitly sending data for analysis
+        calculated_pct = 5
+
+    # Phase 3: Saving Pages (The main progress happens here: 10% -> 90%)
+    elif "saving page" in status.lower(): # Status indicating the loop saving chunks/pages is active
+        if estimated_pages > 0:
+            # Calculate progress ratio (0.0 to 1.0)
+            # Ensure saved count doesn't exceed estimate for the ratio
+            safe_chunks_saved = min(total_chunks_saved, estimated_pages)
+            progress_ratio = safe_chunks_saved / estimated_pages
+
+            # Map the ratio to the percentage range [10, 90]
+            # The range covers 80 percentage points (90 - 10)
+            calculated_pct = 5 + (progress_ratio * 80)
+        else:
+            # If page count is unknown, we can't show granular progress.
+            # Stay at the beginning of this phase.
+            calculated_pct = 5
+
+    # Phase 4: Final Metadata Extraction (Optional, after page saving)
+    elif "extracting final metadata" in status.lower():
+        # This phase should start after page saving is effectively done (>=90%)
+        # Assign a fixed value during this step.
+        calculated_pct = 95
+
+    # Default/Fallback: If status doesn't match known phases,
+    # use the current percentage. This handles intermediate statuses like
+    # "Chunk X/Y saved" which might occur between "saving page" updates.
+    else:
+        calculated_pct = current_pct
+
+
+    # --- Final Adjustments ---
+
+    # Cap at 99% - only "Processing Complete" status should trigger 100%
+    final_pct = min(int(round(calculated_pct)), 99)
+
+    # Prevent percentage from going down, unless it's due to an error state (handled above)
+    # Compare the newly calculated capped percentage with the value read at the function start
+    # This ensures progress is monotonic upwards until completion or error.
+    return max(final_pct, current_pct)
+
 def update_document(**kwargs):
-    document_id             = kwargs.get('document_id')
-    user_id                 = kwargs.get('user_id')
-    status                  = kwargs.get('status')
-    authors                 = kwargs.get('authors')
-    abstract                = kwargs.get('abstract')
-    keywords                = kwargs.get('keywords')
-    number_of_pages         = kwargs.get('number_of_pages')
-    num_chunks              = kwargs.get('num_chunks')
-    version                 = kwargs.get('version')
-    number_of_file_chunks   = kwargs.get('number_of_file_chunks')
-    file_name               = kwargs.get('file_name')
-    title                   = kwargs.get('title')
-    publication_date        = kwargs.get('publication_date')
-    percentage_complete     = kwargs.get('percentage_complete')
-    current_page            = kwargs.get('current_page')
-    current_file_chunk      = kwargs.get('current_file_chunk')
-    organization            = kwargs.get('organization')
-    enhanced_citations      = kwargs.get('enhanced_citations')
-    document_classification = kwargs.get('document_classification')
+    document_id = kwargs.get('document_id')
+    user_id = kwargs.get('user_id')
+    num_chunks_increment = kwargs.pop('num_chunks_increment', 0)
+
+    if not document_id or not user_id:
+        # Cannot proceed without these identifiers
+        print("Error: document_id and user_id are required for update_document")
+        # Depending on context, you might raise an error or return failure
+        raise ValueError("document_id and user_id are required")
 
     current_time = datetime.now(timezone.utc)
     formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     add_file_task_to_file_processing_log(
-        document_id, 
-        user_id, 
-        f"Updating document {document_id} for user {user_id} with all fields: {kwargs}"
+        document_id,
+        user_id,
+        f"Attempting update for document {document_id} with args: {kwargs}"
     )
 
     try:
-        # Retrieve the existing document
+        # 1. Retrieve the existing document FIRST
+        # *****************************************************************
+        # IMPORTANT: Verify your partition key strategy for documents_container.
+        # If '/user_id' is the partition key:
+        # query = "SELECT * FROM c WHERE c.id = @document_id"
+        # parameters = [{"name": "@document_id", "value": document_id}]
+        # existing_documents = list(documents_container.query_items(query=query, parameters=parameters, partition_key=user_id))
+        #
+        # If '/id' is the partition key:
+        # try:
+        #     existing_document = documents_container.read_item(item=document_id, partition_key=document_id)
+        #     # Verify user ownership if needed (important for security)
+        #     if existing_document.get('user_id') != user_id:
+        #          raise CosmosResourceNotFoundError(f"Document {document_id} not found or access denied for user {user_id}")
+        #     existing_documents = [existing_document] # Wrap in list for consistency
+        # except CosmosResourceNotFoundError:
+        #     existing_documents = []
+        #
+        # Using the cross-partition query as in your original code for now,
+        # but strongly recommend using partition keys directly for performance and cost.
+        # *****************************************************************
         query = """
             SELECT *
             FROM c
@@ -161,107 +247,126 @@ def update_document(**kwargs):
             {"name": "@user_id", "value": user_id},
             {"name": "@document_id", "value": document_id}
         ]
-        
         existing_documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
         if not existing_documents:
+            # Log specific error before raising
+            log_msg = f"Document {document_id} not found for user {user_id} during update."
+            print(log_msg)
+            add_file_task_to_file_processing_log(document_id, user_id, log_msg)
             raise CosmosResourceNotFoundError(f"Document {document_id} not found")
 
         existing_document = existing_documents[0]
+        original_percentage = existing_document.get('percentage_complete', 0) # Store for comparison
 
-        if status:
-            # Update the necessary fields
-            existing_document['status'] = status
+        # 2. Apply updates from kwargs
+        update_occurred = False
+        updated_fields_requiring_chunk_sync = set() # Track fields needing propagation
+
+        if num_chunks_increment > 0:
+            current_num_chunks = existing_document.get('num_chunks', 0)
+            existing_document['num_chunks'] = current_num_chunks + num_chunks_increment
+            update_occurred = True # Incrementing counts as an update
+            add_file_task_to_file_processing_log(document_id, user_id, f"Incrementing num_chunks by {num_chunks_increment} to {existing_document['num_chunks']}")
+
+        for key, value in kwargs.items():
+            if value is not None and existing_document.get(key) != value:
+                # Avoid overwriting num_chunks if it was just incremented
+                if key == 'num_chunks' and num_chunks_increment > 0:
+                    continue # Skip direct assignment if increment was used
+                existing_document[key] = value
+                update_occurred = True
+                if key in ['title', 'authors', 'file_name', 'document_classification']:
+                    updated_fields_requiring_chunk_sync.add(key)
+
+        # 3. If any update happened, handle timestamps and percentage
+        if update_occurred:
             existing_document['last_updated'] = formatted_time
 
-            if "Processing Complete" in status.lower():
-                existing_document['percentage_complete'] = 100
-            elif "failed" in status.lower():
-                existing_document['percentage_complete'] = 0
+            # Calculate new percentage based on the *updated* existing_document state
+            # This now includes the potentially incremented num_chunks
+            new_percentage = calculate_processing_percentage(existing_document)
+
+            # Handle final state overrides for percentage
+            status_lower = existing_document.get('status', '').lower()
+            if "processing complete" in status_lower:
+                new_percentage = 100
+            elif "error" in status_lower or "failed" in status_lower:
+                 pass # Percentage already calculated by helper based on 'failed' status
+
+            # Ensure percentage doesn't decrease (unless reset on failure or hitting 100)
+            # Compare against original_percentage fetched *before* any updates in this call
+            if new_percentage < original_percentage and new_percentage != 0 and "failed" not in status_lower and "error" not in status_lower:
+                 existing_document['percentage_complete'] = original_percentage
             else:
-                if existing_document.get('percentage_complete', 0) >= 90:
-                    existing_document['percentage_complete'] = 90
-                else:
-                    existing_document['percentage_complete'] = existing_document.get('percentage_complete') + 1
-       
+                 existing_document['percentage_complete'] = new_percentage
 
-        if title:
-            existing_document['title'] = title
-            for chunk in get_all_chunks(document_id, user_id):
-                update_chunk_metadata(chunk['id'], user_id, document_id, title=title)
-
-        if authors:
-            existing_document['authors'] = authors
-            for chunk in get_all_chunks(document_id, user_id):
-                update_chunk_metadata(chunk['id'], user_id, document_id, author=authors)
-
-        if abstract:
-            existing_document['abstract'] = abstract
-
-        if keywords:
-            existing_document['keywords'] = keywords
-        
-        if number_of_pages:
-            existing_document['number_of_pages'] = number_of_pages
-
-        if num_chunks:
-            existing_document['num_chunks'] = num_chunks
-
-        if version:
-            existing_document['version'] = version
-
-        if file_name:
-            existing_document['file_name'] = file_name
-            for chunk in get_all_chunks(document_id, user_id):
-                update_chunk_metadata(chunk['id'], user_id, document_id, file_name=file_name)
-
-        if percentage_complete:
-            existing_document['percentage_complete'] = percentage_complete
-
-        if publication_date:
-            existing_document['publication_date'] = publication_date
-
-        if number_of_file_chunks:
-            existing_document['number_of_file_chunks'] = number_of_file_chunks
-
-        if current_page:
-            existing_document['current_page'] = current_page
-
-        if current_file_chunk:
-            existing_document['current_file_chunk'] = current_file_chunk
-
-        if enhanced_citations:
-            existing_document['enhanced_citations'] = enhanced_citations
-
-        if organization:
-            existing_document['organization'] = organization
-        
-        add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Attempting to update document {document_id} with document_classification: {document_classification}"
-        )
-
-        if document_classification:
             add_file_task_to_file_processing_log(
-                document_id, 
-                user_id, 
-                f"Updating document classification for document {document_id} to {document_classification}"
+                document_id, user_id,
+                f"Fields updated. New percentage: {existing_document['percentage_complete']}. Status: {existing_document.get('status')}, NumChunks: {existing_document.get('num_chunks')}"
             )
-            existing_document['document_classification'] = document_classification
-            for chunk in get_all_chunks(document_id, user_id):
-                update_chunk_metadata(chunk['id'], user_id, document_id, document_classification=document_classification)
+
+        # 4. Propagate relevant changes to search index chunks
+        # This happens regardless of 'update_occurred' flag because the *intent* from kwargs might trigger it,
+        # even if the main doc update didn't happen (e.g., only percentage changed).
+        # However, it's better to only do this if the relevant fields *actually* changed.
+        if update_occurred and updated_fields_requiring_chunk_sync:
+            try:
+                chunks_to_update = get_all_chunks(document_id, user_id)
+                for chunk in chunks_to_update:
+                    chunk_updates = {}
+                    if 'title' in updated_fields_requiring_chunk_sync:
+                        chunk_updates['title'] = existing_document.get('title')
+                    if 'authors' in updated_fields_requiring_chunk_sync:
+                         # Ensure authors is a list for the chunk metadata if needed
+                        chunk_updates['author'] = existing_document.get('authors')
+                    if 'file_name' in updated_fields_requiring_chunk_sync:
+                        chunk_updates['file_name'] = existing_document.get('file_name')
+                    if 'document_classification' in updated_fields_requiring_chunk_sync:
+                        chunk_updates['document_classification'] = existing_document.get('document_classification')
+
+                    if chunk_updates: # Only call update if there's something to change
+                         update_chunk_metadata(chunk['id'], user_id, document_id, **chunk_updates)
+                add_file_task_to_file_processing_log(
+                    document_id, user_id,
+                    f"Propagated updates for fields {updated_fields_requiring_chunk_sync} to search chunks."
+                )
+            except Exception as chunk_sync_error:
+                 # Log error but don't necessarily fail the whole document update
+                 error_msg = f"Warning: Failed to sync metadata updates to search chunks for doc {document_id}: {chunk_sync_error}"
+                 print(error_msg)
+                 add_file_task_to_file_processing_log(document_id, user_id, error_msg)
 
 
-        # Upsert the updated document
-        documents_container.upsert_item(existing_document)
+        # 5. Upsert the document if changes were made
+        if update_occurred:
+            add_file_task_to_file_processing_log(
+                document_id, user_id,
+                f"Upserting document {document_id} with updated data."
+            )
+            documents_container.upsert_item(existing_document)
+        else:
+             add_file_task_to_file_processing_log(
+                document_id, user_id,
+                f"No effective changes detected for document {document_id}. Skipping upsert."
+            )
 
     except CosmosResourceNotFoundError as e:
-        print(f"Document {document_id} not found: {e}")
-        raise
+        # Error already logged where it was first detected
+        print(f"Document {document_id} not found or access denied: {e}")
+        raise # Re-raise for the caller to handle
     except Exception as e:
-        print(f"Error updating document status for document {document_id}: {e}")
-        raise
+        error_msg = f"Error during update_document for {document_id}: {e}"
+        print(error_msg)
+        add_file_task_to_file_processing_log(document_id, user_id, error_msg)
+        # Optionally update status to failure here if the exception is critical
+        # try:
+        #    existing_document['status'] = f"Update failed: {str(e)[:100]}" # Truncate error
+        #    existing_document['percentage_complete'] = calculate_processing_percentage(existing_document) # Recalculate % based on failure
+        #    documents_container.upsert_item(existing_document)
+        # except Exception as inner_e:
+        #    print(f"Failed to update status to error state for {document_id}: {inner_e}")
+        raise # Re-raise the original exception
 
 def save_chunks(page_text_content, page_number, file_name, user_id, document_id):
     """
@@ -277,9 +382,9 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
 
     try:
         # Update document status
-        num_chunks = 1  # because we only have one chunk (page) here
-        status = f"Processing 1 chunk (page {page_number})"
-        update_document(document_id=document_id, user_id=user_id, status=status)
+        #num_chunks = 1  # because we only have one chunk (page) here
+        #status = f"Processing 1 chunk (page {page_number})"
+        #update_document(document_id=document_id, user_id=user_id, status=status)
 
         version = get_document_metadata(document_id, user_id)['version']
         
@@ -289,8 +394,8 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
 
     # Generate embedding
     try:
-        status = f"Generating embedding for page {page_number}"
-        update_document(document_id=document_id, user_id=user_id, status=status)
+        #status = f"Generating embedding for page {page_number}"
+        #update_document(document_id=document_id, user_id=user_id, status=status)
         embedding = generate_embedding(page_text_content)
     except Exception as e:
         print(f"Error generating embedding for page {page_number} of document {document_id}: {e}")
@@ -317,7 +422,7 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
             "page_number": page_number,
             "author": author,
             "title": title,
-            "document_classification": "TBD",
+            "document_classification": "Pending",
             "chunk_sequence": page_number,  # or you can keep an incremental idx
             "upload_date": formatted_time,
             "version": version
@@ -328,8 +433,8 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
 
     # Upload chunk document to Search
     try:
-        status = f"Uploading page {page_number} of document {document_id} to index."
-        update_document(document_id=document_id, user_id=user_id, status=status)
+        #status = f"Uploading page {page_number} of document {document_id} to index."
+        #update_document(document_id=document_id, user_id=user_id, status=status)
 
         search_client_user = CLIENTS["search_client_user"]
         # Upload as a single-document list
@@ -688,6 +793,60 @@ def detect_doc_type(document_id, user_id=None):
 
     return None
 
+def process_metadata_extraction_background(document_id, user_id):
+    """
+    Background function that calls extract_document_metadata(...)
+    and updates Cosmos DB accordingly.
+    """
+    try:
+        # Log status: starting
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            percentage_complete=5,
+            status="Metadata extraction started..."
+        )
+
+        # Call your existing extraction function
+        metadata = extract_document_metadata(document_id, user_id)
+
+        if not metadata:
+            # If it fails or returns nothing, log an error status and quit
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                status="Metadata extraction returned empty or failed"
+            )
+            return
+
+        # Persist the returned metadata fields back into Cosmos
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            title=metadata.get('title'),
+            authors=metadata.get('authors'),
+            abstract=metadata.get('abstract'),
+            keywords=metadata.get('keywords'),
+            publication_date=metadata.get('publication_date'),
+            organization=metadata.get('organization')
+        )
+
+        # Mark as completed
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            status="Metadata extraction complete",
+            percentage_complete=100
+        )
+
+    except Exception as e:
+        # Log any exceptions
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            status=f"Metadata extraction failed: {str(e)}"
+        )
+        
 def extract_document_metadata(document_id, user_id):
 
     settings = get_settings()
@@ -707,7 +866,7 @@ def extract_document_metadata(document_id, user_id):
         "authors": ["Author 1", "Author 2"],
         "organization": "Organization or Unknown",
         "publication_date": "MM/YYYY or N/A",
-        "keywords": ["keyword1", "keyword2"],
+        "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
         "abstract": "two sentence abstract"
     }
     
@@ -738,12 +897,18 @@ def extract_document_metadata(document_id, user_id):
             enable_cross_partition_query=True
         ))
 
+        update_document(
+            document_id=document_id, 
+            user_id=user_id,
+            percentage_complete=20,
+            status=f"Retrieved document items for document {document_id}: {document_items}"
+        )
+
         add_file_task_to_file_processing_log(
             document_id, 
             user_id, 
             f"Retrieved document items for document {document_id}: {document_items}"
         )
-    
     except Exception as e:
         add_file_task_to_file_processing_log(
             document_id, 
@@ -758,16 +923,17 @@ def extract_document_metadata(document_id, user_id):
     document_metadata = document_items[0]
     
     # --- Step 2: Populate meta_data from DB ---
+    # Convert the DB fields to the correct structure
     if "title" in document_metadata:
         meta_data["title"] = document_metadata["title"]
     if "authors" in document_metadata:
-        meta_data["authors"] = document_metadata["authors"]
+        meta_data["authors"] = ensure_list(document_metadata["authors"])
     if "organization" in document_metadata:
         meta_data["organization"] = document_metadata["organization"]
     if "publication_date" in document_metadata:
         meta_data["publication_date"] = document_metadata["publication_date"]
     if "keywords" in document_metadata:
-        meta_data["keywords"] = document_metadata["keywords"]
+        meta_data["keywords"] = ensure_list(document_metadata["keywords"])
     if "abstract" in document_metadata:
         meta_data["abstract"] = document_metadata["abstract"]
 
@@ -775,6 +941,13 @@ def extract_document_metadata(document_id, user_id):
         document_id, 
         user_id, 
         f"Extracted metadata for document {document_id}, metadata: {meta_data}"
+    )
+
+    update_document(
+        document_id=document_id,
+        user_id=user_id,
+        percentage_complete=45,
+        status=f"Extracted metadata for document {document_id}, metadata: {meta_data}"
     )
 
     # --- Step 3: Content Safety Check (if enabled) ---
@@ -786,8 +959,6 @@ def extract_document_metadata(document_id, user_id):
         blocklist_matches = []
 
         try:
-            # For demonstration, we only check 'title'. 
-            # Consider checking more fields if needed.
             request_obj = AnalyzeTextOptions(text=json.dumps(meta_data))
             cs_response = content_safety_client.analyze_text(request_obj)
 
@@ -821,7 +992,6 @@ def extract_document_metadata(document_id, user_id):
                     user_id, 
                     f"Blocked document metadata: {document_metadata}, reasons: {block_reasons}"
                 )
-                # Log or handle blocked content
                 print(f"Blocked document metadata: {document_metadata}\nReasons: {block_reasons}")
                 return None
 
@@ -833,7 +1003,7 @@ def extract_document_metadata(document_id, user_id):
             )
             print(f"Error checking content safety for document metadata: {e}")
 
-    # --- Step 4: Optional Bing Search ---
+    # --- Step 4: Hybrid Search ---
     try:
         if enable_user_workspace or enable_group_workspaces:
             add_file_task_to_file_processing_log(
@@ -842,15 +1012,35 @@ def extract_document_metadata(document_id, user_id):
                 f"Processing Hybrid search for document {document_id} using json dump of metadata {json.dumps(meta_data)}"
             )
 
-            document_scope, id = detect_doc_type(document_id, user_id)
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                percentage_complete=60,
+                status=f"Processing Hybrid search for document {document_id}"
+            )
+
+            document_scope, scope_id = detect_doc_type(document_id, user_id)
             if document_scope == "personal":
-                search_results = hybrid_search(json.dumps(meta_data), user_id, document_id=document_id, top_n=10, doc_scope=document_scope)
+                search_results = hybrid_search(json.dumps(meta_data), user_id, 
+                                               document_id=document_id, top_n=10, 
+                                               doc_scope=document_scope)
             elif document_scope == "group":
-                search_results = hybrid_search(json.dumps(meta_data), user_id, document_id=document_id, top_n=10, doc_scope=document_scope, active_group_id=id)
+                search_results = hybrid_search(json.dumps(meta_data), user_id, 
+                                               document_id=document_id, top_n=10, 
+                                               doc_scope=document_scope, 
+                                               active_group_id=scope_id)
+
             add_file_task_to_file_processing_log(
                 document_id, 
                 user_id, 
                 f"Hybrid search results for document {document_id}: {search_results}"
+            )
+
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                percentage_complete=75,
+                status=f"Hybrid search results for document {document_id}: {search_results}"
             )
         else:
             search_results = "No Hybrid results"
@@ -858,14 +1048,14 @@ def extract_document_metadata(document_id, user_id):
         add_file_task_to_file_processing_log(
             document_id, 
             user_id, 
-            f"Error processing Bing search for document {document_id}: {e}"
+            f"Error processing Hybrid search for document {document_id}: {e}"
         )
-        print(f"Error processing Bing search for document {document_id}: {e}")
-        bing_results = "No Bing results"
+        print(f"Error processing Hybrid search for document {document_id}: {e}")
+        search_results = "No Hybrid results"
 
     # --- Step 5: Prepare GPT Client ---
     if enable_gpt_apim:
-        # Apim-based GPT client
+        # APIM-based GPT client
         gpt_model = settings.get('azure_apim_gpt_deployment')
         gpt_client = AzureOpenAI(
             api_version=settings.get('azure_apim_gpt_api_version'),
@@ -897,9 +1087,7 @@ def extract_document_metadata(document_id, user_id):
             selected_gpt_model = gpt_model_obj['selected'][0]
             gpt_model = selected_gpt_model['deploymentName']
 
-
     # --- Step 6: GPT Prompt and JSON Parsing ---
-    # Construct messages in the recommended chat format
     try:
         add_file_task_to_file_processing_log(
             document_id, 
@@ -907,14 +1095,19 @@ def extract_document_metadata(document_id, user_id):
             f"Processing GPT request for document {document_id}"
         )
         messages = [
-            {"role": "system", "content": "You are an AI assistant that extracts metadata. Return valid JSON."},
+            {
+                "role": "system", 
+                "content": "You are an AI assistant that extracts metadata. Return valid JSON."
+            },
             {
                 "role": "user", 
                 "content": (
-                f"Search results from AI search index:\n{search_results}\n\n"
-                f"Current known metadata:\n{json.dumps(meta_data, indent=2)}\n\n"
-                f"Desired metadata structure:\n{json.dumps(meta_data_example, indent=2)}\n\n"
-                "Please fill in any missing values. Return only JSON."
+                    f"Search results from AI search index:\n{search_results}\n\n"
+                    f"Current known metadata:\n{json.dumps(meta_data, indent=2)}\n\n"
+                    f"Desired metadata structure:\n{json.dumps(meta_data_example, indent=2)}\n\n"
+                    f"Please attempt to fill in any missing, or empty values."
+                    f"If generating keywords, please create 5-10 keywords."
+                    f"Return only JSON."
                 )
             }
         ]
@@ -928,7 +1121,7 @@ def extract_document_metadata(document_id, user_id):
             f"Error processing GPT request for document {document_id}: {e}"
         )
         print(f"Error processing GPT request for document {document_id}: {e}")
-        return meta_data
+        return meta_data  # Return what we have so far
     
     if not response:
         return meta_data  # or None, depending on your logic
@@ -939,30 +1132,82 @@ def extract_document_metadata(document_id, user_id):
         user_id, 
         f"GPT response for document {document_id}: {response_content}"
     )
+
+    update_document(
+        document_id=document_id,
+        user_id=user_id,
+        percentage_complete=80,
+        status=f"GPT response for document {document_id}: {response_content}"
+    )
+
+    # --- Step 7: Clean and parse the GPT JSON output ---
     try:
         add_file_task_to_file_processing_log(
             document_id, 
             user_id,
-            f"Decoding JSON from response for document {document_id}"
+            f"Decoding JSON from GPT response for document {document_id}"
         )
-        cleaned_output = clean_json_codeFence(response_content)
-        response_json = json.loads(cleaned_output)  
-    except json.JSONDecodeError as e:
+
+        cleaned_str = clean_json_codeFence(response_content)
+
         add_file_task_to_file_processing_log(
             document_id, 
-            user_id,   
-            f"Error decoding JSON from response for document {document_id}: {e}"
+            user_id, 
+            f"Cleaned JSON from GPT response for document {document_id}: {cleaned_str}"
+        )
+
+        gpt_output = json.loads(cleaned_str)
+
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id, 
+            f"Decoded JSON from GPT response for document {document_id}: {gpt_output}"
+        )
+
+        # Ensure authors and keywords are always lists
+        gpt_output["authors"] = ensure_list(gpt_output.get("authors", []))
+        gpt_output["keywords"] = ensure_list(gpt_output.get("keywords", []))
+
+    except (json.JSONDecodeError, TypeError) as e:
+        add_file_task_to_file_processing_log(
+            document_id, 
+            user_id,
+            f"Error decoding JSON from GPT response for document {document_id}: {e}"
         )
         print(f"Error decoding JSON from response: {e}")
         return meta_data  # or None
 
-    # --- Step 7: Merge GPT Output with Existing Metadata ---
-    meta_data["title"] = meta_data["title"] or response_json.get("title", "Unknown")
-    meta_data["authors"] = meta_data["authors"] or response_json.get("authors", []) or [meta_data["organization"]] or ["Unknown"]
-    meta_data["organization"] = meta_data["organization"] or response_json.get("organization", "Unknown")
-    meta_data["publication_date"] = meta_data["publication_date"] or response_json.get("publication_date", "Unknown")
-    meta_data["keywords"] = meta_data["keywords"] or response_json.get("keywords", [])
-    meta_data["abstract"] = meta_data["abstract"] or response_json.get("abstract", "")
+    # --- Step 8: Merge GPT Output with Existing Metadata ---
+    #
+    # If the DB’s version is effectively empty/worthless, then overwrite 
+    # with the GPT’s version if GPT has something non-empty.
+    # Otherwise keep the DB’s version.
+    #
+
+    # Title
+    if is_effectively_empty(meta_data["title"]):
+        meta_data["title"] = gpt_output.get("title", meta_data["title"])
+
+    # Authors
+    if is_effectively_empty(meta_data["authors"]):
+        # If GPT has no authors either, fallback to ["Unknown"]
+        meta_data["authors"] = gpt_output["authors"] or ["Unknown"]
+
+    # Organization
+    if is_effectively_empty(meta_data["organization"]):
+        meta_data["organization"] = gpt_output.get("organization", meta_data["organization"])
+
+    # Publication Date
+    if is_effectively_empty(meta_data["publication_date"]):
+        meta_data["publication_date"] = gpt_output.get("publication_date", meta_data["publication_date"])
+
+    # Keywords
+    if is_effectively_empty(meta_data["keywords"]):
+        meta_data["keywords"] = gpt_output["keywords"]
+
+    # Abstract
+    if is_effectively_empty(meta_data["abstract"]):
+        meta_data["abstract"] = gpt_output.get("abstract", meta_data["abstract"])
 
     add_file_task_to_file_processing_log(
         document_id, 
@@ -970,18 +1215,65 @@ def extract_document_metadata(document_id, user_id):
         f"Final metadata for document {document_id}: {meta_data}"
     )
 
+    update_document(
+        document_id=document_id,
+        user_id=user_id,
+        percentage_complete=95,
+        status=f"Final metadata for document {document_id}: {meta_data}"
+    )
+
     return meta_data
+
 
 def clean_json_codeFence(response_content: str) -> str:
     """
-    Removes leading and trailing triple-backticks or code fences from a string 
-    so that it can be parsed as JSON.
+    Removes leading and trailing triple-backticks (```) or ```json
+    from a string so that it can be parsed as JSON.
     """
-    # This regex looks for ``` or ```json followed by optional whitespace/newlines, 
-    # and removes them, as well as trailing ``` on its own line.
-    cleaned = re.sub(r"^```(?:json)?\s*", "", response_content.strip(), flags=re.IGNORECASE | re.MULTILINE)
-    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    # Remove any ```json or ``` (with optional whitespace/newlines) at the start
+    cleaned = re.sub(r"(?s)^```(?:json)?\s*", "", response_content.strip())
+    # Remove trailing ``` on its own line or at the end
+    cleaned = re.sub(r"```$", "", cleaned.strip())
     return cleaned.strip()
+
+def ensure_list(value, delimiters=r"[;,]"):
+    """
+    Ensures the provided value is returned as a list of strings.
+    - If `value` is already a list, it is returned as-is.
+    - If `value` is a string, it is split on the given delimiters
+      (default: commas and semicolons).
+    - Otherwise, return an empty list.
+    """
+    if isinstance(value, list):
+        return value
+    elif isinstance(value, str):
+        # Split on the given delimiters (commas, semicolons, etc.)
+        items = re.split(delimiters, value)
+        # Strip whitespace and remove empty strings
+        items = [item.strip() for item in items if item.strip()]
+        return items
+    else:
+        return []
+
+def is_effectively_empty(value):
+    """
+    Returns True if the value is 'worthless' or empty.
+    - For a string: empty or just whitespace
+    - For a list: empty OR all empty strings
+    - For None: obviously empty
+    - For other types: not considered here, but you can extend as needed
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()  # '' or whitespace is empty
+    if isinstance(value, list):
+        # Example: [] or [''] or [' ', ''] is empty
+        # If *every* item is effectively empty as a string, treat as empty
+        if len(value) == 0:
+            return True
+        return all(not item.strip() for item in value if isinstance(item, str))
+    return False
 
 def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
     """
@@ -1223,6 +1515,7 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
                         update_document(
                             document_id=document_id,
                             user_id=user_id,
+                            current_file_chunk=int(page_number),
                             status=f"Saving page {page_number} of {chunk_filename}..."
                         )
 

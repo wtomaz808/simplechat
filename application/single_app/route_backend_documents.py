@@ -31,7 +31,8 @@ def register_route_backend_documents(app):
             return jsonify({'error': 'Conversation not found'}), 404
         except Exception as e:
             return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
-
+        
+        add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="Conversation exists, retrieving file content")
         try:
             query_str = """
                 SELECT * FROM c
@@ -48,19 +49,37 @@ def register_route_backend_documents(app):
             ))
 
             if not items:
+                add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="File not found in conversation")
                 return jsonify({'error': 'File not found in conversation'}), 404
 
+            add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="File found, processing content: " + str(items))
             items_sorted = sorted(items, key=lambda x: x.get('chunk_index', 0))
 
             filename = items_sorted[0].get('filename', 'Untitled')
             is_table = items_sorted[0].get('is_table', False)
 
+            add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="Combining file content from chunks, filename: " + filename + ", is_table: " + str(is_table))
             combined_parts = []
             for it in items_sorted:
-                combined_parts.append(it.get('file_content', ''))
-            combined_content = ''.join(combined_parts)
+                fc = it.get('file_content', '')
+
+                if isinstance(fc, list):
+                    # If file_content is a list of dicts, join their 'content' fields
+                    text_chunks = []
+                    for chunk in fc:
+                        text_chunks.append(chunk.get('content', ''))
+                    combined_parts.append("\n".join(text_chunks))
+                elif isinstance(fc, str):
+                    # If it's already a string, just append
+                    combined_parts.append(fc)
+                else:
+                    # If it's neither a list nor a string, handle as needed (e.g., skip or log)
+                    pass
+
+            combined_content = "\n".join(combined_parts)
 
             if not combined_content:
+                add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="Combined file content is empty")
                 return jsonify({'error': 'File content not found'}), 404
 
             return jsonify({
@@ -70,6 +89,7 @@ def register_route_backend_documents(app):
             }), 200
 
         except Exception as e:
+            add_file_task_to_file_processing_log(document_id=file_id, user_id=user_id, content="Error retrieving file content: " + str(e))
             return jsonify({'error': f'Error retrieving file content: {str(e)}'}), 500
     
     @app.route('/api/documents/upload', methods=['POST'])
@@ -140,8 +160,48 @@ def register_route_backend_documents(app):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-                
-        return get_user_documents(user_id)
+
+        # 1) Read pagination parameters from query string
+        page = request.args.get('page', default=1, type=int)
+        page_size = request.args.get('page_size', default=10, type=int)
+
+        # 2) First query: get total count of documents for the user
+        count_query = """
+            SELECT VALUE COUNT(1)
+            FROM c
+            WHERE c.user_id = @user_id
+        """
+        count_params = [{"name": "@user_id", "value": user_id}]
+        count_items = list(documents_container.query_items(
+            query=count_query,
+            parameters=count_params,
+            enable_cross_partition_query=True
+        ))
+        total_count = count_items[0] if count_items else 0
+
+        # 3) Second query: fetch the page of data
+        offset = (page - 1) * page_size
+        # Note: ORDER BY c._ts DESC to show newest first
+        query = f"""
+            SELECT *
+            FROM c
+            WHERE c.user_id = @user_id
+            ORDER BY c._ts DESC
+            OFFSET {offset} LIMIT {page_size}
+        """
+        docs = list(documents_container.query_items(
+            query=query,
+            parameters=count_params,
+            enable_cross_partition_query=True
+        ))
+
+        return jsonify({
+            "documents": docs,
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count
+        }), 200
+
 
     @app.route('/api/documents/<document_id>', methods=['GET'])
     @login_required
@@ -245,7 +305,42 @@ def register_route_backend_documents(app):
             return jsonify({'message': 'Document deleted successfully'}), 200
         except Exception as e:
             return jsonify({'error': f'Error deleting document: {str(e)}'}), 500
-        
+    
+    @app.route('/api/documents/<document_id>/extract_metadata', methods=['POST'])
+    @login_required
+    @user_required
+    @enabled_required("enable_user_workspace")
+    def api_extract_metadata(document_id):
+        """
+        POST /api/documents/<document_id>/extract_metadata
+        Queues a background job that calls extract_document_metadata() 
+        and updates the document in Cosmos DB with the new metadata.
+        """
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        settings = get_settings()
+        if not settings.get('enable_extract_meta_data'):
+            return jsonify({'error': 'Metadata extraction not enabled'}), 403
+
+        # Queue the background task (immediately returns a future)
+        future = executor.submit(
+            process_metadata_extraction_background,
+            document_id,
+            user_id
+        )
+
+        # Optionally store or track this future:
+        executor.submit_stored(f"{document_id}_metadata", process_metadata_extraction_background, document_id, user_id)
+
+        # Return an immediate response to the user
+        return jsonify({
+            'message': 'Metadata extraction has been queued. Check document status periodically.',
+            'document_id': document_id
+        }), 200
+
+
     @app.route("/api/get_citation", methods=["POST"])
     @login_required
     @user_required

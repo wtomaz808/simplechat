@@ -2,320 +2,385 @@
 
 import { showToast } from "./chat-toast.js";
 import { loadMessages } from "./chat-messages.js";
+import { isColorLight } from "./chat-utils.js"; // Assuming you move isColorLight here
 
 const newConversationBtn = document.getElementById("new-conversation-btn");
+const conversationsList = document.getElementById("conversations-list");
+const currentConversationTitleEl = document.getElementById("current-conversation-title");
+const currentConversationClassificationsEl = document.getElementById("current-conversation-classifications");
+const chatbox = document.getElementById("chatbox");
+
+let currentlyEditingId = null; // Track which item is being edited
 
 export function loadConversations() {
-  fetch("/api/get_conversations")
-    .then((response) => response.json())
-    .then((data) => {
-      const conversationsList = document.getElementById("conversations-list");
-      if (!conversationsList) return;
+  if (!conversationsList) return;
+  conversationsList.innerHTML = '<div class="text-center p-3 text-muted">Loading conversations...</div>'; // Loading state
 
-      conversationsList.innerHTML = "";
-      data.conversations.forEach((convo) => {
+  fetch("/api/get_conversations")
+    .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
+    .then(data => {
+      conversationsList.innerHTML = ""; // Clear loading state
+      if (!data.conversations || data.conversations.length === 0) {
+          conversationsList.innerHTML = '<div class="text-center p-3 text-muted">No conversations yet.</div>';
+          return;
+      }
+      data.conversations.forEach(convo => {
         conversationsList.appendChild(createConversationItem(convo));
       });
+      // Optionally, select the first conversation or highlight the active one if ID is known
     })
-    .catch((error) => {
+    .catch(error => {
       console.error("Error loading conversations:", error);
+      conversationsList.innerHTML = `<div class="text-center p-3 text-danger">Error loading conversations: ${error.error || 'Unknown error'}</div>`;
     });
 }
 
 export function createConversationItem(convo) {
-  // Create the list item container
-  const convoItem = document.createElement("div");
-  convoItem.classList.add("list-group-item", "conversation-item");
+  const convoItem = document.createElement("a"); // Use <a> for better semantics if appropriate
+  convoItem.href = "#"; // Prevent default link behavior later
+  convoItem.classList.add("list-group-item", "list-group-item-action", "conversation-item"); // Use action class
   convoItem.setAttribute("data-conversation-id", convo.id);
+  convoItem.setAttribute("data-conversation-title", convo.title); // Store title too
 
+  // *** Store classification data as stringified JSON ***
   convoItem.dataset.classifications = JSON.stringify(convo.classification || []);
 
-  // Left part: (title + timestamp)
   const leftDiv = document.createElement("div");
-  leftDiv.classList.add("d-flex", "flex-column");
+  leftDiv.classList.add("d-flex", "flex-column", "flex-grow-1", "pe-2"); // flex-grow and padding-end
+  leftDiv.style.overflow = "hidden"; // Prevent overflow issues
 
   const titleSpan = document.createElement("span");
-  titleSpan.classList.add("conversation-title");
+  titleSpan.classList.add("conversation-title", "text-truncate"); // Bold and truncate
   titleSpan.textContent = convo.title;
-
-  let classificationPills = null;
-
-  if (window.enable_document_classification) {
-    classificationPills = createClassificationPills(convo.classification);
-  }
+  titleSpan.title = convo.title; // Tooltip for full title
 
   const dateSpan = document.createElement("small");
+  dateSpan.classList.add("text-muted");
   const date = new Date(convo.last_updated);
-  dateSpan.textContent = date.toLocaleString();
+  dateSpan.textContent = date.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }); // Shorter format
 
   leftDiv.appendChild(titleSpan);
-  if (window.enable_document_classification && classificationPills) {
-    leftDiv.appendChild(classificationPills);
-  }
   leftDiv.appendChild(dateSpan);
 
-  // Right part: (three dots with dropdown)
+  // Right part: three dots dropdown
   const rightDiv = document.createElement("div");
   rightDiv.classList.add("dropdown");
 
-  // Button (no 'dropdown-toggle' class => no caret arrow)
   const dropdownBtn = document.createElement("button");
-  dropdownBtn.classList.add("btn", "btn-light", "btn-sm");
+  dropdownBtn.classList.add("btn", "btn-light", "btn-sm"); // Keep btn-sm
   dropdownBtn.type = "button";
   dropdownBtn.setAttribute("data-bs-toggle", "dropdown");
   dropdownBtn.setAttribute("data-bs-display", "static");
   dropdownBtn.setAttribute("aria-expanded", "false");
-  dropdownBtn.innerHTML = `<i class="bi bi-three-dots"></i>`;
+  dropdownBtn.innerHTML = `<i class="bi bi-three-dots-vertical"></i>`; // Vertical dots maybe?
+  dropdownBtn.title = "Conversation options";
 
-  // The dropdown menu
   const dropdownMenu = document.createElement("ul");
-  dropdownMenu.classList.add("dropdown-menu", "dropdown-menu-end", "my-dropdown-menu");
+  dropdownMenu.classList.add("dropdown-menu", "dropdown-menu-end");
 
-  // Edit link
   const editLi = document.createElement("li");
   const editA = document.createElement("a");
   editA.classList.add("dropdown-item", "edit-btn");
-  editA.textContent = "Edit title";
   editA.href = "#";
+  editA.innerHTML = '<i class="bi bi-pencil-fill me-2"></i>Edit title';
   editLi.appendChild(editA);
 
-  // Delete link
   const deleteLi = document.createElement("li");
   const deleteA = document.createElement("a");
   deleteA.classList.add("dropdown-item", "delete-btn", "text-danger");
-  deleteA.textContent = "Delete";
   deleteA.href = "#";
+  deleteA.innerHTML = '<i class="bi bi-trash-fill me-2"></i>Delete';
   deleteLi.appendChild(deleteA);
 
   dropdownMenu.appendChild(editLi);
   dropdownMenu.appendChild(deleteLi);
-
   rightDiv.appendChild(dropdownBtn);
   rightDiv.appendChild(dropdownMenu);
 
-  // Combine left + right
+  // Combine left + right in a wrapper
   const wrapper = document.createElement("div");
-  wrapper.classList.add("d-flex", "justify-content-between", "align-items-center");
+  wrapper.classList.add("d-flex", "justify-content-between", "align-items-center", "w-100");
   wrapper.appendChild(leftDiv);
   wrapper.appendChild(rightDiv);
-
   convoItem.appendChild(wrapper);
 
-  // 1) Select conversation on main click, unless clicked inside .dropdown-menu
+  // Event Listeners
   convoItem.addEventListener("click", (event) => {
-    if (event.target.closest(".dropdown-menu")) {
-      return; // clicked inside the menu; don't select convo
+    event.preventDefault(); // Prevent default <a> behavior
+    if (event.target.closest(".dropdown, .dropdown-menu")) {
+      return; // Don't select if click is on dropdown elements
     }
+    // Don't select if editing this item
+    if(convoItem.classList.contains('editing')) return;
+
     selectConversation(convo.id);
   });
 
-  // 2) Edit
   editA.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    // Close the dropdown menu
     closeDropdownMenu(dropdownBtn);
-    // Enter edit mode
-    enterEditMode(convoItem, convo, dropdownBtn);
+    enterEditMode(convoItem, convo, dropdownBtn, rightDiv); // Pass rightDiv
   });
 
-  // 3) Delete
   deleteA.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    // Close the dropdown menu
     closeDropdownMenu(dropdownBtn);
-    // Proceed with delete
     deleteConversation(convo.id);
   });
 
   return convoItem;
 }
 
-/**
- * Helper to force-close the Bootstrap dropdown.
- */
 function closeDropdownMenu(dropdownBtn) {
-  // If you are using Bootstrap 5 and have the Dropdown instance:
   const dropdownInstance = bootstrap.Dropdown.getInstance(dropdownBtn);
   if (dropdownInstance) {
     dropdownInstance.hide();
-  } else {
-    // Fallback: manually remove "show" classes if needed
-    // dropdownBtn.parentElement.classList.remove("show");
-    // const menu = dropdownBtn.parentElement.querySelector(".dropdown-menu");
-    // if (menu) menu.classList.remove("show");
   }
 }
 
-/**
- * Switch the conversation item into "editing" mode:
- *  - Replace the <span> with an <input>
- *  - Hide the three-dot dropdown button
- *  - Add a Save button
- */
-export function enterEditMode(convoItem, convo, dropdownBtn) {
-  // If we are already editing a conversation, don’t do multiple at once
+export function enterEditMode(convoItem, convo, dropdownBtn, rightDiv) {
   if (currentlyEditingId && currentlyEditingId !== convo.id) {
     showToast("Finish editing the other conversation first.", "warning");
     return;
   }
+  if(convoItem.classList.contains('editing')) return; // Already editing
+
   currentlyEditingId = convo.id;
+  convoItem.classList.add('editing'); // Add class to prevent selection
 
-  // Hide the three-dot dropdown button
-  dropdownBtn.style.display = "none";
+  dropdownBtn.style.display = "none"; // Hide dots button
 
-  // Get the span with .conversation-title
   const titleSpan = convoItem.querySelector(".conversation-title");
-  // Create an input for editing
+  const dateSpan = convoItem.querySelector("small"); // Get date span too
+
   const input = document.createElement("input");
   input.type = "text";
   input.value = convo.title;
-  input.classList.add("form-control", "form-control-sm");
-  input.style.maxWidth = "200px";
+  input.classList.add("form-control", "form-control-sm", "me-1"); // Add margin
+  input.style.flexGrow = '1'; // Allow input to grow
 
-  // Insert the input in place of the span
-  titleSpan.replaceWith(input);
-
-  // Create a Save button
+  // Create Save button
   const saveBtn = document.createElement("button");
-  saveBtn.classList.add("btn", "btn-primary", "btn-sm", "ms-2");
-  saveBtn.textContent = "Save";
+  saveBtn.classList.add("btn", "btn-success", "btn-sm"); // Success color
+  saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>'; // Check icon
+  saveBtn.title = "Save title";
 
-  // We'll place it near the dropdown or after the input
-  const parentDiv = convoItem.querySelector(".d-flex.justify-content-between");
-  parentDiv.appendChild(saveBtn);
+   // Create Cancel button
+  const cancelBtn = document.createElement("button");
+  cancelBtn.classList.add("btn", "btn-secondary", "btn-sm", "ms-1"); // Secondary color, margin
+  cancelBtn.innerHTML = '<i class="bi bi-x-lg"></i>'; // X icon
+  cancelBtn.title = "Cancel edit";
 
-  // On Save, call updateConversationTitle
-  saveBtn.addEventListener("click", async () => {
+  // Replace title span with input
+  titleSpan.replaceWith(input);
+  if (dateSpan) dateSpan.style.display = 'none'; // Hide date while editing
+
+  // Add Save and Cancel buttons to the right div
+  rightDiv.appendChild(saveBtn);
+  rightDiv.appendChild(cancelBtn);
+
+  input.focus(); // Focus the input
+  input.select(); // Select existing text
+
+  // Save handler
+  saveBtn.addEventListener("click", async (e) => {
+    e.stopPropagation(); // Prevent convo selection
     const newTitle = input.value.trim();
     if (!newTitle) {
       showToast("Title cannot be empty.", "warning");
       return;
     }
+    saveBtn.disabled = true; // Disable while saving
+    cancelBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; // Loading spinner
 
     try {
-      await updateConversationTitle(convo.id, newTitle);
-      // success => revert to normal view
-      convo.title = newTitle; // update local data
-      exitEditMode(convoItem, convo, dropdownBtn);
+      // *** Call update API and get potentially updated convo data (including classification) ***
+      const updatedConvoData = await updateConversationTitle(convo.id, newTitle);
+      convo.title = updatedConvoData.title || newTitle; // Update local title
+
+      // *** Update local classification data if returned from API ***
+      if (updatedConvoData.classification) {
+          convoItem.dataset.classifications = JSON.stringify(updatedConvoData.classification);
+      }
+
+      exitEditMode(convoItem, convo, dropdownBtn, rightDiv, dateSpan, saveBtn, cancelBtn);
+
+      // *** If this is the currently selected convo, refresh the header ***
+      if (currentConversationId === convo.id) {
+          selectConversation(convo.id); // Re-run selection logic to update header
+      }
     } catch (err) {
       console.error(err);
       showToast("Failed to update title.", "danger");
+       saveBtn.disabled = false; // Re-enable buttons on error
+       cancelBtn.disabled = false;
+       saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>'; // Restore icon
     }
+  });
+
+   // Cancel handler
+  cancelBtn.addEventListener("click", (e) => {
+     e.stopPropagation(); // Prevent convo selection
+     exitEditMode(convoItem, convo, dropdownBtn, rightDiv, dateSpan, saveBtn, cancelBtn);
+  });
+
+  // Also handle Enter key in input for saving
+  input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          saveBtn.click(); // Trigger save button click
+      }
+  });
+   // Handle Escape key for canceling
+  input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+          cancelBtn.click(); // Trigger cancel button click
+      }
   });
 }
 
-/**
- * Restore the conversation item to non-editing mode:
- *  - Replace the <input> with the updated <span>
- *  - Remove the Save button
- *  - Show the three-dot dropdown button
- */
-export function exitEditMode(convoItem, convo, dropdownBtn) {
+export function exitEditMode(convoItem, convo, dropdownBtn, rightDiv, dateSpan, saveBtn, cancelBtn) {
   currentlyEditingId = null;
-  // Find the input
+  convoItem.classList.remove('editing');
+
   const input = convoItem.querySelector("input.form-control");
   if (!input) return;
 
-  // Create a new <span> with updated text
   const newSpan = document.createElement("span");
-  newSpan.classList.add("conversation-title");
+  newSpan.classList.add("conversation-title", "text-truncate");
   newSpan.textContent = convo.title;
+  newSpan.title = convo.title; // Add tooltip back
 
-  // Replace the input with the new span
-  input.replaceWith(newSpan);
+  input.replaceWith(newSpan); // Replace input with updated span
+  if (dateSpan) dateSpan.style.display = ''; // Show date again
 
-  // Remove the Save button
-  const saveBtn = convoItem.querySelector("button.btn-primary");
-  if (saveBtn) {
-    saveBtn.remove();
-  }
+  if (saveBtn) saveBtn.remove(); // Remove Save button
+  if (cancelBtn) cancelBtn.remove(); // Remove Cancel button
 
-  // Show the three-dot dropdown button again
-  dropdownBtn.style.display = "";
+  dropdownBtn.style.display = ""; // Show dots button again
 }
 
-
-/**
- * Call the API to PUT/PATCH the conversation title
- */
 export async function updateConversationTitle(conversationId, newTitle) {
   const response = await fetch(`/api/conversations/${conversationId}`, {
-    method: "PUT", // or PATCH
-    headers: {
-      "Content-Type": "application/json",
-    },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title: newTitle }),
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
     throw new Error(errData.error || "Failed to update conversation");
   }
+  // *** Return the full updated conversation object if the API provides it ***
   return response.json();
 }
 
-export function addConversationToList(conversationId, title = null) {
-  const conversationsList = document.getElementById("conversations-list");
+// Add a new conversation item to the top of the list
+export function addConversationToList(conversationId, title = null, classifications = []) {
   if (!conversationsList) return;
 
-  const items = document.querySelectorAll(".conversation-item");
-  items.forEach((i) => i.classList.remove("active"));
+  // Deselect any currently active item visually
+  const currentActive = conversationsList.querySelector(".conversation-item.active");
+  if (currentActive) {
+    currentActive.classList.remove("active");
+  }
 
+  // Create the new conversation object
   const convo = {
     id: conversationId,
-    title: title || "New conversation",
+    title: title || "New Conversation", // Default title
     last_updated: new Date().toISOString(),
+    classification: classifications // Include classifications
   };
+
   const convoItem = createConversationItem(convo);
-  convoItem.classList.add("active");
-  conversationsList.prepend(convoItem);
+  convoItem.classList.add("active"); // Mark the new one as active
+  conversationsList.prepend(convoItem); // Add to the top
 }
 
+// Select a conversation, load messages, update UI
 export function selectConversation(conversationId) {
   currentConversationId = conversationId;
 
-  const convoItem = document.querySelector(
-    `.conversation-item[data-conversation-id="${conversationId}"]`
-  );
-  const conversationTitleSpan = convoItem
-    ? convoItem.querySelector(".conversation-title")
-    : null;
-  const conversationTitle = conversationTitleSpan
-    ? conversationTitleSpan.textContent
-    : "Conversation";
-
-  const currentTitleEl = document.getElementById("current-conversation-title");
-  if (currentTitleEl) {
-    currentTitleEl.textContent = conversationTitle;
+  const convoItem = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+  if (!convoItem) {
+      console.warn(`Conversation item not found for ID: ${conversationId}`);
+      // Handle case where item might have been deleted or list not fully loaded
+      if (currentConversationTitleEl) currentConversationTitleEl.textContent = "Conversation not found";
+      if (currentConversationClassificationsEl) currentConversationClassificationsEl.innerHTML = "";
+      if (chatbox) chatbox.innerHTML = '<div class="text-center p-5 text-muted">Conversation not found.</div>';
+      highlightSelectedConversation(null); // Deselect all visually
+      return;
   }
 
-  const classificationsEl = document.getElementById("current-conversation-classifications");
-  if (classificationsEl) {
-    // Clear anything old
-    classificationsEl.innerHTML = "";
+  const conversationTitle = convoItem.getAttribute("data-conversation-title") || "Conversation"; // Use stored title
 
-    if (window.enable_document_classification){
-      const classData = convoItem.dataset.classifications;
-      if (classData) {
-        const classifications = JSON.parse(classData);
-        classifications.forEach(cls => {
-          const pill = document.createElement("span");
-          pill.classList.add("badge", "rounded-pill", "bg-info", "me-1");
-          pill.textContent = cls;
-          classificationsEl.appendChild(pill);
-        });
+  // Update Header Title
+  if (currentConversationTitleEl) {
+    currentConversationTitleEl.textContent = conversationTitle;
+  }
+
+  // Update Header Classifications
+  if (currentConversationClassificationsEl) {
+    currentConversationClassificationsEl.innerHTML = ""; // Clear previous
+    if (window.enable_document_classification) {
+      try {
+        const classificationLabels = JSON.parse(convoItem.dataset.classifications || '[]');
+        if (Array.isArray(classificationLabels) && classificationLabels.length > 0) {
+           const allCategories = window.classification_categories || [];
+
+           classificationLabels.forEach(label => {
+            const category = allCategories.find(cat => cat.label === label);
+            const pill = document.createElement("span");
+            pill.classList.add("chat-classification-badge"); // Use specific class
+            pill.textContent = label; // Display the label
+
+            if (category) {
+                // Found category definition, apply color
+                pill.style.backgroundColor = category.color;
+                if (isColorLight(category.color)) {
+                    pill.classList.add("text-dark"); // Add dark text for light backgrounds
+                }
+            } else {
+                // Label exists but no definition found (maybe deleted in admin)
+                pill.classList.add("bg-warning", "text-dark"); // Use warning style
+                pill.title = `Definition for "${label}" not found`;
+            }
+            currentConversationClassificationsEl.appendChild(pill);
+          });
+        } else {
+             // Optionally display "None" if no classifications
+             // currentConversationClassificationsEl.innerHTML = '<span class="badge bg-secondary">None</span>';
+        }
+      } catch (e) {
+        console.error("Error parsing classification data:", e);
+        // Handle error, maybe display an error message
       }
     }
   }
 
   loadMessages(conversationId);
   highlightSelectedConversation(conversationId);
+
+  // Clear any "edit mode" state if switching conversations
+  if (currentlyEditingId && currentlyEditingId !== conversationId) {
+      const editingItem = document.querySelector(`.conversation-item[data-conversation-id="${currentlyEditingId}"]`);
+      if(editingItem && editingItem.classList.contains('editing')) {
+          // Need original convo object and button references to properly exit edit mode
+          // This might require fetching the convo data again or storing references differently
+          console.warn("Need to implement cancel/exit edit mode when switching conversations.");
+          // Simple visual reset for now:
+          loadConversations(); // Less ideal, reloads the whole list
+      }
+  }
 }
 
+// Visually highlight the selected conversation in the list
 export function highlightSelectedConversation(conversationId) {
   const items = document.querySelectorAll(".conversation-item");
-  items.forEach((item) => {
+  items.forEach(item => {
     if (item.getAttribute("data-conversation-id") === conversationId) {
       item.classList.add("active");
     } else {
@@ -324,106 +389,86 @@ export function highlightSelectedConversation(conversationId) {
   });
 }
 
+// Delete a conversation
 export function deleteConversation(conversationId) {
-  if (!confirm("Are you sure you want to delete this conversation?")) {
+  if (!confirm("Are you sure you want to delete this conversation? This action cannot be undone.")) {
     return;
   }
 
-  fetch(`/api/conversations/${conversationId}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-  })
-    .then((response) => {
-      if (response.ok) {
-        const convoItem = document.querySelector(
-          `.conversation-item[data-conversation-id="${conversationId}"]`
-        );
-        if (convoItem) {
-          convoItem.remove();
-        }
+  // Optionally show loading state on the item being deleted
 
+  fetch(`/api/conversations/${conversationId}`, { method: "DELETE" })
+    .then(response => {
+      if (response.ok) {
+        const convoItem = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+        if (convoItem) convoItem.remove();
+
+        // If the deleted conversation was the current one, reset the chat view
         if (currentConversationId === conversationId) {
           currentConversationId = null;
-          const titleEl = document.getElementById("current-conversation-title");
-          if (titleEl) {
-            titleEl.textContent =
-              "Start typing to create a new conversation or select one on the left";
-          }
-          const chatbox = document.getElementById("chatbox");
-          if (chatbox) {
-            chatbox.innerHTML = "";
-          }
+          if (currentConversationTitleEl) currentConversationTitleEl.textContent = "Select or start a conversation";
+          if (currentConversationClassificationsEl) currentConversationClassificationsEl.innerHTML = ""; // Clear classifications
+          if (chatbox) chatbox.innerHTML = '<div class="text-center p-5 text-muted">Select a conversation to view messages.</div>'; // Reset chatbox
+          highlightSelectedConversation(null); // Deselect all
         }
+         showToast("Conversation deleted.", "success");
       } else {
-        showToast("Failed to delete the conversation.", "danger");
+         return response.json().then(err => Promise.reject(err)); // Pass error details
       }
     })
-    .catch((error) => {
+    .catch(error => {
       console.error("Error deleting conversation:", error);
-      showToast("Error deleting the conversation.", "danger");
+      showToast(`Error deleting conversation: ${error.error || 'Unknown error'}`, "danger");
+      // Re-enable button if loading state was shown
     });
 }
 
+// Create a new conversation via API
 export async function createNewConversation(callback) {
+    // Disable new button? Show loading?
+    if (newConversationBtn) newConversationBtn.disabled = true;
   try {
     const response = await fetch("/api/create_conversation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
     });
     if (!response.ok) {
-      const errData = await response.json();
+      const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || "Failed to create conversation");
     }
-
     const data = await response.json();
     if (!data.conversation_id) {
       throw new Error("No conversation_id returned from server.");
     }
 
     currentConversationId = data.conversation_id;
-    addConversationToList(data.conversation_id);
+    // Add to list (pass empty classifications for new convo)
+    addConversationToList(data.conversation_id, data.title /* Use title from API if provided */, []);
+    // Select the new conversation to update header and chatbox
+    selectConversation(data.conversation_id);
 
-    const currentTitleEl = document.getElementById("current-conversation-title");
-    if (currentTitleEl) {
-      currentTitleEl.textContent = "New Conversation";
-    }
-
-    const chatbox = document.getElementById("chatbox");
-    if (chatbox) {
-      chatbox.innerHTML = "";
-    }
-
+    // Execute callback if provided (e.g., to send the first message)
     if (typeof callback === "function") {
       callback();
-    } else {
-      loadMessages(data.conversation_id);
     }
+
   } catch (error) {
     console.error("Error creating conversation:", error);
     showToast(`Failed to create a new conversation: ${error.message}`, "danger");
+  } finally {
+      if (newConversationBtn) newConversationBtn.disabled = false;
   }
 }
 
-function createClassificationPills(classifications) {
-  const container = document.createElement("div");
-  container.classList.add("classification-container");
-  
-  if (classifications && Array.isArray(classifications)) {
-    classifications.forEach((classification) => {
-      const pill = document.createElement("span");
-      // You can change the bg color class, e.g. "bg-info", "bg-secondary", etc.
-      pill.classList.add("badge", "rounded-pill", "bg-info", "me-1");
-      pill.textContent = classification;
-      container.appendChild(pill);
-    });
-  }
-  
-  return container;
-}
 
+// --- Event Listener ---
 if (newConversationBtn) {
   newConversationBtn.addEventListener("click", () => {
+    // If already editing, ask to finish first
+    if(currentlyEditingId) {
+        showToast("Please save or cancel the title edit first.", "warning");
+        return;
+    }
     createNewConversation();
   });
 }

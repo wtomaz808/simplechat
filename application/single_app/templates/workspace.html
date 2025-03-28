@@ -1,826 +1,1123 @@
 <!-- templates/workspace.html -->
-{% extends "base.html" %} {% block title %} Your Workspace - {{
-app_settings.app_title }} {% endblock %} {% block head %}
-<link
-  rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css"
-/>
-{% endblock %} {% block content %}
-
-<div class="container">
-  <h2>Your Workspace</h2>
-
-  <!-- Nav Tabs -->
-  <ul class="nav nav-tabs" id="workspaceTab" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button
-        class="nav-link active"
-        id="documents-tab-btn"
-        data-bs-toggle="tab"
-        data-bs-target="#documents-tab"
-        type="button"
-        role="tab"
-        aria-controls="documents-tab"
-        aria-selected="true"
-      >
-        Your Documents
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button
-        class="nav-link"
-        id="prompts-tab-btn"
-        data-bs-toggle="tab"
-        data-bs-target="#prompts-tab"
-        type="button"
-        role="tab"
-        aria-controls="prompts-tab"
-        aria-selected="false"
-      >
-        Your Prompts
-      </button>
-    </li>
-  </ul>
-
-  <!-- Tab Panes -->
-  <div class="tab-content" id="workspaceTabContent">
-    <!-- ============= DOCUMENTS TAB ============= -->
-    <div
-      class="tab-pane fade show active"
-      id="documents-tab"
-      role="tabpanel"
-      aria-labelledby="documents-tab-btn"
-    >
-      <div class="card p-3 my-3">
-        <h5>Your Documents</h5>
-        <p class="text-muted">Only you can see documents you upload. Allowed extensions 
-          'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 
-          'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json' 
-        </p>
-
-        <!-- Document Upload Form -->
-        <div class="mb-3">
-          <input type="file" id="file-input" />
-          <button id="upload-btn" class="btn btn-primary">
-            Upload Document
-          </button>
-        </div>
-
-        <!-- Documents List -->
-        <table class="table table-striped" id="documents-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>File Name</th>
-              <th>Title</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Populated by JavaScript -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <!-- End DOCUMENTS TAB -->
-
-    <!-- ============= PROMPTS TAB ============= -->
-    <div
-      class="tab-pane fade"
-      id="prompts-tab"
-      role="tabpanel"
-      aria-labelledby="prompts-tab-btn"
-    >
-      <div class="card p-3 my-3">
-        <h5>Your Prompts</h5>
-        <p class="text-muted">Create and manage personal prompts here.</p>
-        <div class="mb-3">
-          <button id="create-prompt-btn" class="btn btn-success">
-            New Prompt
-          </button>
-        </div>
-
-        <table class="table table-striped" id="prompts-table">
-          <thead>
-            <tr>
-              <th>Prompt Name</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Populated by JavaScript -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <!-- End PROMPTS TAB -->
-  </div>
-  <!-- End Tab Content -->
-</div>
-
-<!-- Modal for Creating/Editing Prompts -->
-<div
-  class="modal fade"
-  id="promptModal"
-  tabindex="-1"
-  aria-labelledby="promptModalLabel"
-  aria-hidden="true"
->
-  <div class="modal-dialog modal-xl" style="max-width: 80%">
-    <form id="prompt-form">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="promptModalLabel">Create Prompt</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="prompt-id" name="prompt_id" value="" />
-          <div class="mb-3">
-            <label for="prompt-name" class="form-label">Prompt Name</label>
-            <input
-              type="text"
-              class="form-control"
-              id="prompt-name"
-              name="name"
-              required
-            />
-          </div>
-          <div class="mb-3">
-            <label for="prompt-content" class="form-label"
-              >Prompt Content</label
-            >
-            <textarea
-              class="form-control"
-              id="prompt-content"
-              name="content"
-              rows="10"
-            ></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="prompt-save-btn" type="submit" class="btn btn-primary">
-            Save Prompt
-          </button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Modal for Editing Document Metadata -->
-<div
-  class="modal fade"
-  id="docMetadataModal"
-  tabindex="-1"
-  aria-labelledby="docMetadataModalLabel"
-  aria-hidden="true"
->
-  <div class="modal-dialog">
-    <form id="doc-metadata-form">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="docMetadataModalLabel">
-            Edit Document Metadata
-          </h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
-        </div>
-
-        <div class="modal-body">
-          <!-- Hidden doc-id field -->
-          <input type="hidden" id="doc-id" name="doc_id" value="" />
-
-          <!-- Document Classification -->
-          {% if settings.enable_document_classification %}
-          <div class="mb-3">
-            <label for="doc-classification" class="form-label"
-              >Document Classification</label
-            >
-            <select class="form-select" id="doc-classification">
-              <option value="">-- Select Classification --</option>
-              {% for cat in settings.document_classification_categories %}
-              <option value="{{ cat }}">{{ cat }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-
-          <!-- Title -->
-          <div class="mb-3">
-            <label for="doc-title" class="form-label">Title</label>
-            <input type="text" class="form-control" id="doc-title" />
-          </div>
-
-          <!-- Abstract -->
-          <div class="mb-3">
-            <label for="doc-abstract" class="form-label">Abstract</label>
-            <textarea
-              class="form-control"
-              id="doc-abstract"
-              rows="3"
-            ></textarea>
-          </div>
-
-          <!-- Keywords -->
-          <div class="mb-3">
-            <label for="doc-keywords" class="form-label"
-              >Keywords (comma separated)</label
-            >
-            <input type="text" class="form-control" id="doc-keywords" />
-          </div>
-
-          <!-- Publication Date -->
-          <div class="mb-3">
-            <label for="doc-publication-date" class="form-label"
-              >Publication Date</label
-            >
-            <input
-              type="text"
-              class="form-control"
-              id="doc-publication-date"
-              placeholder="e.g. 08/2005"
-            />
-          </div>
-
-          <!-- Authors -->
-          <div class="mb-3">
-            <label for="doc-authors" class="form-label"
-              >Authors (comma separated)</label
-            >
-            <input type="text" class="form-control" id="doc-authors" />
-          </div>
-        </div>
-        <!-- end modal-body -->
-
-        <div class="modal-footer">
-          <button id="doc-save-btn" type="submit" class="btn btn-primary">
-            Save Metadata
-          </button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-{% endblock %} {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
-
-<script>
-  // ------------------ Documents Section ------------------
-  window.enable_document_classification =
-    "{{ enable_document_classification }}";
-
-  const fileInput = document.getElementById("file-input");
-  const uploadBtn = document.getElementById("upload-btn");
-  const documentsTableBody = document.querySelector("#documents-table tbody");
-  const docMetadataModalEl = new bootstrap.Modal(
-    document.getElementById("docMetadataModal")
-  );
-  const docMetadataForm = document.getElementById("doc-metadata-form");
-
-  function toBoolean(str) {
-    return String(str).toLowerCase() === "true";
-  }
-
-  function onEditDocument(docId) {
-    // Fetch the doc from the server
-    fetch(`/api/documents/${docId}`)
-      .then((r) => r.json())
-      .then((doc) => {
-        if (doc.error) {
-          alert("Error retrieving document: " + doc.error);
-          return;
-        }
-
-        // Populate the form fields
-        document.getElementById("doc-id").value = doc.id;
-        document.getElementById("doc-title").value = doc.title || "";
-        document.getElementById("doc-abstract").value = doc.abstract || "";
-        if (Array.isArray(doc.keywords)) {
-          document.getElementById("doc-keywords").value =
-            doc.keywords.join(", ");
-        } else {
-          document.getElementById("doc-keywords").value = doc.keywords || "";
-        }
-
-        document.getElementById("doc-publication-date").value =
-          doc.publication_date || "";
-
-        if (Array.isArray(doc.authors)) {
-          document.getElementById("doc-authors").value = doc.authors.join(", ");
-        } else {
-          document.getElementById("doc-authors").value = doc.authors || "";
-        }
-
-        // ========== If classification is enabled, populate the field ==========
-        if (toBoolean(window.enable_document_classification)) {
-          document.getElementById("doc-classification").value =
-            doc.document_classification || "";
-        }
-
-        docMetadataModalEl.show();
-      })
-      .catch((err) => {
-        console.error("Error:", err);
-      });
-  }
-
-  // Handle metadata form submit => call PATCH
-  docMetadataForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-
-    // Grab the save button
-    const docSaveBtn = document.getElementById("doc-save-btn");
-
-    // Show spinner in the button & disable it
-    docSaveBtn.disabled = true;
-    // You can use any spinner markup you like; here's a Bootstrap example:
-    docSaveBtn.innerHTML = `
-      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-      Saving...
-    `;
-
-    const docId = document.getElementById("doc-id").value;
-    const payload = {
-      title: document.getElementById("doc-title").value,
-      abstract: document.getElementById("doc-abstract").value,
-      keywords: document.getElementById("doc-keywords").value,
-      publication_date: document.getElementById("doc-publication-date").value,
-      authors: document.getElementById("doc-authors").value,
-    };
-
-    // Convert comma-separated strings to arrays
-    if (typeof payload.keywords === "string") {
-      payload.keywords = payload.keywords.split(",").map((kw) => kw.trim());
-    }
-    if (typeof payload.authors === "string") {
-      payload.authors = payload.authors.split(",").map((a) => a.trim());
+{% extends "base.html" %}
+{% block title %} Your Workspace - {{ app_settings.app_title }} {% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css" />
+  <style>
+    /* Force fixed layout so columns don't expand when content changes */
+    #documents-table {
+      table-layout: fixed;
+      width: 100%;
     }
 
-    // Include document classification if enabled
-    if (toBoolean(window.enable_document_classification)) {
-      payload.document_classification =
-        document.getElementById("doc-classification").value;
+    /* Example: Keep the expand-arrow column narrow */
+    #documents-table th:nth-child(1),
+    #documents-table td:nth-child(1) {
+      width: 50px;
+      text-align: Left;
     }
 
-    fetch(`/api/documents/${docId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    })
-      .then((r) => r.json())
-      .then((updatedDoc) => {
-        if (updatedDoc.error) {
-          alert("Error updating document: " + updatedDoc.error);
-          return;
-        }
-        alert("Document metadata updated successfully!");
-        docMetadataModalEl.hide();
-        fetchUserDocuments();
-      })
-      .catch((err) => {
-        console.error("Error in update:", err);
-        alert("An error occurred while updating the document.");
-      })
-      .finally(() => {
-        // Re-enable button & restore text no matter success or error
-        docSaveBtn.disabled = false;
-        docSaveBtn.textContent = "Save Metadata";
-      });
-  });
+    /* File Name column */
+    #documents-table th:nth-child(2),
+    #documents-table td:nth-child(2) {
+      min-width: 50px;
+      max-width: 150px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis; /* if you want "..." on overflow */
+    }
 
-  // Fetch & render user documents
-  function fetchUserDocuments() {
-    fetch("/api/documents")
-      .then((response) => response.json())
-      .then((data) => {
-        documentsTableBody.innerHTML = "";
-        (data.documents || []).forEach((doc) => {
-          renderDocumentRow(doc);
-        });
-      })
-      .catch((error) => {
-        console.error("Error fetching documents:", error);
-      });
-  }
+    /* Title column */
+    #documents-table th:nth-child(3),
+    #documents-table td:nth-child(3) {
+      min-width: 50px;
+      max-width: 200px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
 
-  function renderDocumentRow(doc) {
-    const docId = doc.id;
-    const pct = parseInt(doc.percentage_complete, 10) || 0;
-    const docStatus = doc.status || "";
+    /* Actions column */
+    #documents-table th:nth-child(4),
+    #documents-table td:nth-child(4) {
+      width: 200px; /* or whatever fits your buttons */
+    }
 
-    const arrowButton =
-      pct === 100
-        ? `<button class="btn btn-link" onclick="toggleDetails('${docId}')">
-          <span id="arrow-icon-${docId}" class="bi bi-chevron-right"></span>
-        </button>`
-        : "";
+    /* Style for the classification badge */
+    .classification-badge {
+        display: inline-block;
+        padding: 0.3em 0.6em;
+        font-size: 0.85em;
+        font-weight: 600;
+        line-height: 1;
+        color: #fff; /* Default white text */
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.375rem; /* Bootstrap's default badge radius */
+        /* Text color adjustment based on background lightness might be needed */
+    }
+    /* Helper function (or manual calculation) needed to determine if text should be dark */
+    .classification-badge.text-dark {
+        color: #212529 !important; /* Bootstrap dark text color */
+    }
 
-    // Main doc row
-    const docRow = document.createElement("tr");
-    docRow.id = `doc-row-${docId}`;
-    docRow.innerHTML = `
-      <td>${arrowButton}</td>
-      <td>${doc.file_name || ""}</td>
-      <td>${doc.title || ""}</td>
-      <td>
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container">
+    <h2>Your Workspace</h2>
+
+    <!-- Nav Tabs -->
+    <ul class="nav nav-tabs" id="workspaceTab" role="tablist">
+      <li class="nav-item" role="presentation">
         <button
-          class="btn btn-sm btn-danger"
-          onclick="deleteDocument('${docId}')"
+          class="nav-link active"
+          id="documents-tab-btn"
+          data-bs-toggle="tab"
+          data-bs-target="#documents-tab"
+          type="button"
+          role="tab"
+          aria-controls="documents-tab"
+          aria-selected="true"
         >
-          Delete
+          Your Documents
         </button>
+      </li>
+      <li class="nav-item" role="presentation">
         <button
-          class="btn btn-sm btn-primary"
-          onclick="redirectToChat('${docId}')"
+          class="nav-link"
+          id="prompts-tab-btn"
+          data-bs-toggle="tab"
+          data-bs-target="#prompts-tab"
+          type="button"
+          role="tab"
+          aria-controls="prompts-tab"
+          aria-selected="false"
         >
-          Search in Chat
+          Your Prompts
         </button>
-      </td>
-    `;
-    documentsTableBody.appendChild(docRow);
+      </li>
+    </ul>
 
-    // Details row (collapsible) - only if doc is fully processed
-    if (pct === 100) {
-      const detailsRow = document.createElement("tr");
-      detailsRow.id = `details-row-${docId}`;
-      detailsRow.style.display = "none";
+    <!-- Tab Panes -->
+    <div class="tab-content" id="workspaceTabContent">
+      <!-- ============= DOCUMENTS TAB ============= -->
+      <div
+        class="tab-pane fade show active"
+        id="documents-tab"
+        role="tabpanel"
+        aria-labelledby="documents-tab-btn"
+      >
+        <div class="card p-3 my-3">
+          <h5>Your Documents</h5>
+          <p class="text-muted">Only you can see documents you upload. Allowed extensions
+            'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg',
+            'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
+            {% if settings.enable_video_file_support %}
+                , 'mp4', 'mov', 'avi', 'wmv', 'mkv', 'webm' {# Add relevant video extensions #}
+            {% endif %}
+            {% if settings.enable_audio_file_support %}
+                , 'mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a' {# Add relevant audio extensions #}
+            {% endif %}
+          </p>
 
-      // classification text if available
-      const classificationHTML = doc.document_classification
-        ? `<p><strong>Classification:</strong> ${doc.document_classification}</p>`
-        : `<p><strong>Classification:</strong> N/A</p>`;
+          <!-- Document Upload Form -->
+          <div class="mb-3">
+            <input type="file" id="file-input" multiple /> {# Allow multiple files if desired #}
+            <button id="upload-btn" class="btn btn-primary">
+              Upload Document(s)
+            </button>
+            <span id="upload-status" class="ms-2 text-muted small"></span>
+          </div>
 
-      // Build details
-      detailsRow.innerHTML = `
-        <td colspan="4">
-          <div class="bg-light p-3 border rounded">
-            ${classificationHTML}
-            <p><strong>Version:</strong> ${doc.version || ""}</p>
-            <p><strong>Authors:</strong> ${
-              Array.isArray(doc.authors)
-                ? doc.authors.join(", ")
-                : doc.authors || ""
-            }</p>
-            <p><strong>Number of Pages:</strong> ${
-              doc.number_of_pages || ""
-            }</p>
-            <p><strong>Enhanced Citations:</strong> ${
-              doc.enhanced_citations
-                ? '<span class="badge bg-success">Enhanced</span>'
-                : '<span class="badge bg-secondary">Standard</span>'
-            }</p>
-            <p><strong>Abstract:</strong> ${doc.abstract || ""}</p>
-            <p><strong>Keywords:</strong> ${
-              Array.isArray(doc.keywords)
-                ? doc.keywords.join(", ")
-                : doc.keywords || ""
-            }</p>
-            <p><strong>Publication Date:</strong> ${
-              doc.publication_date || ""
-            }</p>
-            
-            
-            <button
-              class="btn btn-sm btn-info"
-              onclick="onEditDocument('${docId}')"
-            >
-              Edit Metadata
+          <!-- Documents List -->
+          <table class="table table-striped" id="documents-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>File Name</th>
+                <th>Title</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <!-- Page Size Section -->
+            <div>
+              <label for="page-size-select" class="visually-hidden">Items per page:</label>
+              <select id="page-size-select" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <span class="ms-1 small text-muted">items per page</span>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="pagination-container" class="d-flex gap-1 ms-auto"></div> {# Use ms-auto to push pagination right #}
+          </div>
+
+        </div>
+      </div>
+      <!-- End DOCUMENTS TAB -->
+
+      <!-- ============= PROMPTS TAB ============= -->
+      <div
+        class="tab-pane fade"
+        id="prompts-tab"
+        role="tabpanel"
+        aria-labelledby="prompts-tab-btn"
+      >
+        <div class="card p-3 my-3">
+          <h5>Your Prompts</h5>
+          <p class="text-muted">Create and manage personal prompts here.</p>
+          <div class="mb-3">
+            <button id="create-prompt-btn" class="btn btn-success">
+              New Prompt
             </button>
           </div>
-        </td>
-      `;
-      documentsTableBody.appendChild(detailsRow);
-    }
 
-    // Show progress/status rows if incomplete
-    if (pct < 100 && !docStatus.toLowerCase().includes("processing complete")) {
-      const progressRow = document.createElement("tr");
-      progressRow.id = `progress-row-${docId}`;
-      progressRow.innerHTML = `
-        <td colspan="4">
-          <div class="progress" style="height: 20px;">
-            <div
-              id="progress-bar-${docId}"
-              class="progress-bar progress-bar-striped bg-info"
-              role="progressbar"
-              style="width: ${pct}%;"
-              aria-valuenow="${pct}"
-              aria-valuemin="0"
-              aria-valuemax="100"
-            >
-              ${pct}%
+          <table class="table table-striped" id="prompts-table">
+            <thead>
+              <tr>
+                <th>Prompt Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- End PROMPTS TAB -->
+    </div>
+    <!-- End Tab Content -->
+  </div>
+
+  <!-- Modal for Creating/Editing Prompts -->
+  <!-- (Keep Existing Prompt Modal As Is) -->
+  <div
+    class="modal fade"
+    id="promptModal"
+    tabindex="-1"
+    aria-labelledby="promptModalLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-xl" style="max-width: 80%">
+      <form id="prompt-form">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="promptModalLabel">Create Prompt</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="prompt-id" name="prompt_id" value="" />
+            <div class="mb-3">
+              <label for="prompt-name" class="form-label">Prompt Name</label>
+              <input
+                type="text"
+                class="form-control"
+                id="prompt-name"
+                name="name"
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label for="prompt-content" class="form-label"
+                >Prompt Content</label
+              >
+              <textarea
+                class="form-control"
+                id="prompt-content"
+                name="content"
+                rows="10"
+              ></textarea>
             </div>
           </div>
-        </td>
-      `;
-      documentsTableBody.appendChild(progressRow);
+          <div class="modal-footer">
+            <button id="prompt-save-btn" type="submit" class="btn btn-primary">
+              Save Prompt
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      const statusRow = document.createElement("tr");
-      statusRow.id = `status-row-${docId}`;
-      statusRow.innerHTML = `
-        <td colspan="4">
-          <small class="text-muted">Status: ${docStatus}</small>
-        </td>
-      `;
-      documentsTableBody.appendChild(statusRow);
+  <!-- Modal for Editing Document Metadata -->
+  <div
+    class="modal fade"
+    id="docMetadataModal"
+    tabindex="-1"
+    aria-labelledby="docMetadataModalLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog">
+      <form id="doc-metadata-form">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="docMetadataModalLabel">
+              Edit Document Metadata
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Hidden doc-id field -->
+            <input type="hidden" id="doc-id" name="doc_id" value="" />
+
+            <!-- Document Classification -->
+            {% if settings.enable_document_classification %}
+            <div class="mb-3">
+              <label for="doc-classification" class="form-label"
+                >Document Classification</label
+              >
+              <select class="form-select" id="doc-classification">
+                <option value="">-- Select Classification --</option>
+                {# *** Corrected Loop *** #}
+                {% for cat in settings.document_classification_categories %}
+                  <option value="{{ cat.label }}">{{ cat.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+
+            <!-- Title -->
+            <div class="mb-3">
+              <label for="doc-title" class="form-label">Title</label>
+              <input type="text" class="form-control" id="doc-title" />
+            </div>
+
+            <!-- Abstract -->
+            <div class="mb-3">
+              <label for="doc-abstract" class="form-label">Abstract</label>
+              <textarea
+                class="form-control"
+                id="doc-abstract"
+                rows="3"
+              ></textarea>
+            </div>
+
+            <!-- Keywords -->
+            <div class="mb-3">
+              <label for="doc-keywords" class="form-label"
+                >Keywords (comma separated)</label
+              >
+              <input type="text" class="form-control" id="doc-keywords" />
+            </div>
+
+            <!-- Publication Date -->
+            <div class="mb-3">
+              <label for="doc-publication-date" class="form-label"
+                >Publication Date</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="doc-publication-date"
+                placeholder="e.g. 08/2005"
+              />
+            </div>
+
+            <!-- Authors -->
+            <div class="mb-3">
+              <label for="doc-authors" class="form-label"
+                >Authors (comma separated)</label
+              >
+              <input type="text" class="form-control" id="doc-authors" />
+            </div>
+          </div>
+          <!-- end modal-body -->
+
+          <div class="modal-footer">
+            <button id="doc-save-btn" type="submit" class="btn btn-primary">
+              Save Metadata
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
+
+  <script>
+    window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
+    // Ensure it's always an array
+    if (!Array.isArray(window.classificationCategories)) {
+        window.classificationCategories = [];
     }
-  }
+    window.enable_document_classification = "{{ enable_document_classification }}";
+    window.enable_extract_meta_data = "{{ enable_extract_meta_data }}";
 
-  function toggleDetails(docId) {
-    const detailsRow = document.getElementById(`details-row-${docId}`);
-    if (!detailsRow) return;
-    if (detailsRow.style.display === "none") {
-      detailsRow.style.display = "";
-      document.getElementById(`arrow-icon-${docId}`).className =
-        "bi bi-chevron-down";
-    } else {
-      detailsRow.style.display = "none";
-      document.getElementById(`arrow-icon-${docId}`).className =
-        "bi bi-chevron-right";
+    let currentPage = 1;
+    let pageSize = 10;
+
+    // ------------- DOM Elements -------------
+    const paginationContainer = document.getElementById("pagination-container");
+    const pageSizeSelect = document.getElementById("page-size-select");
+    const fileInput = document.getElementById("file-input");
+    const uploadBtn = document.getElementById("upload-btn");
+    const uploadStatusSpan = document.getElementById("upload-status");
+    const documentsTableBody = document.querySelector("#documents-table tbody");
+    const docMetadataModalEl = new bootstrap.Modal(document.getElementById("docMetadataModal"));
+    const docMetadataForm = document.getElementById("doc-metadata-form");
+
+    // ------------- Helper Functions -------------
+    function escapeHtml(unsafe) {
+        if (unsafe === null || typeof unsafe === 'undefined') return '';
+        return unsafe.toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
-  }
 
-  // Poll doc status for progress
-  function pollDocumentStatus(documentId) {
-    const pollInterval = setInterval(() => {
-      fetch(`/api/documents/${documentId}`)
-        .then((r) => r.json())
-        .then((doc) => {
-          if (doc.error) {
-            clearInterval(pollInterval);
-            alert("Error retrieving status: " + doc.error);
-            return;
-          }
-          const pct = parseInt(doc.percentage_complete, 10) || 0;
-          const progressBar = document.getElementById(
-            `progress-bar-${documentId}`
-          );
-          const statusRow = document.getElementById(`status-row-${documentId}`);
+    // Simple function to determine if a hex color is light or dark
+    // Returns true if light, false if dark
+    function isColorLight(hexColor) {
+        if (!hexColor || hexColor.length < 4) return true; // Default to light if invalid
+        let r, g, b;
+        if (hexColor.length === 4) { // #RGB format
+            r = parseInt(hexColor[1] + hexColor[1], 16);
+            g = parseInt(hexColor[2] + hexColor[2], 16);
+            b = parseInt(hexColor[3] + hexColor[3], 16);
+        } else { // #RRGGBB format
+            r = parseInt(hexColor.substring(1, 3), 16);
+            g = parseInt(hexColor.substring(3, 5), 16);
+            b = parseInt(hexColor.substring(5, 7), 16);
+        }
+        // Formula for perceived brightness (YIQ)
+        const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return brightness > 150; // Threshold can be adjusted (128 is middle gray)
+    }
 
-          if (progressBar) {
-            progressBar.style.width = pct + "%";
-            progressBar.setAttribute("aria-valuenow", pct);
-            progressBar.textContent = pct + "%";
+    // ------------- Event Listeners -------------
+    pageSizeSelect.addEventListener("change", (e) => {
+      pageSize = parseInt(e.target.value, 10);
+      currentPage = 1; // reset to page 1
+      fetchUserDocuments();
+    });
+
+    // Handle metadata form submit => call PATCH
+    docMetadataForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const docSaveBtn = document.getElementById("doc-save-btn");
+      docSaveBtn.disabled = true;
+      docSaveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...`;
+
+      const docId = document.getElementById("doc-id").value;
+      const payload = {
+        title: document.getElementById("doc-title").value.trim(),
+        abstract: document.getElementById("doc-abstract").value.trim(),
+        keywords: document.getElementById("doc-keywords").value.trim(),
+        publication_date: document.getElementById("doc-publication-date").value.trim(),
+        authors: document.getElementById("doc-authors").value.trim(),
+      };
+
+      // Convert comma-separated strings to arrays, filtering empty entries
+      if (typeof payload.keywords === "string") {
+        payload.keywords = payload.keywords.split(",").map(kw => kw.trim()).filter(Boolean);
+      }
+      if (typeof payload.authors === "string") {
+        payload.authors = payload.authors.split(",").map(a => a.trim()).filter(Boolean);
+      }
+
+      // Include document classification if enabled
+      if (window.enable_document_classification) {
+        payload.document_classification = document.getElementById("doc-classification").value;
+      }
+
+      fetch(`/api/documents/${docId}`, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(updatedDoc => {
+          docMetadataModalEl.hide();
+          fetchUserDocuments(); // Refresh the table
+        })
+        .catch(err => {
+          console.error("Error updating document:", err);
+          alert("Error updating document: " + (err.error || "Unknown error"));
+        })
+        .finally(() => {
+          docSaveBtn.disabled = false;
+          docSaveBtn.textContent = "Save Metadata";
+        });
+    });
+
+    // Upload button listener
+    uploadBtn.addEventListener("click", () => {
+      const files = fileInput.files;
+      if (!files || files.length === 0) {
+        alert("Please select at least one file to upload.");
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      uploadStatusSpan.textContent = `Uploading ${files.length} file(s)...`;
+      uploadBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Uploading...`;
+
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+          formData.append("file", files[i]); // Use same key 'file' for multiple files
+      }
+
+      fetch("/api/documents/upload", {
+        method: "POST",
+        body: formData, // Send FormData directly
+      })
+      .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
+      .then(data => {
+          // Handle potential multiple results or single result
+          const docIds = data.document_ids || (data.document_id ? [data.document_id] : []);
+          const successCount = docIds.length;
+          const totalCount = files.length;
+
+          if (successCount > 0) {
+             console.log(`Successfully started processing for ${successCount} document(s).`);
+             fetchUserDocuments(); // Refresh the list
+             docIds.forEach(docId => pollDocumentStatus(docId)); // Poll each new doc
           }
-          if (statusRow) {
-            const smallEl = statusRow.querySelector("small");
-            if (smallEl) {
-              smallEl.textContent = "Status: " + (doc.status || "");
+
+          if (data.errors && data.errors.length > 0) {
+             alert(`Upload partially failed:\n- ${data.errors.join('\n- ')}`);
+          } else if (successCount === 0 && data.error) {
+             alert("Upload failed: " + data.error);
+          } else if (successCount < totalCount) {
+             alert(`Successfully uploaded ${successCount} out of ${totalCount} files. Some may have failed.`);
+          }
+
+          fileInput.value = ""; // Clear file input
+      })
+      .catch(err => {
+          console.error("Upload failed:", err);
+          alert("Upload failed: " + (err.error || err.message || "Unknown error"));
+      })
+      .finally(() => {
+          uploadBtn.disabled = false;
+          uploadBtn.innerHTML = "Upload Document(s)";
+          uploadStatusSpan.textContent = "";
+      });
+    });
+
+
+    // ------------- Document Functions -------------
+    function fetchUserDocuments() {
+      // Add spinner or loading indicator maybe?
+      documentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading documents...</td></tr>';
+
+      fetch(`/api/documents?page=${currentPage}&page_size=${pageSize}`)
+        .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
+        .then(data => {
+          documentsTableBody.innerHTML = ""; // Clear loading/existing rows
+          if (!data.documents || data.documents.length === 0) {
+              documentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No documents found. Upload a document to get started.</td></tr>';
+          } else {
+              data.documents.forEach(doc => renderDocumentRow(doc));
+          }
+          renderPaginationControls(data.page, data.page_size, data.total_count);
+          // Polling is handled within renderDocumentRow now
+        })
+        .catch(error => {
+          console.error("Error fetching documents:", error);
+          documentsTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger p-4">Error loading documents: ${error.error || error.message || 'Unknown error'}</td></tr>`;
+          renderPaginationControls(1, pageSize, 0); // Show empty pagination
+        });
+    }
+
+    function renderDocumentRow(doc) {
+        const docId = doc.id;
+        const pct = parseInt(doc.percentage_complete, 10) || 0;
+        const docStatus = doc.status || "";
+        const isComplete = pct >= 100 || docStatus.toLowerCase().includes("complete") || docStatus.toLowerCase().includes("error"); // Treat error as complete for UI purposes
+        const hasError = docStatus.toLowerCase().includes("error");
+
+        // Main document row
+        const docRow = document.createElement("tr");
+        docRow.id = `doc-row-${docId}`;
+        docRow.innerHTML = `
+            <td class="align-middle">
+                ${isComplete && !hasError ?
+                    `<button class="btn btn-link p-0" onclick="toggleDetails('${docId}')" title="Show/Hide Details">
+                        <span id="arrow-icon-${docId}" class="bi bi-chevron-right"></span>
+                     </button>` :
+                     (hasError ? '<span class="text-danger" title="Processing Error"><i class="bi bi-exclamation-triangle-fill"></i></span>' : '<span class="text-muted" title="Processing..."><i class="bi bi-hourglass-split"></i></span>')
+                }
+            </td>
+            <td class="align-middle" title="${escapeHtml(doc.file_name || "")}">${escapeHtml(doc.file_name || "")}</td>
+            <td class="align-middle" title="${escapeHtml(doc.title || "")}">${escapeHtml(doc.title || "")}</td>
+            <td class="align-middle">
+                <button class="btn btn-sm btn-danger" onclick="deleteDocument('${docId}')" title="Delete Document">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+                ${isComplete && !hasError ?
+                    `<button class="btn btn-sm btn-primary ms-1" onclick="redirectToChat('${docId}')" title="Search in Chat">
+                        <i class="bi bi-chat-dots-fill"></i> Chat
+                     </button>` :
+                    ''
+                }
+            </td>
+        `;
+        documentsTableBody.appendChild(docRow);
+
+        // Details row (collapsible) - only if complete and no error
+        if (isComplete && !hasError) {
+            const detailsRow = document.createElement("tr");
+            detailsRow.id = `details-row-${docId}`;
+            detailsRow.style.display = "none"; // Initially hidden
+
+            let classificationDisplayHTML = '<p><strong>Classification:</strong> Not Enabled</p>';
+            if (window.enable_document_classification) {
+                const currentLabel = doc.document_classification || null;
+                const category = (window.classification_categories || []).find(cat => cat.label === currentLabel);
+
+                if (category) {
+                    const bgColor = category.color;
+                    const textColorClass = isColorLight(bgColor) ? 'text-dark' : ''; // Add text-dark if background is light
+                    classificationDisplayHTML = `<p><strong>Classification:</strong> <span class="classification-badge ${textColorClass}" style="background-color: ${escapeHtml(bgColor)};">${escapeHtml(category.label)}</span></p>`;
+                } else if (currentLabel) {
+                    // Label exists but doesn't match defined categories
+                     classificationDisplayHTML = `<p><strong>Classification:</strong> <span class="badge bg-warning text-dark" title="Category definition not found">${escapeHtml(currentLabel)} (?)</span></p>`;
+                }
+                 else {
+                    classificationDisplayHTML = '<p><strong>Classification:</strong> <span class="badge bg-secondary">None</span></p>';
+                }
+            }
+
+            let detailsHtml = `
+                <td colspan="4">
+                    <div class="bg-light p-3 border rounded small">
+                        ${classificationDisplayHTML}
+                        <p class="mb-1"><strong>Version:</strong> ${escapeHtml(doc.version || "N/A")}</p>
+                        <p class="mb-1"><strong>Authors:</strong> ${escapeHtml(Array.isArray(doc.authors) ? doc.authors.join(", ") : doc.authors || "N/A")}</p>
+                        <p class="mb-1"><strong>Pages:</strong> ${escapeHtml(doc.number_of_pages || "N/A")}</p>
+                        <p class="mb-1"><strong>Citations:</strong> ${doc.enhanced_citations ? '<span class="badge bg-success">Enhanced</span>' : '<span class="badge bg-secondary">Standard</span>'}</p>
+                        <p class="mb-1"><strong>Publication Date:</strong> ${escapeHtml(doc.publication_date || "N/A")}</p>
+                        <p class="mb-1"><strong>Keywords:</strong> ${escapeHtml(Array.isArray(doc.keywords) ? doc.keywords.join(", ") : doc.keywords || "N/A")}</p>
+                        <p class="mb-0"><strong>Abstract:</strong> ${escapeHtml(doc.abstract || "N/A")}</p>
+                        <hr class="my-2">
+                        <button class="btn btn-sm btn-info" onclick="onEditDocument('${docId}')" title="Edit Metadata">
+                            <i class="bi bi-pencil-fill"></i> Edit Metadata
+                        </button>
+            `;
+
+            // Append extra button if extraction is enabled
+            if (window.enable_extract_meta_data) {
+                detailsHtml += `
+                    <button class="btn btn-sm btn-warning ms-2" onclick="window.onExtractMetadata('${docId}')" title="Re-run Metadata Extraction">
+                        <i class="bi bi-magic"></i> Extract Metadata
+                    </button>
+                `;
+            }
+
+            detailsHtml += `</div></td>`; // Close div and td
+            detailsRow.innerHTML = detailsHtml;
+            documentsTableBody.appendChild(detailsRow);
+        }
+
+        // Progress/status row if incomplete or has error
+        if (!isComplete || hasError) {
+            const statusRow = document.createElement("tr");
+            statusRow.id = `status-row-${docId}`;
+            statusRow.innerHTML = `
+                <td colspan="4">
+                    ${hasError ?
+                        `<div class="alert alert-danger alert-sm py-1 px-2 mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${escapeHtml(docStatus)}
+                         </div>` :
+                        (pct < 100 ?
+                            `<div class="progress" style="height: 10px;">
+                                <div id="progress-bar-${docId}" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: ${pct}%;" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <small class="text-muted" id="status-text-${docId}">Status: ${escapeHtml(docStatus)} (${pct}%)</small>` :
+                            // Should not happen if isComplete logic is correct, but as fallback
+                            `<small class="text-muted">Status: Processing...</small>`
+                        )
+                    }
+                </td>
+            `;
+            documentsTableBody.appendChild(statusRow);
+
+            // Start polling only if not complete and not error
+            if (!isComplete && !hasError) {
+                 pollDocumentStatus(docId);
+            }
+        }
+    }
+
+
+    function renderPaginationControls(page, pageSize, totalCount) {
+      paginationContainer.innerHTML = ""; // clear old
+      const totalPages = Math.ceil(totalCount / pageSize);
+
+      if (totalPages <= 1) return; // Don't show pagination if only one page
+
+      // "Previous" button
+      const prevBtn = document.createElement("button");
+      prevBtn.innerHTML = '« <span class="d-none d-sm-inline">Previous</span>'; // Icon + Text
+      prevBtn.classList.add("btn", "btn-sm", "btn-outline-secondary");
+      prevBtn.disabled = (page <= 1);
+      prevBtn.onclick = () => {
+        if (currentPage > 1) {
+          currentPage -= 1;
+          fetchUserDocuments();
+        }
+      };
+      paginationContainer.appendChild(prevBtn);
+
+      // Page Number Buttons (Simplified Logic)
+      const maxButtons = 5; // Max number of page buttons to show
+      let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+      let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+       // Adjust startPage if endPage hits the limit first
+       startPage = Math.max(1, endPage - maxButtons + 1);
+
+       if (startPage > 1) {
+            // Ellipsis at the beginning
+            const ellipsisStart = document.createElement('span');
+            ellipsisStart.classList.add('align-self-end', 'px-1');
+            ellipsisStart.innerHTML = '…';
+            paginationContainer.appendChild(ellipsisStart);
+       }
+
+      for (let p = startPage; p <= endPage; p++) {
+        const pageBtn = document.createElement("button");
+        pageBtn.textContent = p;
+        pageBtn.classList.add("btn", "btn-sm", p === page ? "btn-primary" : "btn-outline-secondary");
+        pageBtn.onclick = () => {
+          currentPage = p;
+          fetchUserDocuments();
+        };
+        paginationContainer.appendChild(pageBtn);
+      }
+
+      if (endPage < totalPages) {
+            // Ellipsis at the end
+            const ellipsisEnd = document.createElement('span');
+            ellipsisEnd.classList.add('align-self-end', 'px-1');
+            ellipsisEnd.innerHTML = '…';
+            paginationContainer.appendChild(ellipsisEnd);
+       }
+
+
+      // "Next" button
+      const nextBtn = document.createElement("button");
+      nextBtn.innerHTML = '<span class="d-none d-sm-inline">Next</span> »'; // Text + Icon
+      nextBtn.classList.add("btn", "btn-sm", "btn-outline-secondary");
+      nextBtn.disabled = (page >= totalPages);
+      nextBtn.onclick = () => {
+        if (currentPage < totalPages) {
+          currentPage += 1;
+          fetchUserDocuments();
+        }
+      };
+      paginationContainer.appendChild(nextBtn);
+
+      // Optional: show "Page X of Y" info - Can be added elsewhere if needed
+      // const infoSpan = document.createElement("span");
+      // infoSpan.classList.add("ms-3", "align-self-center", "small", "text-muted");
+      // infoSpan.textContent = `Page ${page} of ${totalPages}`;
+      // paginationContainer.appendChild(infoSpan);
+    }
+
+    function toggleDetails(docId) {
+      const detailsRow = document.getElementById(`details-row-${docId}`);
+      const arrowIcon = document.getElementById(`arrow-icon-${docId}`);
+      if (!detailsRow || !arrowIcon) return;
+
+      if (detailsRow.style.display === "none") {
+        detailsRow.style.display = ""; // Show row (default display is table-row)
+        arrowIcon.classList.remove("bi-chevron-right");
+        arrowIcon.classList.add("bi-chevron-down");
+      } else {
+        detailsRow.style.display = "none"; // Hide row
+        arrowIcon.classList.remove("bi-chevron-down");
+        arrowIcon.classList.add("bi-chevron-right");
+      }
+    }
+
+    // Store active poll intervals to prevent duplicates
+    const activePolls = new Set();
+
+    function pollDocumentStatus(documentId) {
+        if (activePolls.has(documentId)) {
+            // console.log(`Polling already active for ${documentId}`);
+            return; // Already polling this document
+        }
+        activePolls.add(documentId);
+        // console.log(`Starting polling for ${documentId}`);
+
+        const pollInterval = setInterval(() => {
+            fetch(`/api/documents/${documentId}`)
+                .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+                .then(doc => {
+                    const pct = parseInt(doc.percentage_complete, 10) || 0;
+                    const docStatus = doc.status || "";
+                    const isComplete = pct >= 100 || docStatus.toLowerCase().includes("complete") || docStatus.toLowerCase().includes("error");
+                    const hasError = docStatus.toLowerCase().includes("error");
+
+                    const progressBar = document.getElementById(`progress-bar-${documentId}`);
+                    const statusText = document.getElementById(`status-text-${documentId}`);
+
+                    if (progressBar) {
+                        progressBar.style.width = pct + "%";
+                        progressBar.setAttribute("aria-valuenow", pct);
+                    }
+                    if (statusText) {
+                        statusText.textContent = `Status: ${escapeHtml(docStatus)} (${pct}%)`;
+                    }
+
+                    if (isComplete) {
+                        // console.log(`Polling complete or error for ${documentId}`);
+                        clearInterval(pollInterval);
+                        activePolls.delete(documentId);
+                        // Optionally re-render just this row or fetch all again
+                        // Could replace the status row content or remove it
+                         const statusRow = document.getElementById(`status-row-${documentId}`);
+                         const mainRow = document.getElementById(`doc-row-${documentId}`);
+                         if (statusRow) statusRow.remove(); // Remove status/progress row
+
+                         // Update the main row's icons/buttons based on completion/error
+                         if(mainRow) {
+                            const firstCell = mainRow.cells[0];
+                            const actionsCell = mainRow.cells[3]; // Assuming 4th cell
+                            if(firstCell) {
+                                // Update expand/error/processing icon
+                                firstCell.innerHTML = hasError ? '<span class="text-danger" title="Processing Error"><i class="bi bi-exclamation-triangle-fill"></i></span>' :
+                                                      `<button class="btn btn-link p-0" onclick="toggleDetails('${docId}')" title="Show/Hide Details"><span id="arrow-icon-${docId}" class="bi bi-chevron-right"></span></button>`;
+                            }
+                            if(actionsCell) {
+                                // Add chat button if complete and no error
+                                const existingChatBtn = actionsCell.querySelector('button[onclick*="redirectToChat"]');
+                                if (!existingChatBtn && !hasError) {
+                                    const chatBtn = document.createElement('button');
+                                    chatBtn.className = 'btn btn-sm btn-primary ms-1';
+                                    chatBtn.onclick = () => redirectToChat(docId);
+                                    chatBtn.title = 'Search in Chat';
+                                    chatBtn.innerHTML = '<i class="bi bi-chat-dots-fill"></i> Chat';
+                                    actionsCell.appendChild(chatBtn);
+                                }
+                            }
+                         }
+                         // Potentially create and append the details row if it wasn't there before
+                         if (!document.getElementById(`details-row-${docId}`) && !hasError) {
+                             // Re-call renderDocumentRow logic for details row part or just create it here
+                             const detailsRow = document.createElement("tr");
+                             detailsRow.id = `details-row-${docId}`;
+                             detailsRow.style.display = "none";
+                             // ... (populate detailsRow.innerHTML as in renderDocumentRow) ...
+                             // Ensure it's inserted correctly after the main row
+                             const mainDocRow = document.getElementById(`doc-row-${documentId}`);
+                             mainDocRow?.parentNode.insertBefore(detailsRow, mainDocRow.nextSibling);
+                         }
+
+                    }
+                })
+                .catch(err => {
+                    console.error(`Error polling document ${documentId}:`, err);
+                    clearInterval(pollInterval);
+                    activePolls.delete(documentId);
+                    const statusRow = document.getElementById(`status-row-${documentId}`);
+                    if(statusRow) {
+                        statusRow.innerHTML = `<td colspan="4"><div class="alert alert-warning alert-sm py-1 px-2 mb-0" role="alert">Could not retrieve status.</div></td>`;
+                    }
+                });
+        }, 5000); // Poll every 5 seconds
+    }
+
+
+    window.onEditDocument = function(docId) { // Make it global for onclick
+      // Fetch the doc from the server
+      fetch(`/api/documents/${docId}`)
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(doc => {
+          // Populate the form fields
+          document.getElementById("doc-id").value = doc.id;
+          document.getElementById("doc-title").value = doc.title || "";
+          document.getElementById("doc-abstract").value = doc.abstract || "";
+          document.getElementById("doc-keywords").value = Array.isArray(doc.keywords) ? doc.keywords.join(", ") : (doc.keywords || "");
+          document.getElementById("doc-publication-date").value = doc.publication_date || "";
+          document.getElementById("doc-authors").value = Array.isArray(doc.authors) ? doc.authors.join(", ") : (doc.authors || "");
+
+          // Set classification dropdown value
+          if (window.enable_document_classification) {
+            const classificationSelect = document.getElementById("doc-classification");
+            // Set value based on the label string. Ensure the option exists.
+            classificationSelect.value = doc.document_classification || "";
+            if (classificationSelect.selectedIndex === -1 && classificationSelect.options.length > 0) {
+                // If the value didn't match any option, select the default "-- Select --"
+                 classificationSelect.value = "";
             }
           }
 
-          if (doc.status?.toLowerCase().includes("complete") || pct >= 100) {
-            clearInterval(pollInterval);
-            alert("Upload complete!");
-            const progressRow = document.getElementById(
-              `progress-row-${documentId}`
-            );
-            if (progressRow) progressRow.remove();
-            if (statusRow) statusRow.remove();
-          }
+          docMetadataModalEl.show();
         })
-        .catch((err) => {
-          console.error("Error in pollDocumentStatus:", err);
-          clearInterval(pollInterval);
+        .catch(err => {
+          console.error("Error retrieving document for edit:", err);
+          alert("Error retrieving document details: " + (err.error || "Unknown error"));
         });
-    }, 3000);
-  }
-
-  // Upload
-  uploadBtn.addEventListener("click", () => {
-    const file = fileInput.files[0];
-    if (!file) {
-      alert("Please select a file to upload.");
-      return;
     }
-    const formData = new FormData();
-    formData.append("file", file);
 
-    fetch("/api/documents/upload", {
-      method: "POST",
-      body: formData,
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.document_id) {
-          const docId = data.document_id;
+    window.onExtractMetadata = function (docId) { // Make it global for onclick
+      if (!confirm("Run metadata extraction for this document? This may overwrite existing metadata.")) {
+        return;
+      }
+      const extractBtn = event.target.closest('button'); // Get the button that was clicked
+      if (extractBtn) {
+          extractBtn.disabled = true;
+          extractBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Extracting...`;
+      }
+
+      fetch(`/api/documents/${docId}/extract_metadata`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+          console.log("Metadata extraction started/completed:", data);
+          // Refresh documents table to show updated data or potentially new status
           fetchUserDocuments();
-          pollDocumentStatus(docId);
-        } else if (data.error) {
-          alert("Error uploading: " + data.error);
-        }
-      })
-      .catch((err) => {
-        console.error("Upload failed:", err);
-      });
-  });
-
-  function fetchUserDocumentsAndPoll() {
-    fetch("/api/documents")
-      .then((response) => response.json())
-      .then((data) => {
-        documentsTableBody.innerHTML = "";
-        (data.documents || []).forEach((doc) => {
-          renderDocumentRow(doc);
-          // If incomplete, poll
-          let pct = parseInt(doc.percentage_complete, 10) || 0;
-          if (pct < 100 && !doc.status?.toLowerCase().includes("complete")) {
-            pollDocumentStatus(doc.id);
-          }
+           // Hide the details row as data might have changed
+          const detailsRow = document.getElementById(`details-row-${docId}`);
+           if (detailsRow) detailsRow.style.display = 'none';
+           const arrowIcon = document.getElementById(`arrow-icon-${docId}`);
+           if(arrowIcon) arrowIcon.className = 'bi bi-chevron-right';
+           // Optionally show a success message if the API returns one
+           // alert(data.message || "Metadata extraction initiated.");
+        })
+        .catch(err => {
+          console.error("Error calling extract metadata:", err);
+          alert("Error extracting metadata: " + (err.error || "Unknown error"));
+        })
+        .finally(() => {
+            if(extractBtn) {
+                extractBtn.disabled = false;
+                extractBtn.innerHTML = '<i class="bi bi-magic"></i> Extract Metadata';
+            }
         });
-      })
-      .catch((error) => {
-        console.error("Error fetching documents:", error);
-      });
-  }
-
-  function deleteDocument(documentId) {
-    if (!confirm("Are you sure you want to delete this document?")) return;
-    fetch(`/api/documents/${documentId}`, { method: "DELETE" })
-      .then((response) => {
-        if (!response.ok) {
-          return response.json().then((data) => {
-            alert(
-              "Error deleting document: " + (data.error || "Unknown error")
-            );
-            throw new Error(data.error || "Delete failed");
-          });
-        }
-        return response.json();
-      })
-      .then((data) => {
-        alert(data.message);
-        fetchUserDocuments();
-      })
-      .catch((error) => {
-        console.error("Error deleting document:", error);
-      });
-  }
-
-  function redirectToChat(documentId) {
-    window.location.href = `/chats?search_documents=true&doc_scope=personal&document_id=${documentId}`;
-  }
-
-  // ------------------ Prompts Section ------------------
-  const promptsTableBody = document.querySelector("#prompts-table tbody");
-  const promptModalEl = new bootstrap.Modal(
-    document.getElementById("promptModal")
-  );
-  const promptForm = document.getElementById("prompt-form");
-  const promptIdEl = document.getElementById("prompt-id");
-  const promptNameEl = document.getElementById("prompt-name");
-  const promptContentEl = document.getElementById("prompt-content");
-
-  let simplemde = new SimpleMDE({
-    element: promptContentEl,
-    spellChecker: false,
-  });
-
-  function fetchUserPrompts() {
-    fetch("/api/prompts")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          console.error("Error fetching prompts:", data.error);
-          return;
-        }
-        promptsTableBody.innerHTML = "";
-        (data.prompts || []).forEach((p) => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${p.name}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-primary"
-                onclick="onEditPrompt('${p.id}')"
-              >
-                Edit
-              </button>
-              <button
-                class="btn btn-sm btn-danger"
-                onclick="onDeletePrompt('${p.id}')"
-              >
-                Delete
-              </button>
-            </td>
-          `;
-          promptsTableBody.appendChild(tr);
-        });
-      })
-      .catch((err) => console.error("Error:", err));
-  }
-
-  document.getElementById("create-prompt-btn").addEventListener("click", () => {
-    promptModalEl.show();
-    document.getElementById("promptModalLabel").textContent = "Create Prompt";
-    promptIdEl.value = "";
-    promptNameEl.value = "";
-    promptContentEl.value = "";
-    simplemde.value("");
-  });
-
-  promptForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    promptContentEl.value = simplemde.value();
-
-    const promptId = promptIdEl.value;
-    const payload = {
-      name: promptNameEl.value,
-      content: promptContentEl.value,
     };
 
-    if (!promptId) {
-      // create
-      fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.error) {
-            alert("Error creating prompt: " + data.error);
-            return;
+    window.deleteDocument = function(documentId) { // Make it global for onclick
+      if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) return;
+
+      const deleteBtn = event.target.closest('button');
+       if (deleteBtn) {
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...`;
+       }
+
+
+      fetch(`/api/documents/${documentId}`, { method: "DELETE" })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => Promise.reject(data));
           }
-          promptModalEl.hide();
-          fetchUserPrompts();
+          return response.json();
         })
-        .catch((err) => console.error(err));
-    } else {
-      // update
-      fetch("/api/prompts/" + promptId, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.error) {
-            alert("Error updating prompt: " + data.error);
-            return;
-          }
-          promptModalEl.hide();
-          fetchUserPrompts();
+        .then(data => {
+          // console.log(data.message); // Log success message
+          fetchUserDocuments(); // Refresh the table
         })
-        .catch((err) => console.error(err));
+        .catch(error => {
+          console.error("Error deleting document:", error);
+          alert("Error deleting document: " + (error.error || "Unknown error"));
+           if (deleteBtn) { // Re-enable button on error
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i> Delete';
+           }
+        });
     }
-  });
 
-  window.onEditPrompt = function (promptId) {
-    fetch("/api/prompts/" + promptId)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          alert("Error retrieving prompt: " + data.error);
-          return;
-        }
-        document.getElementById("promptModalLabel").textContent = "Edit Prompt";
-        promptIdEl.value = data.id;
-        promptNameEl.value = data.name;
-        promptContentEl.value = data.content;
-        simplemde.value(data.content || "");
-        promptModalEl.show();
+    window.redirectToChat = function(documentId) { // Make it global for onclick
+      window.location.href = `/chats?search_documents=true&doc_scope=personal&document_id=${documentId}`;
+    }
+
+    // ------------------ Prompts Section (Keep Existing Logic) ------------------
+    const promptsTableBody = document.querySelector("#prompts-table tbody");
+    const promptModalEl = new bootstrap.Modal(document.getElementById("promptModal"));
+    const promptForm = document.getElementById("prompt-form");
+    const promptIdEl = document.getElementById("prompt-id");
+    const promptNameEl = document.getElementById("prompt-name");
+    const promptContentEl = document.getElementById("prompt-content");
+
+    let simplemde; // Declare outside to be accessible
+    try {
+        simplemde = new SimpleMDE({ element: promptContentEl, spellChecker: false });
+    } catch(e) {
+        console.error("Failed to initialize SimpleMDE:", e);
+        // Fallback or alternative behavior if needed
+    }
+
+
+    function fetchUserPrompts() {
+       promptsTableBody.innerHTML = '<tr><td colspan="2" class="text-center p-3"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading prompts...</td></tr>';
+       fetch("/api/prompts")
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+          promptsTableBody.innerHTML = "";
+          if (!data.prompts || data.prompts.length === 0) {
+              promptsTableBody.innerHTML = '<tr><td colspan="2" class="text-center p-3 text-muted">No prompts created yet.</td></tr>';
+          } else {
+              data.prompts.forEach(p => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                  <td>${escapeHtml(p.name)}</td>
+                  <td>
+                    <button class="btn btn-sm btn-primary" onclick="onEditPrompt('${p.id}')" title="Edit Prompt">
+                      <i class="bi bi-pencil-fill"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-danger ms-1" onclick="onDeletePrompt('${p.id}')" title="Delete Prompt">
+                      <i class="bi bi-trash-fill"></i> Delete
+                    </button>
+                  </td>
+                `;
+                promptsTableBody.appendChild(tr);
+              });
+          }
+        })
+        .catch(err => {
+            console.error("Error fetching prompts:", err);
+            promptsTableBody.innerHTML = `<tr><td colspan="2" class="text-center text-danger p-3">Error loading prompts: ${err.error || err.message || 'Unknown error'}</td></tr>`;
+        });
+    }
+
+    document.getElementById("create-prompt-btn").addEventListener("click", () => {
+      document.getElementById("promptModalLabel").textContent = "Create New Prompt";
+      promptIdEl.value = ""; // Clear ID for creation
+      promptNameEl.value = "";
+      if(simplemde) {
+         simplemde.value(""); // Clear editor content
+      } else {
+         promptContentEl.value = ""; // Fallback if MDE failed
+      }
+      promptModalEl.show();
+    });
+
+    promptForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const promptSaveBtn = document.getElementById('prompt-save-btn');
+      promptSaveBtn.disabled = true;
+      promptSaveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Saving...`;
+
+      // Ensure content is updated from SimpleMDE if it exists
+      let contentValue = simplemde ? simplemde.value() : promptContentEl.value;
+
+      const promptId = promptIdEl.value;
+      const payload = {
+        name: promptNameEl.value.trim(),
+        content: contentValue.trim(), // Use updated content
+      };
+
+      const url = promptId ? `/api/prompts/${promptId}` : "/api/prompts";
+      const method = promptId ? "PATCH" : "POST";
+
+      fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       })
-      .catch((err) => console.error(err));
-  };
+      .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+      .then(data => {
+          promptModalEl.hide();
+          fetchUserPrompts(); // Refresh list
+      })
+      .catch(err => {
+          console.error(`Error ${method === 'POST' ? 'creating' : 'updating'} prompt:`, err);
+          alert(`Error ${method === 'POST' ? 'creating' : 'updating'} prompt: ` + (err.error || "Unknown error"));
+      })
+      .finally(() => {
+          promptSaveBtn.disabled = false;
+          promptSaveBtn.innerHTML = "Save Prompt";
+      });
+    });
 
-  window.onDeletePrompt = function (promptId) {
-    if (!confirm("Are you sure you want to delete this prompt?")) return;
-    fetch("/api/prompts/" + promptId, {
-      method: "DELETE",
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          alert("Error deleting prompt: " + data.error);
-          return;
-        }
+    window.onEditPrompt = function (promptId) { // Make global for onclick
+      fetch(`/api/prompts/${promptId}`)
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+          document.getElementById("promptModalLabel").textContent = `Edit Prompt: ${escapeHtml(data.name)}`;
+          promptIdEl.value = data.id;
+          promptNameEl.value = data.name;
+          if(simplemde) {
+             simplemde.value(data.content || "");
+          } else {
+             promptContentEl.value = data.content || ""; // Fallback
+          }
+          promptModalEl.show();
+        })
+        .catch(err => {
+            console.error("Error retrieving prompt for edit:", err);
+            alert("Error retrieving prompt: " + (err.error || "Unknown error"));
+        });
+    };
+
+    window.onDeletePrompt = function (promptId) { // Make global for onclick
+      if (!confirm("Are you sure you want to delete this prompt?")) return;
+
+       const deleteBtn = event.target.closest('button');
+       if(deleteBtn) {
+            deleteBtn.disabled = true;
+            // Optionally add spinner icon
+       }
+
+      fetch(`/api/prompts/${promptId}`, { method: "DELETE" })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+          fetchUserPrompts(); // Refresh list
+        })
+        .catch(err => {
+          console.error("Error deleting prompt:", err);
+          alert("Error deleting prompt: " + (err.error || "Unknown error"));
+           if(deleteBtn) deleteBtn.disabled = false; // Re-enable on error
+        });
+    };
+
+
+    // ------------- Initial Load -------------
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchUserDocuments();
         fetchUserPrompts();
-      })
-      .catch((err) => console.error(err));
-  };
 
-  // Initial load
-  fetchUserDocumentsAndPoll();
-  fetchUserPrompts();
+        // Add listener for tab switching if needed
+         const workspaceTabs = document.querySelectorAll('#workspaceTab button[data-bs-toggle="tab"]');
+         workspaceTabs.forEach(tabEl => {
+           tabEl.addEventListener('shown.bs.tab', event => {
+             if (event.target.id === 'documents-tab-btn') {
+               // Optionally refresh documents if tab becomes visible again
+               // fetchUserDocuments();
+             } else if (event.target.id === 'prompts-tab-btn') {
+               // Optionally refresh prompts
+               // fetchUserPrompts();
+             }
+           });
+         });
+    });
 
-  // Optional: re-fetch if user revisits tab
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      fetchUserDocumentsAndPoll();
-    }
-  });
-</script>
+
+  </script>
 {% endblock %}
