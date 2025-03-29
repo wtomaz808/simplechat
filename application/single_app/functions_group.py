@@ -106,10 +106,7 @@ def find_group_by_id(group_id):
 def update_active_group_for_user(group_id):
     user_id = get_current_user_id()
     new_settings = {
-        "settings": {
-            "activeGroupOid": group_id
-        },
-        "lastUpdated": datetime.utcnow().isoformat()
+        "activeGroupOid": group_id
     }
     update_user_settings(user_id, new_settings)
 
