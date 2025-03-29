@@ -5,7 +5,7 @@ import { renderFeedbackIcons } from "./chat-feedback.js";
 import { showLoadingIndicatorInChatbox, hideLoadingIndicatorInChatbox } from "./chat-loading-indicator.js";
 import { docScopeSelect } from "./chat-documents.js";
 import { promptSelect } from "./chat-prompts.js";
-import { createNewConversation  } from "./chat-conversations.js";
+import { createNewConversation, selectConversation, addConversationToList  } from "./chat-conversations.js";
 import { isColorLight } from "./chat-utils.js";
 
 export const userInput = document.getElementById("user-input");
@@ -183,6 +183,31 @@ export function appendMessage(sender, messageContent, modelName = null, messageI
         ${filename}
       </a>
     `;
+  } else if (sender === "Error") {
+    messageClass = "error-message"; // Use a specific class for styling errors
+    senderLabel = "System Error";
+    avatarImg = "/static/images/alert.png"; // Use an error icon
+    avatarAltText = "Error Avatar";
+    // Ensure the error message is safely displayed (escape HTML)
+    // You might not want to parse Markdown for system errors.
+    messageContentHtml = `<span class="text-danger">${escapeHtml(messageContent)}</span>`;
+    feedbackHtml = ""; // No feedback for errors
+  } else {
+      console.warn("Unknown message sender type:", sender);
+      messageClass = "unknown-message";
+      senderLabel = "System"; // Default label
+      avatarImg = "/static/images/ai-avatar.png"; // Default avatar
+      avatarAltText = "System Avatar";
+      messageContentHtml = escapeHtml(messageContent); // Safe display
+      feedbackHtml = "";
+  }
+
+  if (messageClass) { // Check if messageClass is not empty
+    messageDiv.classList.add("message", messageClass);
+  } else {
+      // Fallback if somehow messageClass is still empty (shouldn't happen with the else block)
+      console.error("Message class is empty for sender:", sender);
+      messageDiv.classList.add("message", "unknown-message");
   }
 
   messageDiv.classList.add("message", messageClass);

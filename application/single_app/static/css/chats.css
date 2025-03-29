@@ -73,7 +73,7 @@
 }
 /* Styling for the draggable gutter */
 .gutter {
-  background-color: #f1f1f1;
+  background-color: #ffffff;
   background-repeat: no-repeat;
   background-position: 50%;
   /* position: relative; - Generally not needed unless overlapping */
