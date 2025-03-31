@@ -76,7 +76,9 @@ def get_settings():
             # Workspaces
             'enable_user_workspace': True,
             'enable_group_workspaces': True,
-            'enable_file_processing_logs': True,
+            'require_member_of_create_group': False,
+            'enable_public_workspaces': False,
+            'require_member_of_create_public_workspace': False,
 
             # Multimedia
             'enable_video_file_support': False,
@@ -115,6 +117,7 @@ def get_settings():
 
             # Safety (Content Safety) Settings
             'enable_content_safety': False,
+            'require_member_of_safety_violation_admin': False,
             'content_safety_endpoint': '',
             'content_safety_key': '',
             'content_safety_authentication_type': 'key',
@@ -124,6 +127,7 @@ def get_settings():
 
             # User Feedback / Conversation Archiving
             'enable_user_feedback': True,
+            'require_member_of_feedback_admin': False,
             'enable_conversation_archiving': False,
 
             # Search and Extract
@@ -150,7 +154,8 @@ def get_settings():
             # Other Settings
             'max_file_size_mb': 150,
             'conversation_history_limit': 10,
-            'default_system_prompt': ''
+            'default_system_prompt': '',
+            'enable_file_processing_logs': True
         }
 
         settings_container.create_item(body=default_settings)

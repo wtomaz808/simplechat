@@ -9,6 +9,7 @@ def register_route_frontend_safety(app):
     @app.route('/admin/safety_violations', methods=['GET'])
     @login_required
     @admin_required
+    @safety_violation_admin_required
     @enabled_required("enable_content_safety")
     def admin_safety_violations():
         """

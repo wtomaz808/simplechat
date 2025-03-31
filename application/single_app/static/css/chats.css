@@ -705,3 +705,18 @@ ol {
 .copy-code-btn:hover {
   color: #0d6efd; /* turn blue on hover, consistent with your brand */
 }
+
+.chat-input-container {
+  /* Ensures elements align nicely at their bottom edges */
+  align-items: flex-end;
+}
+#prompt-selection-container {
+  /* Prevent the container from growing vertically */
+  align-self: flex-end; /* Align item itself to bottom */
+}
+#prompt-select {
+  /* Adjust max-width as needed */
+  max-width: 250px;
+  border-radius: var(--bs-border-radius);
+  margin-bottom: 0;
+}

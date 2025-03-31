@@ -373,8 +373,8 @@
     }
     // Pass boolean flags as strings 'True'/'False' or numbers 1/0, and check accordingly in JS
     // Or use tojson | safe for true/false -> true/false in JS
-    window.enable_document_classification = "{{ settings.enable_document_classification|tojson|safe }}"; // e.g., true or false
-    window.enable_extract_meta_data = "{{ settings.enable_extract_meta_data|tojson|safe }}"; // e.g., true or false
+    window.enable_document_classification = "{{ settings.enable_document_classification }}"; // e.g., true or false
+    window.enable_extract_meta_data = "{{ settings.enable_extract_meta_data }}"; // e.g., true or false
 
      // Convert boolean to string 'True'/'False' if needed for backward compatibility with previous JS checks
      // window.enable_document_classification = "{{ settings.enable_document_classification }}";

@@ -10,6 +10,7 @@ import { isColorLight } from "./chat-utils.js";
 
 export const userInput = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
+const promptSelectionContainer = document.getElementById("prompt-selection-container");
 
 export function loadMessages(conversationId) {
   fetch(`/conversation/${conversationId}/messages`)
@@ -234,30 +235,70 @@ export function appendMessage(sender, messageContent, modelName = null, messageI
 }
 
 export function sendMessage() {
-  const userInput = document.getElementById("user-input");
-  
-  let textVal = "";
-  if (promptSelect && promptSelect.style.display !== "none") {
-    const selectedOpt = promptSelect.options[promptSelect.selectedIndex];
-    textVal = selectedOpt?.dataset?.promptContent?.trim() || "";
-  } else if (userInput) {
-    textVal = userInput.value.trim();
+  // Ensure elements exist
+  if (!userInput) {
+      console.error("User input element not found.");
+      return;
   }
 
-  if (!textVal) return;
+  let userText = userInput.value.trim();
+  let promptText = "";
+  let combinedMessage = "";
 
-  if (!currentConversationId) {
-    createNewConversation(() => {
-      actuallySendMessage(textVal);
-    });
+  // Check if prompt container is visible and a prompt is selected
+  if (promptSelectionContainer && promptSelectionContainer.style.display !== "none" && promptSelect && promptSelect.selectedIndex > 0) {
+      const selectedOpt = promptSelect.options[promptSelect.selectedIndex];
+      promptText = selectedOpt?.dataset?.promptContent?.trim() || "";
+  }
+
+  // Combine user input and prompt text
+  if (userText && promptText) {
+      combinedMessage = userText + "\n\n" + promptText; // Add a separator (e.g., newline)
   } else {
-    actuallySendMessage(textVal);
+      combinedMessage = userText || promptText; // Use whichever one has content, or empty if both are empty
   }
+
+  // Trim the final combined message
+  combinedMessage = combinedMessage.trim();
+
+  // Only proceed if there's a message to send
+  if (!combinedMessage) {
+      // Optional: Provide feedback if sending empty is attempted
+      // console.log("Cannot send empty message.");
+      return;
+  }
+
+  // Proceed with sending
+  if (!currentConversationId) {
+      // Start a new conversation if none exists, then send
+      createNewConversation(() => {
+          actuallySendMessage(combinedMessage); // Send the combined message
+      });
+  } else {
+      // Send message in the current conversation
+      actuallySendMessage(combinedMessage); // Send the combined message
+  }
+
+  // Clear input and reset prompt AFTER initiating the send
+  userInput.value = "";
+  userInput.style.height = ''; // Reset height
+  if (promptSelect) {
+      promptSelect.selectedIndex = 0; // Reset prompt selection
+  }
+  // Optional: Keep prompt selector visible or hide it?
+  // If you want to hide it after sending:
+  // if (promptSelectionContainer && searchPromptsBtn) {
+  //    promptSelectionContainer.style.display = 'none';
+  //    searchPromptsBtn.classList.remove('active');
+  //    userInput.classList.remove('with-prompt-active');
+  // }
+   userInput.focus(); // Return focus to input
 }
 
-export function actuallySendMessage(textVal) {
+
+export function actuallySendMessage(finalMessageToSend) {
   const userInput = document.getElementById("user-input");
-  appendMessage("You", textVal);
+  appendMessage("You", finalMessageToSend);
   userInput.value = "";
   userInput.style.height = '';
   showLoadingIndicatorInChatbox();
@@ -304,7 +345,7 @@ export function actuallySendMessage(textVal) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      message: textVal,
+      message: finalMessageToSend,
       conversation_id: currentConversationId,
       hybrid_search: hybridSearchEnabled,
       selected_document_id: selectedDocumentId,

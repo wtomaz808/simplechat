@@ -18,6 +18,8 @@ const classificationTbody = document.getElementById('classification-categories-t
 const addClassificationBtn = document.getElementById('add-classification-btn');
 const classificationJsonInput = document.getElementById('document_classification_categories_json');
 const adminForm = document.getElementById('admin-settings-form');
+const enableGroupWorkspacesToggle = document.getElementById('enable_group_workspaces');
+const createGroupPermissionSettingDiv = document.getElementById('create_group_permission_setting');
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Existing Setup ---
@@ -756,6 +758,15 @@ function setupToggles() {
                 (this.value === 'key') ? 'block' : 'none';
         });
     }}
+
+    if (enableGroupWorkspacesToggle && createGroupPermissionSettingDiv) {
+        // Initial state
+        createGroupPermissionSettingDiv.style.display = enableGroupWorkspacesToggle.checked ? 'block' : 'none';
+        // Listener for changes
+        enableGroupWorkspacesToggle.addEventListener('change', function() {
+            createGroupPermissionSettingDiv.style.display = this.checked ? 'block' : 'none';
+        });
+    }
 
 
 function setupTestButtons() {

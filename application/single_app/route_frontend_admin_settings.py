@@ -25,6 +25,15 @@ def register_route_frontend_admin_settings(app):
         if 'image_gen_model' not in settings or not isinstance(settings.get('image_gen_model'), dict) or 'selected' not in settings.get('image_gen_model', {}):
             settings['image_gen_model'] = {'selected': [], 'all': []}
 
+        # (get_settings should handle this, but explicit check is safe)
+        if 'require_member_of_create_group' not in settings:
+            settings['require_member_of_create_group'] = False
+        if 'require_member_of_safety_violation_admin' not in settings:
+            settings['require_member_of_safety_violation_admin'] = False
+        if 'require_member_of_feedback_admin' not in settings:
+            settings['require_member_of_feedback_admin'] = False
+        # --- End NEW Default Checks ---
+
         # Ensure classification fields exist with defaults if missing in DB
         if 'enable_document_classification' not in settings:
             settings['enable_document_classification'] = False # Default value from get_settings
@@ -78,6 +87,10 @@ def register_route_frontend_admin_settings(app):
             enable_video_file_support = form_data.get('enable_video_file_support') == 'on'
             enable_audio_file_support = form_data.get('enable_audio_file_support') == 'on'
             enable_extract_meta_data = form_data.get('enable_extract_meta_data') == 'on'
+
+            require_member_of_create_group = form_data.get('require_member_of_create_group') == 'on'
+            require_member_of_safety_violation_admin = form_data.get('require_member_of_safety_violation_admin') == 'on'
+            require_member_of_feedback_admin = form_data.get('require_member_of_feedback_admin') == 'on'
 
             # --- Handle Document Classification Toggle ---
             enable_document_classification = form_data.get('enable_document_classification') == 'on'
@@ -214,6 +227,7 @@ def register_route_frontend_admin_settings(app):
                 'enable_user_workspace': form_data.get('enable_user_workspace') == 'on',
                 'enable_group_workspaces': form_data.get('enable_group_workspaces') == 'on',
                 'enable_file_processing_logs': form_data.get('enable_file_processing_logs') == 'on',
+                'require_member_of_create_group': require_member_of_create_group, # ADDE
 
                 # Multimedia & Metadata
                 'enable_video_file_support': enable_video_file_support,
@@ -244,6 +258,8 @@ def register_route_frontend_admin_settings(app):
                 'enable_content_safety_apim': form_data.get('enable_content_safety_apim') == 'on',
                 'azure_apim_content_safety_endpoint': form_data.get('azure_apim_content_safety_endpoint', '').strip(),
                 'azure_apim_content_safety_subscription_key': form_data.get('azure_apim_content_safety_subscription_key', '').strip(),
+                'require_member_of_safety_violation_admin': require_member_of_safety_violation_admin, # ADDED
+                'require_member_of_feedback_admin': require_member_of_feedback_admin, # ADDED
 
                 # Feedback & Archiving
                 'enable_user_feedback': form_data.get('enable_user_feedback') == 'on',

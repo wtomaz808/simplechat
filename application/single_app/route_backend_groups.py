@@ -88,6 +88,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups", methods=["POST"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_create_group():
         """
@@ -123,6 +124,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["DELETE"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_delete_group(group_id):
         """
@@ -146,6 +148,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["PATCH", "PUT"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_update_group(group_id):
         """
