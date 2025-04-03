@@ -14,11 +14,6 @@
              class="mb-4">
     {% endif %}
 
-    {# 
-      1) Check user is logged in 
-      2) Check user has "roles"
-      3) Check user is either Admin or User
-    #}
     {% if session.get('user') and session['user'].get('roles')
           and ('Admin' in session['user']['roles'] or 'User' in session['user']['roles']) %}
         <h2>Welcome to {{ app_settings.app_title }}</h2>
@@ -30,7 +25,6 @@
         </a>
 
     {% else %}
-        {# The user is either not logged in or doesn't have the Admin/User roles #}
         {% if session.get('user') %}
             <h2>Welcome to {{ app_settings.app_title }}</h2>
             <p class="lead">

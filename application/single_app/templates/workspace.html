@@ -115,17 +115,17 @@
           <p class="text-muted">Only you can see documents you upload. Allowed extensions
             'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg',
             'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
-            {% if settings.enable_video_file_support %}
-                , 'mp4', 'mov', 'avi', 'wmv', 'mkv', 'webm' {# Add relevant video extensions #}
+            {% if enable_video_file_support %}
+                , 'mp4', 'mov', 'avi', 'wmv', 'mkv', 'webm'
             {% endif %}
-            {% if settings.enable_audio_file_support %}
-                , 'mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a' {# Add relevant audio extensions #}
+            {% if enable_audio_file_support %}
+                , 'mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'
             {% endif %}
           </p>
 
           <!-- Document Upload Form -->
           <div class="mb-3">
-            <input type="file" id="file-input" multiple /> {# Allow multiple files if desired #}
+            <input type="file" id="file-input" multiple />
             <button id="upload-btn" class="btn btn-primary">
               Upload Document(s)
             </button>
@@ -160,7 +160,7 @@
             </div>
 
             <!-- Pagination Controls -->
-            <div id="pagination-container" class="d-flex gap-1 ms-auto"></div> {# Use ms-auto to push pagination right #}
+            <div id="pagination-container" class="d-flex gap-1 ms-auto"></div>
           </div>
 
         </div>
@@ -284,14 +284,13 @@
             <input type="hidden" id="doc-id" name="doc_id" value="" />
 
             <!-- Document Classification -->
-            {% if settings.enable_document_classification %}
+            {% if enable_document_classification in [True, 'True', 'true'] %}
             <div class="mb-3">
               <label for="doc-classification" class="form-label"
-                >Document Classification</label
+                >Classification</label
               >
               <select class="form-select" id="doc-classification">
                 <option value="">-- Select Classification --</option>
-                {# *** Corrected Loop *** #}
                 {% for cat in settings.document_classification_categories %}
                   <option value="{{ cat.label }}">{{ cat.label }}</option>
                 {% endfor %}
@@ -359,42 +358,26 @@
 {% endblock %}
 
 {% block scripts %}
-  <!-- Library Dependencies (Make sure SimpleMDE is loaded first) -->
   <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 
-  <!-- Global Settings Passed from Server -->
   <script>
-    // Make sure these are properly JSON encoded and escaped if necessary in your backend
-    // Using 'tojson' filter with 'safe' is usually correct for Jinja2
+
     window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
-    // Ensure it's always an array, just in case the setting is missing or null
     if (!Array.isArray(window.classification_categories)) {
         window.classification_categories = [];
     }
     // Pass boolean flags as strings 'True'/'False' or numbers 1/0, and check accordingly in JS
-    // Or use tojson | safe for true/false -> true/false in JS
-    window.enable_document_classification = "{{ settings.enable_document_classification }}"; // e.g., true or false
-    window.enable_extract_meta_data = "{{ settings.enable_extract_meta_data }}"; // e.g., true or false
-
-     // Convert boolean to string 'True'/'False' if needed for backward compatibility with previous JS checks
-     // window.enable_document_classification = "{{ settings.enable_document_classification }}";
-     // window.enable_extract_meta_data = "{{ settings.enable_extract_meta_data }}";
+    window.enable_document_classification = "{{ enable_document_classification | tojson }}";
+    window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
+    window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
+    window.enable_audio_file_support = "{{ enable_audio_file_support | tojson }}";
 
   </script>
 
-  <!-- Your Custom Workspace Scripts -->
-  <!-- Adjust paths if your static folder structure is different -->
-  <!-- Using url_for is the recommended Flask/Jinja way -->
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-utils.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-documents.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-prompts.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-init.js') }}"></script>
 
-  <!-- Example using direct paths (less robust than url_for) -->
-  <!--
-  <script src="/static/js/workspace/workspace-documents.js"></script>
-  <script src="/static/js/workspace/workspace-prompts.js"></script>
-  <script src="/static/js/workspace/workspace-init.js"></script>
-  -->
 
 {% endblock %}

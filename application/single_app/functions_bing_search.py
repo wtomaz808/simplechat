@@ -20,7 +20,7 @@ def get_suggestions(query):
     suggestions = response.json()["suggestionGroups"][0]["searchSuggestions"]
     return [s["displayText"] for s in suggestions]
 
-def get_search_results(query, top_n=20):
+def get_search_results(query, top_n=6):
     settings = get_settings()
     if not settings.get('enable_web_search'):
         return []
@@ -38,7 +38,7 @@ def get_search_results(query, top_n=20):
     return [{"name": r["name"], "url": r["url"], "snippet": r["snippet"]} for r in results]
 
 
-def process_query_with_bing_and_llm(user_query, top_n=20):
+def process_query_with_bing_and_llm(user_query, top_n=6):
     print(f"Original Query: {user_query}")
     suggestions = get_suggestions(user_query)
     if suggestions:

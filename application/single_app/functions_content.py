@@ -2,6 +2,7 @@
 
 from config import *
 from functions_settings import *
+from functions_logging import *
 
 def extract_text_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -11,14 +12,14 @@ def extract_markdown_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         return f.read()
 
-def extract_content_with_azure_di(file_path):
+def extract_content_with_azure_di(document_id, user_id, file_path):
     """
-    Extracts text page-by-page using Azure Document Intelligence "prebuilt-read" 
+    Extracts text page-by-page using Azure Document Intelligence "prebuilt-read"
     and returns a list of dicts, each containing page_number and content.
     """
     try:
+        document_intelligence_client = CLIENTS['document_intelligence_client'] # Ensure CLIENTS is populated
         with open(file_path, "rb") as f:
-            document_intelligence_client = CLIENTS['document_intelligence_client']
             poller = document_intelligence_client.begin_analyze_document(
                 model_id="prebuilt-read",
                 document=f
@@ -26,44 +27,99 @@ def extract_content_with_azure_di(file_path):
 
         max_wait_time = 600
         start_time = time.time()
-        time.sleep(3)
 
         while True:
             status = poller.status()
-            if status in ["succeeded", "failed", "canceled"]:
-                break
+            if status == "succeeded":
+                 break
+            if status in ["failed", "canceled"]:
+                # Attempt to get result even on failure for potential error details
+                try:
+                     result = poller.result()
+                     # Optionally add failed result details to the exception message
+                     error_details = f"Failed DI result details: {result}"
+                except Exception as res_ex:
+                     error_details = f"Could not get result details after failure: {res_ex}"
+                raise Exception(f"Document analysis {status} for document ID {document_id}. {error_details}")
             if time.time() - start_time > max_wait_time:
-                raise TimeoutError("Document analysis took too long.")
-            time.sleep(10)
+                raise TimeoutError(f"Document analysis took too long for document ID {document_id}.")
+
+            sleep_duration = 10 # Or adjust based on expected processing time
+            time.sleep(sleep_duration)
+
 
         result = poller.result()
 
-        # Build a list of pages. Each element is {"page_number": int, "content": str}
         pages_data = []
 
         if result.pages:
             for page in result.pages:
                 page_number = page.page_number
-                # Build text for this page by combining all lines
-                page_text = "\n".join(line.content for line in page.lines)
+                page_text = "" # Initialize page_text
+
+                # --- METHOD 1: Preferred - Use spans and result.content ---
+                if page.spans and result.content:
+                    try:
+                        page_content_parts = []
+                        for span in page.spans:
+                            start = span.offset
+                            end = start + span.length
+                            page_content_parts.append(result.content[start:end])
+                        page_text = "".join(page_content_parts)
+                    except Exception as span_ex:
+                         # Silently ignore span extraction error and try next method
+                         page_text = "" # Reset on error
+
+                # --- METHOD 2: Fallback - Use lines if spans failed or weren't available ---
+                if not page_text and page.lines:
+                    try:
+                        page_text = "\n".join(line.content for line in page.lines)
+                    except Exception as line_ex:
+                        # Silently ignore line extraction error and try next method
+                        page_text = "" # Reset on error
+
+
+                # --- METHOD 3: Last Resort Fallback - Use words (less accurate formatting) ---
+                if not page_text and page.words:
+                     try:
+                        page_text = " ".join(word.content for word in page.words)
+                     except Exception as word_ex:
+                         # Silently ignore word extraction error
+                         page_text = "" # Reset on error
+
+                # If page_text is still empty after all attempts, it will be added as such
+
                 pages_data.append({
                     "page_number": page_number,
-                    "content": page_text
+                    "content": page_text.strip() # Add strip() just in case
                 })
-        else:
-            # Fallback if result.pages is empty but result.content is present
-            # This may happen if the doc is recognized as a single chunk
-            # or a scenario where lines/pages were not delineated
+        # --- Fallback if NO pages were found at all, but top-level content exists ---
+        elif result.content:
             pages_data.append({
                 "page_number": 1,
-                "content": result.content if result.content else ""
+                "content": result.content.strip()
             })
+        # else: # No pages and no content, pages_data remains empty
+
+
+        # Log the *processed* data using your existing logging function (optional)
+        # add_file_task_to_file_processing_log(
+        #     document_id=document_id,
+        #     user_id=user_id,
+        #     content=f"DI extraction processed data: {pages_data}"
+        # )
 
         return pages_data
 
     except HttpResponseError as e:
+        # Consider adding to your specific log here if needed, before re-raising
+        # add_file_task_to_file_processing_log(document_id, user_id, f"HTTP error during DI: {e}")
+        raise e
+    except TimeoutError as e:
+        # add_file_task_to_file_processing_log(document_id, user_id, f"Timeout error during DI: {e}")
         raise e
     except Exception as e:
+        # add_file_task_to_file_processing_log(document_id, user_id, f"General error during DI: {e}")
         raise e
 
 
@@ -136,17 +192,6 @@ def parse_authors(author_input):
     # If it's some other unexpected data type, fallback to empty
     return []
 
-def convert_word_to_pdf(input_path: str, output_path: str):
-    """
-    Convert Word (.docx) file to PDF using the docx2pdf library.
-    """
-    try:
-        convert(input_path, output_path)
-        print(f"Successfully converted {input_path} to {output_path}")
-    except Exception as e:
-        print(f"Error converting {input_path} to PDF: {e}")
-        raise
-
 def chunk_text(text, chunk_size=2000, overlap=200):
     try:
         words = text.split()
@@ -159,6 +204,60 @@ def chunk_text(text, chunk_size=2000, overlap=200):
         # Log the exception or handle it as needed
         print(f"Error in chunk_text: {e}")
         raise e  # Re-raise the exception to propagate it
+    
+def chunk_word_file_into_pages(document_id, user_id, di_pages):
+    """
+    Chunks the content extracted from a Word document by Azure DI into smaller
+    chunks based on a target word count.
+
+    Args:
+        di_pages (list): A list of dictionaries, where each dictionary represents
+                         a page extracted by Azure DI and contains at least a
+                         'page_number' and 'content' key.
+
+    Returns:
+        list: A new list of dictionaries, where each dictionary represents a
+              smaller chunk with 'page_number' (representing the chunk sequence)
+              and 'content' (the chunked text).
+    """
+    new_pages = []
+    current_chunk_content = []
+    current_word_count = 0
+    new_page_number = 1 # This will represent the chunk number
+
+    for page in di_pages:
+        page_content = page.get("content", "")
+        # Split content into words (handling various whitespace)
+        words = re.findall(r'\S+', page_content)
+
+        for word in words:
+            current_chunk_content.append(word)
+            current_word_count += 1
+
+            # If the chunk reaches the desired size, finalize it
+            if current_word_count >= WORD_CHUNK_SIZE:
+                chunk_text = " ".join(current_chunk_content)
+                new_pages.append({
+                    "page_number": new_page_number,
+                    "content": chunk_text
+                })
+                # Reset for the next chunk
+                current_chunk_content = []
+                current_word_count = 0
+                new_page_number += 1
+
+    # Add any remaining words as the last chunk, if any exist
+    if current_chunk_content:
+        chunk_text = " ".join(current_chunk_content)
+        new_pages.append({
+            "page_number": new_page_number,
+            "content": chunk_text
+        })
+
+    # If the input was empty or contained no words, return an empty list
+    # or a single empty chunk depending on desired behavior.
+    # Current logic returns empty list if no words.
+    return new_pages
 
 def generate_embedding(
     text,
@@ -228,3 +327,50 @@ def generate_embedding(
 
         except Exception as e:
             return None
+
+def get_all_chunks(document_id, user_id):
+    try:
+        search_client_user = CLIENTS["search_client_user"]
+        results = search_client_user.search(
+            search_text="*",
+            filter=f"document_id eq '{document_id}' and user_id eq '{user_id}'",
+            select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+        )
+        return results
+    except Exception as e:
+        print(f"Error retrieving chunks for document {document_id}: {e}")
+        raise
+
+def update_chunk_metadata(chunk_id, user_id, document_id, **kwargs):
+    try:
+        search_client_user = CLIENTS["search_client_user"]
+        chunk_item = search_client_user.get_document(chunk_id)
+
+        if not chunk_item:
+            raise Exception("Chunk not found")
+        
+        if chunk_item['user_id'] != user_id:
+            raise Exception("Unauthorized access to chunk")
+        
+        if chunk_item['document_id'] != document_id:
+            raise Exception("Chunk does not belong to document")
+        
+        if 'chunk_keywords' in kwargs:
+            chunk_item['chunk_keywords'] = kwargs['chunk_keywords']
+
+        if 'chunk_summary' in kwargs:
+            chunk_item['chunk_summary'] = kwargs['chunk_summary']
+
+        if 'author' in kwargs:
+            chunk_item['author'] = kwargs['author']
+
+        if 'title' in kwargs:
+            chunk_item['title'] = kwargs['title']
+
+        if 'document_classification' in kwargs:
+            chunk_item['document_classification'] = kwargs['document_classification']
+
+        search_client_user.upload_documents(documents=[chunk_item])
+    except Exception as e:
+        print(f"Error updating chunk metadata for chunk {chunk_id}: {e}")
+        raise

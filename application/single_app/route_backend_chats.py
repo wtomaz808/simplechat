@@ -28,7 +28,11 @@ def register_route_backend_chats(app):
         image_gen_enabled = data.get('image_generation')
         document_scope = data.get('doc_scope')
         active_group_id = data.get('active_group_id')
-
+        
+        search_query = user_message # <--- ADD THIS LINE (Initialize search_query)
+        hybrid_citations_list = [] # <--- ADD THIS LINE (Initialize hybrid list)
+        system_messages_for_augmentation = [] # Collect system messages from search/bing
+        search_results = []
         # --- Configuration ---
         # History / Summarization Settings
         raw_conversation_history_limit = settings.get('conversation_history_limit', 6)
@@ -39,7 +43,7 @@ def register_route_backend_chats(app):
         summarize_content_history_beyond_limit = settings.get('summarize_older_history', True) # Use a dedicated setting if possible
 
         # Search Summarization Settings (kept separate)
-        summarize_content_history_for_search = True # Or get from settings/request
+        summarize_content_history_for_search = False # Or get from settings/request
         summarize_content_history_for_search_limit = 5 # Or get from settings/request
 
         max_file_content_length = 50000 # 50KB
@@ -264,24 +268,25 @@ def register_route_backend_chats(app):
         # ---------------------------------------------------------------------
         # 4) Augmentation (Search, Bing, etc.) - Run *before* final history prep
         # ---------------------------------------------------------------------
-        system_messages_for_augmentation = [] # Collect system messages from search/bing
-
+        
         # Hybrid Search
         if hybrid_search_enabled:
-            search_query = user_message
+            
             # Optional: Summarize recent history *for search* (uses its own limit)
             if summarize_content_history_for_search:
                 # Fetch last N messages for search context
                 limit_n_search = summarize_content_history_for_search_limit * 2
                 query_search = f"SELECT TOP {limit_n_search} * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp DESC"
                 params_search = [{"name": "@conv_id", "value": conversation_id}]
+                
+                
                 try:
                     last_messages_desc = list(messages_container.query_items(
                         query=query_search, parameters=params_search, partition_key=conversation_id, enable_cross_partition_query=True
                     ))
                     last_messages_asc = list(reversed(last_messages_desc))
 
-                    if last_messages_asc:
+                    if last_messages_asc and len(last_messages_asc) >= conversation_history_limit:
                         summary_prompt_search = "Please summarize the key topics or questions from this recent conversation history in 50 words or less:\n\n"
                         message_texts_search = [f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}" for msg in last_messages_asc]
                         summary_prompt_search += "\n".join(message_texts_search)
@@ -304,12 +309,11 @@ def register_route_backend_chats(app):
 
 
             # Perform the search
-            search_results = []
             try:
                 search_args = {
                     "query": search_query,
                     "user_id": user_id,
-                    "top_n": 20,
+                    "top_n": 10,
                     "doc_scope": document_scope,
                     "active_group_id": active_group_id
                 }
@@ -335,19 +339,30 @@ def register_route_backend_chats(app):
                     page_number = doc.get('page_number') or chunk_sequence or 1 # Ensure a fallback page
                     citation_id = doc.get('id', str(uuid.uuid4())) # Ensure ID exists
                     classification = doc.get('document_classification')
+                    chunk_id = doc.get('chunk_id', str(uuid.uuid4())) # Ensure ID exists
+                    score = doc.get('score', 0.0) # Add default score
+                    group_id = doc.get('group_id', None) # Add default group ID
 
                     citation = f"(Source: {file_name}, Page: {page_number}) [#{citation_id}]"
                     retrieved_texts.append(f"{chunk_text}\n{citation}")
                     combined_documents.append({
-                        "file_name": file_name, "citation_id": citation_id, "page_number": page_number,
-                        "version": version, "classification": classification, "chunk_text": chunk_text
+                        "file_name": file_name, 
+                        "citation_id": citation_id, 
+                        "page_number": page_number,
+                        "version": version, 
+                        "classification": classification, 
+                        "chunk_text": chunk_text,
+                        "chunk_sequence": chunk_sequence,
+                        "chunk_id": chunk_id,
+                        "score": score,
+                        "group_id": group_id,
                     })
                     if classification:
                         classifications_found.add(classification)
 
                 retrieved_content = "\n\n".join(retrieved_texts)
                 # Construct system prompt for search results
-                system_prompt_search = f"""You are an AI assistant. Use the following retrieved document excerpts to answer the user's question. Cite sources using the format (Source: filename, Page: page number) [#ID].
+                system_prompt_search = f"""You are an AI assistant. Use the following retrieved document excerpts to answer the user's question. Cite sources using the format (Source: filename, Page: page number).
 
                     Retrieved Excerpts:
                     {retrieved_content}
@@ -356,7 +371,7 @@ def register_route_backend_chats(app):
 
                     Example
                     User: What is the policy on double dipping?
-                    Assistant: The policy prohibits entities from using federal funds received through one program to apply for additional funds through another program, commonly known as 'double dipping' (Source: PolicyDocument.pdf, Page: 12) [#123abc]
+                    Assistant: The policy prohibits entities from using federal funds received through one program to apply for additional funds through another program, commonly known as 'double dipping' (Source: PolicyDocument.pdf, Page: 12)
                     """
                 # Add this to a temporary list, don't save to DB yet
                 system_messages_for_augmentation.append({
@@ -365,14 +380,40 @@ def register_route_backend_chats(app):
                     'documents': combined_documents # Keep track of docs used
                 })
 
+                # Loop through each source document/chunk used for this message
+                for source_doc in combined_documents:
+                    # 4. Create a citation dictionary, selecting the desired fields
+                    #    It's generally best practice *not* to include the full chunk_text
+                    #    in the citation itself, as it can be large. The citation points *to* the chunk.
+                    citation_data = {
+                        "file_name": source_doc.get("file_name"),
+                        "citation_id": source_doc.get("citation_id"), # Seems like a useful identifier
+                        "page_number": source_doc.get("page_number"),
+                        "chunk_id": source_doc.get("chunk_id"), # Specific chunk identifier
+                        "chunk_sequence": source_doc.get("chunk_sequence"), # Order within document/group
+                        "score": source_doc.get("score"), # Relevance score from search
+                        "group_id": source_doc.get("group_id"), # Grouping info if used
+                        "version": source_doc.get("version"), # Document version
+                        "classification": source_doc.get("classification") # Document classification
+                        # Add any other relevant metadata fields from source_doc here
+                    }
+                    # Using .get() provides None if a key is missing, preventing KeyErrors
+                    hybrid_citations_list.append(citation_data)
+
+                # Reorder hybrid citations list in descending order based on page_number
+                hybrid_citations_list.sort(key=lambda x: x.get('page_number', 0), reverse=True)
+
                 # Update conversation classifications if new ones were found
                 if list(classifications_found) != conversation_item.get('classification', []):
                      conversation_item['classification'] = list(classifications_found)
                      # No need to upsert item here, will be updated later
 
         # Bing Search
+        bing_results = []
+        bing_citations_list = []
+        
         if bing_search_enabled:
-            bing_results = []
+             # Collect citations for Bing results
             try:
                 bing_results = process_query_with_bing_and_llm(user_message) # Assuming this function exists and works
             except Exception as e:
@@ -387,9 +428,17 @@ def register_route_backend_chats(app):
                     url = r.get("url", "#")
                     citation = f"(Source: {title}) [{url}]"
                     retrieved_texts_bing.append(f"{snippet}\n{citation}")
+                    
+                    # <<< Collect Bing citation data >>>
+                    bing_citation_data = {
+                        "title": title,
+                        "url": url,
+                        "snippet": snippet # Store the snippet used in the prompt
+                    }
+                    bing_citations_list.append(bing_citation_data)
 
                 retrieved_content_bing = "\n\n".join(retrieved_texts_bing)
-                system_prompt_bing = f"""You are an AI assistant. Use the following web search results to answer the user's question. Cite sources using the format (Source: page_title) [url].
+                system_prompt_bing = f"""You are an AI assistant. Use the following web search results to answer the user's question. Cite sources using the format (Source: page_title).
 
                     Web Search Results:
                     {retrieved_content_bing}
@@ -398,7 +447,7 @@ def register_route_backend_chats(app):
 
                     Example:
                     User: What is the capital of France?
-                    Assistant: The capital of France is Paris (Source: OfficialFrancePage) [https://url.com]
+                    Assistant: The capital of France is Paris (Source: OfficialFrancePage)
                     """
                 # Add to the temporary list
                 system_messages_for_augmentation.append({
@@ -482,6 +531,7 @@ def register_route_backend_chats(app):
         conversation_history_for_api = []
         summary_of_older = ""
 
+
         try:
             # Fetch ALL messages for potential summarization, sorted OLD->NEW
             all_messages_query = "SELECT * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp ASC"
@@ -548,11 +598,23 @@ def register_route_backend_chats(app):
             # **Important**: Decide if you want these saved. If so, you need to upsert them now.
             # For simplicity here, we're just adding them to the API call context.
             for aug_msg in system_messages_for_augmentation:
-                 # Optionally save these system messages to DB if you want them persisted
-                 # system_message_id = f"{conversation_id}_system_aug_{int(time.time())}_{random.randint(1000,9999)}"
-                 # system_doc = { 'id': system_message_id, 'conversation_id': conversation_id, **aug_msg, 'timestamp': datetime.utcnow().isoformat() }
-                 # messages_container.upsert_item(system_doc)
-                 conversation_history_for_api.append(aug_msg) # Add to API context
+                # 1. Extract the source documents list for this specific system message
+                # Use .get with a default empty list [] for safety in case 'documents' is missing
+
+                # 5. Create the final system_doc dictionary for Cosmos DB upsert
+                system_message_id = f"{conversation_id}_system_aug_{int(time.time())}_{random.randint(1000,9999)}"
+                system_doc = {
+                    'id': system_message_id,
+                    'conversation_id': conversation_id,
+                    'role': aug_msg.get('role'),
+                    'content': aug_msg.get('content'),
+                    'search_query': search_query, # Include the search query used for this augmentation
+                    'user_message': user_message, # Include the original user message for context
+                    'model_deployment_name': None, # As per your original structure
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                messages_container.upsert_item(system_doc)
+                conversation_history_for_api.append(aug_msg) # Add to API context
 
 
             # Add the recent messages (user, assistant, relevant system/file messages)
@@ -656,10 +718,14 @@ def register_route_backend_chats(app):
             'id': assistant_message_id,
             'conversation_id': conversation_id,
             'role': 'assistant',
-            'content': ai_message, # Save the actual response or the error message
+            'content': ai_message,
             'timestamp': datetime.utcnow().isoformat(),
-            'model_deployment_name': final_model_used # Log the model attempted/used
-            # Optionally add token usage: 'usage': response.usage.dict() if response and response.usage else None
+            'augmented': bool(system_messages_for_augmentation),
+            'hybrid_citations': hybrid_citations_list, # <--- SIMPLIFIED: Directly use the list
+            'hybridsearch_query': search_query if hybrid_search_enabled and search_results else None, # Log query only if hybrid search ran and found results
+            'web_search_citations': bing_citations_list, # <--- SIMPLIFIED: Directly use the list
+            'user_message': user_message,
+            'model_deployment_name': final_model_used
         }
         messages_container.upsert_item(assistant_doc)
 
@@ -678,5 +744,8 @@ def register_route_backend_chats(app):
             'classification': conversation_item.get('classification', []), # Send classifications if any
             'model_deployment_name': final_model_used,
             'message_id': assistant_message_id,
-            'blocked': False # Explicitly false if we got this far
+            'blocked': False, # Explicitly false if we got this far
+            'augmented': bool(system_messages_for_augmentation),
+            'hybrid_citations': hybrid_citations_list,
+            'web_search_citations': bing_citations_list
         }), 200

@@ -15,6 +15,8 @@ def register_route_frontend_workspace(app):
         public_settings = sanitize_settings_for_user(settings)
         enable_document_classification = settings.get('enable_document_classification', False)
         enable_extract_meta_data = settings.get('enable_extract_meta_data', False)
+        enable_video_file_support = settings.get('enable_video_file_support', False)
+        enable_audio_file_support = settings.get('enable_audio_file_support', False)
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
@@ -23,7 +25,9 @@ def register_route_frontend_workspace(app):
             'workspace.html', 
             settings=public_settings, 
             enable_document_classification=enable_document_classification, 
-            enable_extract_meta_data=enable_extract_meta_data
+            enable_extract_meta_data=enable_extract_meta_data,
+            enable_video_file_support=enable_video_file_support,
+            enable_audio_file_support=enable_audio_file_support,
         )
 
     

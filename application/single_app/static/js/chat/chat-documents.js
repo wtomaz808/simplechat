@@ -105,6 +105,24 @@ export function populateDocumentSelectScope() {
   handleDocumentSelectChange();
 }
 
+export function getDocumentMetadata(docId) {
+  if (!docId) return null;
+  // Search personal docs first
+  const personalMatch = personalDocs.find(doc => doc.id === docId || doc.document_id === docId); // Check common ID keys
+  if (personalMatch) {
+    // console.log(`Metadata found in personalDocs for ${docId}`);
+    return personalMatch;
+  }
+  // Then search group docs
+  const groupMatch = groupDocs.find(doc => doc.id === docId || doc.document_id === docId);
+   if (groupMatch) {
+    // console.log(`Metadata found in groupDocs for ${docId}`);
+    return groupMatch;
+  }
+  // console.log(`Metadata NOT found for ${docId}`);
+  return null; // Not found in either list
+}
+
 /* ---------------------------------------------------------------------------
    Loading Documents (Keep existing loadPersonalDocs, loadGroupDocs, loadAllDocs)
 --------------------------------------------------------------------------- */

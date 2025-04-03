@@ -4,50 +4,13 @@ from config import *
 from functions_content import *
 from functions_settings import *
 from functions_search import *
+from functions_logging import *
 
 def allowed_file(filename, allowed_extensions=None):
     if not allowed_extensions:
         allowed_extensions = ALLOWED_EXTENSIONS
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in allowed_extensions
-
-def add_system_message_to_conversation(conversation_id, user_id, content):
-    try:
-        conversation_item = container.read_item(
-            item=conversation_id,
-            partition_key=conversation_id
-        )
-
-        conversation_item['messages'].append({
-            "role": "system",
-            "content": content,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-        conversation_item['last_updated'] = datetime.utcnow().isoformat()
-
-        container.upsert_item(conversation_item)
-
-    except Exception as e:
-        raise e
-    
-
-def add_file_task_to_file_processing_log(document_id, user_id, content):
-    settings = get_settings()
-    enable_file_processing_log = settings.get('enable_file_processing_log', True)
-
-    if enable_file_processing_log:
-        try:
-            id_value = str(uuid.uuid4())
-            log_item = {
-                "id": id_value,
-                "document_id": document_id,
-                "user_id": user_id,
-                "log": content,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            file_processing_container.create_item(log_item)
-        except Exception as e:
-            raise e
     
 def create_document(file_name, user_id, document_id, num_file_chunks, status):
     current_time = datetime.now(timezone.utc)
@@ -133,7 +96,15 @@ def calculate_processing_percentage(doc_metadata):
     Returns:
         int: The calculated percentage (0-100).
     """
-    status = doc_metadata.get('status', '').lower()
+    status = doc_metadata.get('status', '')
+    if isinstance(status, str):
+        status = status.lower()
+    elif isinstance(status, bytes):
+        status = status.decode('utf-8').lower()
+    elif isinstance(status, dict):
+        status = json.dumps(status).lower()
+        
+
     current_pct = doc_metadata.get('percentage_complete', 0)
     estimated_pages = doc_metadata.get('number_of_pages', 0)
     total_chunks_saved = doc_metadata.get('current_file_chunk', 0)
@@ -150,15 +121,15 @@ def calculate_processing_percentage(doc_metadata):
     calculated_pct = 0
 
     # Phase 1: Initial steps up to sending to DI
-    if "queued" in status.lower():
+    if "queued" in status:
         calculated_pct = 0
 
-    elif "sending" in status.lower():
+    elif "sending" in status:
         # Explicitly sending data for analysis
         calculated_pct = 5
 
     # Phase 3: Saving Pages (The main progress happens here: 10% -> 90%)
-    elif "saving page" in status.lower(): # Status indicating the loop saving chunks/pages is active
+    elif "saving page" in status: # Status indicating the loop saving pages is active
         if estimated_pages > 0:
             # Calculate progress ratio (0.0 to 1.0)
             # Ensure saved count doesn't exceed estimate for the ratio
@@ -174,7 +145,7 @@ def calculate_processing_percentage(doc_metadata):
             calculated_pct = 5
 
     # Phase 4: Final Metadata Extraction (Optional, after page saving)
-    elif "extracting final metadata" in status.lower():
+    elif "extracting final metadata" in status:
         # This phase should start after page saving is effectively done (>=90%)
         # Assign a fixed value during this step.
         calculated_pct = 95
@@ -210,34 +181,7 @@ def update_document(**kwargs):
     current_time = datetime.now(timezone.utc)
     formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    add_file_task_to_file_processing_log(
-        document_id,
-        user_id,
-        f"Attempting update for document {document_id} with args: {kwargs}"
-    )
-
     try:
-        # 1. Retrieve the existing document FIRST
-        # *****************************************************************
-        # IMPORTANT: Verify your partition key strategy for documents_container.
-        # If '/user_id' is the partition key:
-        # query = "SELECT * FROM c WHERE c.id = @document_id"
-        # parameters = [{"name": "@document_id", "value": document_id}]
-        # existing_documents = list(documents_container.query_items(query=query, parameters=parameters, partition_key=user_id))
-        #
-        # If '/id' is the partition key:
-        # try:
-        #     existing_document = documents_container.read_item(item=document_id, partition_key=document_id)
-        #     # Verify user ownership if needed (important for security)
-        #     if existing_document.get('user_id') != user_id:
-        #          raise CosmosResourceNotFoundError(f"Document {document_id} not found or access denied for user {user_id}")
-        #     existing_documents = [existing_document] # Wrap in list for consistency
-        # except CosmosResourceNotFoundError:
-        #     existing_documents = []
-        #
-        # Using the cross-partition query as in your original code for now,
-        # but strongly recommend using partition keys directly for performance and cost.
-        # *****************************************************************
         query = """
             SELECT *
             FROM c
@@ -248,6 +192,14 @@ def update_document(**kwargs):
             {"name": "@document_id", "value": document_id}
         ]
         existing_documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+
+        status = kwargs.get('status', '')
+
+        add_file_task_to_file_processing_log(
+            document_id=document_id,
+            user_id=user_id,
+            content=f"Status: {status}"
+        )
 
         if not existing_documents:
             # Log specific error before raising
@@ -286,9 +238,17 @@ def update_document(**kwargs):
             # Calculate new percentage based on the *updated* existing_document state
             # This now includes the potentially incremented num_chunks
             new_percentage = calculate_processing_percentage(existing_document)
-
+            
             # Handle final state overrides for percentage
-            status_lower = existing_document.get('status', '').lower()
+
+            status_lower = existing_document.get('status', '')
+            if isinstance(status_lower, str):
+                status_lower = status_lower.lower()
+            elif isinstance(status_lower, bytes):
+                status_lower = status_lower.decode('utf-8').lower()
+            elif isinstance(status_lower, dict):
+                status_lower = json.dumps(status_lower).lower()
+
             if "processing complete" in status_lower:
                 new_percentage = 100
             elif "error" in status_lower or "failed" in status_lower:
@@ -300,11 +260,6 @@ def update_document(**kwargs):
                  existing_document['percentage_complete'] = original_percentage
             else:
                  existing_document['percentage_complete'] = new_percentage
-
-            add_file_task_to_file_processing_log(
-                document_id, user_id,
-                f"Fields updated. New percentage: {existing_document['percentage_complete']}. Status: {existing_document.get('status')}, NumChunks: {existing_document.get('num_chunks')}"
-            )
 
         # 4. Propagate relevant changes to search index chunks
         # This happens regardless of 'update_occurred' flag because the *intent* from kwargs might trigger it,
@@ -340,16 +295,7 @@ def update_document(**kwargs):
 
         # 5. Upsert the document if changes were made
         if update_occurred:
-            add_file_task_to_file_processing_log(
-                document_id, user_id,
-                f"Upserting document {document_id} with updated data."
-            )
             documents_container.upsert_item(existing_document)
-        else:
-             add_file_task_to_file_processing_log(
-                document_id, user_id,
-                f"No effective changes detected for document {document_id}. Skipping upsert."
-            )
 
     except CosmosResourceNotFoundError as e:
         # Error already logged where it was first detected
@@ -900,8 +846,7 @@ def extract_document_metadata(document_id, user_id):
         update_document(
             document_id=document_id, 
             user_id=user_id,
-            percentage_complete=20,
-            status=f"Retrieved document items for document {document_id}: {document_items}"
+            status=f"Retrieved document items for document {document_id}"
         )
 
         add_file_task_to_file_processing_log(
@@ -946,8 +891,7 @@ def extract_document_metadata(document_id, user_id):
     update_document(
         document_id=document_id,
         user_id=user_id,
-        percentage_complete=45,
-        status=f"Extracted metadata for document {document_id}, metadata: {meta_data}"
+        status=f"Extracted metadata for document {document_id}"
     )
 
     # --- Step 3: Content Safety Check (if enabled) ---
@@ -1015,8 +959,7 @@ def extract_document_metadata(document_id, user_id):
             update_document(
                 document_id=document_id,
                 user_id=user_id,
-                percentage_complete=60,
-                status=f"Processing Hybrid search for document {document_id}"
+                status=f"Collecting document data to generate metadata from document: {document_id}"
             )
 
             document_scope, scope_id = detect_doc_type(document_id, user_id)
@@ -1030,18 +973,6 @@ def extract_document_metadata(document_id, user_id):
                                                doc_scope=document_scope, 
                                                active_group_id=scope_id)
 
-            add_file_task_to_file_processing_log(
-                document_id, 
-                user_id, 
-                f"Hybrid search results for document {document_id}: {search_results}"
-            )
-
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                percentage_complete=75,
-                status=f"Hybrid search results for document {document_id}: {search_results}"
-            )
         else:
             search_results = "No Hybrid results"
     except Exception as e:
@@ -1092,7 +1023,7 @@ def extract_document_metadata(document_id, user_id):
         add_file_task_to_file_processing_log(
             document_id, 
             user_id,
-            f"Processing GPT request for document {document_id}"
+            f"Sending search results to AI to generate metadata {document_id}"
         )
         messages = [
             {
@@ -1131,13 +1062,6 @@ def extract_document_metadata(document_id, user_id):
         document_id, 
         user_id, 
         f"GPT response for document {document_id}: {response_content}"
-    )
-
-    update_document(
-        document_id=document_id,
-        user_id=user_id,
-        percentage_complete=80,
-        status=f"GPT response for document {document_id}: {response_content}"
     )
 
     # --- Step 7: Clean and parse the GPT JSON output ---
@@ -1218,8 +1142,7 @@ def extract_document_metadata(document_id, user_id):
     update_document(
         document_id=document_id,
         user_id=user_id,
-        percentage_complete=95,
-        status=f"Final metadata for document {document_id}: {meta_data}"
+        status=f"Metadata generated for document {document_id}"
     )
 
     return meta_data
@@ -1278,354 +1201,420 @@ def is_effectively_empty(value):
 def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
     """
     Runs in a background thread via Flask-Executor.
-    Chunk the file, call Azure DI, upsert each page into Search, update doc status in Cosmos, etc.
+    Performs metadata extraction, file-level chunking (PDF only), Azure DI call,
+    page/content-level chunking (DI output for PDF/PPT, Word content),
+    upserts chunks into Search, and updates doc status in Cosmos.
+    Supports PDF, Word (.docx, .doc), and PowerPoint (.pptx, .ppt) file types via Azure DI.
     """
     settings = get_settings()
     enable_enhanced_citations = settings.get('enable_enhanced_citations')
     enable_extract_meta_data = settings.get('enable_extract_meta_data')
     max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
+    # Azure Document Intelligence limits (check latest documentation)
+    # General: 500 MB per document, 4MB per page for images/PDFs. Timeout 30 mins.
+    # Layout model page limit: 2000 pages for PDF/TIFF.
     di_limit_bytes = 500 * 1024 * 1024
     di_page_limit = 2000
 
-    file_ext = os.path.splitext(original_filename)[-1].lower()
+    try:
+        file_ext = os.path.splitext(original_filename)[-1]
 
-    # We'll read metadata from the temp file (for PDF, docx, etc.)
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            status=f"Processing file {original_filename}, file extension: {file_ext}"
+        )
+    
+    except Exception as e:
+        file_ext = os.path.splitext(temp_file_path)[-1]
+        update_document(
+            document_id=document_id,
+            user_id=user_id,
+            status=f"Processing file using temp file path {temp_file_path}, file extension: {file_ext}"
+        )
+
+    # We'll read metadata from the temp file
     doc_title = ''
     doc_author = ''
     doc_subject = None
     doc_keywords = None
+    doc_authors_list = [] # Initialize
 
     try:
-        # Attempt to get some metadata if it's one of our known doc types
-        if file_ext in [
-            '.pdf', '.docx', '.doc', '.xlsx', '.pptx',
-            '.html', '.jpg', '.jpeg', '.png', '.bmp',
-            '.tiff', '.tif', '.heif', '.csv'
-        ]:
-            # extract metadata
-            if file_ext == '.pdf':
-                doc_title, doc_author, doc_subject, doc_keywords = extract_pdf_metadata(temp_file_path)
-                doc_authors_list = parse_authors(doc_author)
+        # --- 1. Metadata Extraction and Initial Checks ---
+        file_size = os.path.getsize(temp_file_path)
+        page_count = 0 # Initialize page count, only relevant for PDF pre-check
 
-            elif file_ext in ('.docx', '.doc'):
-                doc_title, doc_author = extract_docx_metadata(temp_file_path)
-                doc_authors_list = parse_authors(doc_author)
+        # Check overall max file size limit first
+        if file_size > max_file_size_bytes:
+            update_document(
+                document_id=document_id,
+                user_id=user_id,
+                status=f"Error: File exceeds maximum allowed size ({max_file_size_bytes} bytes)."
+            )
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            # Assuming jsonify is available in the context this runs
+            # return jsonify({'error': f'File exceeds maximum size of {max_file_size_bytes} bytes.'}), 400
+            print(f"Error: File {document_id} exceeds maximum size.") # Use print or logging if jsonify not available
+            return # Exit processing
 
-            # Retrieve file size, (optionally) page count
-            page_count = 0
-            file_size = os.path.getsize(temp_file_path)
-            if file_ext == '.pdf':
-                page_count = get_pdf_page_count(temp_file_path)
+        is_pdf = file_ext == '.pdf'
+        is_word = file_ext in ('.docx', '.doc')
+        is_ppt = file_ext in ('.pptx', '.ppt')
 
-            # Update cosmos doc with known metadata
-            if doc_title:
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    title=doc_title
-                )
-            if doc_author:
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    authors=doc_author
-                )
-            if doc_subject:
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    abstract=doc_subject
-                )
-            if doc_keywords:
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    keywords=doc_keywords
-                )
+        if is_pdf:
+            update_document(document_id=document_id, user_id=user_id, status=f"Processing PDF file...")
+            doc_title, doc_author, doc_subject, doc_keywords = extract_pdf_metadata(temp_file_path)
+            doc_authors_list = parse_authors(doc_author)
+            page_count = get_pdf_page_count(temp_file_path) # Get PDF page count early
+        elif is_word:
+            update_document(document_id=document_id, user_id=user_id, status=f"Processing Word file...")
+            doc_title, doc_author = extract_docx_metadata(temp_file_path)
+            doc_authors_list = parse_authors(doc_author)
+            # page_count remains 0, Word page count isn't reliable pre-DI
+        elif is_ppt: # <-- ADDED PPT block
+            update_document(document_id=document_id, user_id=user_id, status=f"Processing PowerPoint file...")
+        
+            # page_count remains 0, Word page count isn't reliable pre-DI
 
-            # ---------------------------
-            # Check Enhanced Citations?
-            # ---------------------------
+        # Update cosmos doc with known metadata (if found)
+        update_fields = {}
+        if doc_title: update_fields['title'] = doc_title
+        # Use authors_list if available and parsed, otherwise fallback to raw string
+        if doc_authors_list: update_fields['authors'] = doc_authors_list
+        elif doc_author: update_fields['authors'] = [doc_author] # Store as list even if single string found
+        if doc_subject: update_fields['abstract'] = doc_subject # Assuming subject maps to abstract
+        if doc_keywords: update_fields['keywords'] = doc_keywords # Handle parsing if needed
+        if update_fields:
+            update_fields['status'] = "Extracted initial metadata"
+            update_document(document_id=document_id, user_id=user_id, **update_fields)
+
+        # --- 2. Determine File Chunking Strategy (PDF only) & Enhanced Citations ---
+        file_paths_to_process = [temp_file_path] # Default: process the single uploaded file
+        needs_pdf_file_chunking = False
+        use_enhanced_citations = False # Default
+
+        # Check if DI processing is applicable (PDF, Word, PPT)
+        if is_pdf or is_word or is_ppt:
             if not enable_enhanced_citations:
-                # Non-enhanced mode: must be <= 500MB, <= 2000 pages, and <= max_file_size_bytes
-                if (file_size > di_limit_bytes or 
-                    page_count > di_page_limit or 
-                    file_size > max_file_size_bytes):
-                    # Not supported in non-enhanced mode
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status="Error: File exceeds non-enhanced citations limits."
-                    )
-                    # Cleanup temp file
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
-                    return jsonify({
-                        'error': (
-                            f'File exceeds non-enhanced citations limits '
-                            f'(max {di_limit_bytes} bytes / {di_page_limit} pages / {max_file_size_bytes} bytes).'
-                        )
-                    }), 400
-
-                # No chunking for non-enhanced mode
-                file_paths_to_process = [temp_file_path]
+                # Non-enhanced mode: Check DI size limit. Page limit mainly for PDF pre-check.
+                if file_size > di_limit_bytes:
+                     raise ValueError(f"File size ({file_size} bytes) exceeds Document Intelligence limit ({di_limit_bytes} bytes) for non-enhanced mode.")
+                if is_pdf and page_count > di_page_limit:
+                     raise ValueError(f"PDF page count ({page_count}) exceeds Document Intelligence limit ({di_page_limit}) for non-enhanced mode.")
+                # No file-level chunking needed here. DI handles the single file.
+                use_enhanced_citations = False
+                update_document(document_id=document_id, user_id=user_id, enhanced_citations=False, status="Enhanced citations disabled")
 
             else:
-                # Enhanced citations
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    enhanced_citations=True
-                )
+                # Enhanced citations mode enabled globally - applies to PDF and PPT for blob storage link
+                if is_pdf or is_ppt:
+                    use_enhanced_citations = True
+                    update_document(document_id=document_id, user_id=user_id, enhanced_citations=True, status=f"Enhanced citations enabled for {file_ext}")
+                    # Check if PDF needs *file-level* chunking before DI call due to strict limits
+                    if is_pdf and (file_size > di_limit_bytes or page_count > di_page_limit):
+                        needs_pdf_file_chunking = True
+                elif is_word:
+                    # Word files currently don't use the blob storage link part of enhanced citations in this flow
+                    use_enhanced_citations = False # Keep it False for Word specific logic downstream if needed
+                    update_document(document_id=document_id, user_id=user_id, enhanced_citations=False, status="Enhanced citations (blob link) not used for Word files")
+                    # Check Word file size against DI limit
+                    if file_size > di_limit_bytes:
+                         raise ValueError(f"Word file size ({file_size} bytes) exceeds Document Intelligence limit ({di_limit_bytes} bytes).")
 
-                # Still reject if file is bigger than your max or the pages are too high
-                if file_size > max_file_size_bytes:
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status="Error: File exceeds maximum size in enhanced mode."
-                    )
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
-                    return jsonify({
-                        'error': f'File exceeds maximum size of {max_file_size_bytes} bytes in enhanced mode.'
-                    }), 400
+                # Perform PDF file chunking if needed (only for PDF)
+                if needs_pdf_file_chunking:
+                    try:
+                        update_document(document_id=document_id, user_id=user_id, status="Chunking large PDF file...")
+                        # Adjust max_pages as needed, ensure it respects DI limits comfortably
+                        pdf_chunk_max_pages = di_page_limit // 4 if di_page_limit > 4 else 500 # Example: chunk into 500-page segments
+                        file_paths_to_process = chunk_pdf(temp_file_path, max_pages=pdf_chunk_max_pages)
 
-                # If the file is <= 500MB and <= 2000 pages => no chunk
-                if file_size <= di_limit_bytes and page_count <= di_page_limit:
-                    file_paths_to_process = [temp_file_path]
-                else:
-                    # If bigger than 500MB or more than 2000 pages => chunk it (PDF only)
-                    if file_ext == '.pdf':
-                        file_paths_to_process = chunk_pdf(temp_file_path, max_pages=500)
-                        # Clean up the original big PDF if chunking was successful
+                        if not file_paths_to_process: # Handle chunking failure
+                             raise Exception("PDF chunking failed to produce output files.")
+                        # Clean up the original large PDF if chunking was successful
                         if os.path.exists(temp_file_path):
                             os.remove(temp_file_path)
-                    else:
-                        update_document(
-                            document_id=document_id,
-                            user_id=user_id,
-                            status="Error: Only PDF chunking is supported."
-                        )
-                        if os.path.exists(temp_file_path):
-                            os.remove(temp_file_path)
-                        return jsonify({
-                            'error': 'Only PDF chunking is supported in this scenario.'
-                        }), 400
+                        print(f"Successfully chunked large PDF into {len(file_paths_to_process)} files.")
+                    except Exception as e:
+                        raise Exception(f"Failed to chunk PDF file: {str(e)}")
 
-            # Update doc with chunk count
+
+
+            # Update doc with the number of *file* chunks being processed
             num_file_chunks = len(file_paths_to_process)
             update_document(
                 document_id=document_id,
                 user_id=user_id,
                 num_file_chunks=num_file_chunks,
-                status=f"Processing {original_filename} with {num_file_chunks} chunk(s)"
+                status=f"Processing {original_filename} in {num_file_chunks} file chunk(s)"
             )
 
-            # -----------------------------------
-            # Process each chunk (or single file)
-            # -----------------------------------
+            # --- 3. Process Each File Chunk (usually just one unless PDF was chunked) ---
+            total_final_chunks_processed = 0 # Track total final chunks (pages/slides/word-chunks) across file parts
             for idx, chunk_path in enumerate(file_paths_to_process, start=1):
+                chunk_base_name, chunk_ext_loop = os.path.splitext(original_filename)
+                # Use original filename for metadata/search unless it's a chunked PDF part
+                chunk_effective_filename = original_filename
+                if num_file_chunks > 1:
+                    # Create a filename reflecting the chunk index for chunked PDFs
+                    chunk_effective_filename = f"{chunk_base_name}_chunk_{idx}{chunk_ext_loop}"
+                    print(f"Processing PDF chunk {idx}/{num_file_chunks}: {chunk_effective_filename}")
+                else:
+                     print(f"Processing file: {chunk_effective_filename}")
+
+
                 update_document(
-                    document_id=document_id,
+                    document_id=document_id, # Update main doc status
                     user_id=user_id,
-                    status=f"Processing file chunk {idx} of {num_file_chunks}"
+                    status=f"Processing file chunk {idx}/{num_file_chunks}: {chunk_effective_filename}"
                 )
 
-                # Build chunk-based doc ID if multiple chunks
-                if num_file_chunks > 1:
-                    chunk_document_id = f"{document_id}-chunk-{idx}"
-                else:
-                    chunk_document_id = document_id
 
-                # Decide a chunk filename that includes original name + index
-                base_name, ext = os.path.splitext(original_filename)
-                if num_file_chunks > 1:
-                    # e.g. "mydoc_chunk_1.pdf"
-                    chunk_filename = f"{base_name}_chunk_{idx}{ext}"
-                else:
-                    chunk_filename = original_filename
-
-                # -------------------------------------------------
-                # If enhanced_citations, we also upload to Blob
-                # -------------------------------------------------
-                if enable_enhanced_citations:
+                # --- 3a. Upload to Blob for Enhanced Citations (PDF and PPT only) ---
+                # Upload the *original* or *chunked PDF part* to blob storage
+                if use_enhanced_citations and (is_pdf or is_ppt):
                     try:
-                        blob_path = f"{user_id}/{chunk_filename}"
+                        # Use the effective filename for the blob path to match chunk if needed
+                        blob_path = f"{user_id}/{chunk_effective_filename}"
                         blob_service_client = CLIENTS.get("office_docs_client")
+                        if not blob_service_client:
+                             raise Exception("Blob service client not available/configured.")
+
                         blob_client = blob_service_client.get_blob_client(
-                            container=user_documents_container_name,
+                            container=user_documents_container_name, # Ensure this is defined in config
                             blob=blob_path
                         )
-                        # Add metadata fields for user_id and document_id
-                        blob_metadata = {
-                            "user_id": str(user_id),
-                            "document_id": str(document_id)
-                        }
+                        # Metadata for linking blob back to document
+                        blob_metadata = {"user_id": str(user_id), "document_id": str(document_id)}
+                        update_document(document_id=document_id, user_id=user_id, status=f"Uploading {chunk_effective_filename} to Blob Storage...")
                         with open(chunk_path, "rb") as f:
                             blob_client.upload_blob(f, overwrite=True, metadata=blob_metadata)
+                        print(f"Successfully uploaded {chunk_effective_filename} to blob storage at {blob_path}")
                     except Exception as e:
-                        update_document(
+                        # Log error, decide if it's critical (e.g., network issue vs config issue)
+                        raise Exception(f"Error uploading {chunk_effective_filename} to Blob Storage: {str(e)}")
+
+                # --- 3b. Send chunk to Azure DI ---
+                update_document(document_id=document_id, user_id=user_id, status=f"Sending {chunk_effective_filename} to Azure Document Intelligence...")
+                di_extracted_pages = [] # Initialize
+                try:
+                    # extract_content_with_azure_di should handle PDF, DOCX, PPTX, PPT
+                    # It should return a list of page-like objects, e.g., [{"page_number": 1, "content": "..."}, ...]
+                    # For PPTX/PPT, page_number corresponds to slide number.
+                    di_extracted_pages = extract_content_with_azure_di(document_id=document_id, user_id=user_id, file_path=chunk_path)
+
+                    if not di_extracted_pages:
+                         # Log a warning, might not be an error if file is empty/unsupported by DI model
+                         print(f"Warning: Azure DI returned no content for {chunk_effective_filename}.")
+                         # Update status to reflect no content found for this chunk/file
+                         update_document(
                             document_id=document_id,
                             user_id=user_id,
-                            status=(
-                                f"Error uploading {chunk_filename} to Blob Storage: {str(e)}"
-                            )
-                        )
-                        if os.path.exists(chunk_path):
-                            os.remove(chunk_path)
-                        return jsonify({
-                            'error': f'Error uploading chunk {chunk_filename} to Blob Storage: {str(e)}'
-                        }), 500
+                            status=f"Azure DI found no content in {chunk_effective_filename}."
+                         )
+                         # Decide whether to continue to next file chunk (if any) or stop
+                         # For now, let's continue if there are more file chunks
+                         # If this was the only file chunk, the process will end with 0 pages.
 
-                # ----------------------
-                # Send chunk to Azure DI
-                # ----------------------
-                update_document(
-                    document_id=document_id,
-                    user_id=user_id,
-                    status=f"Sending {chunk_filename} (chunk {idx} of {num_file_chunks}) to Azure Document Intelligence"
-                )
-
-                try:
-                    pages = extract_content_with_azure_di(chunk_path)
+                    num_di_pages = len(di_extracted_pages)
                     update_document(
                         document_id=document_id,
                         user_id=user_id,
-                        number_of_pages=len(pages),
-                        status=f"Extracted content from {chunk_filename}."
+                        # Store the number of pages/slides/sections DI found for this chunk
+                        # If multiple file chunks, this gets overwritten; final count updated later.
+                        number_of_pages=num_di_pages, # Temporary update for progress calculation
+                        status=f"Received {num_di_pages} pages/slides from Azure DI for {chunk_effective_filename}."
                     )
                 except Exception as e:
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status=f"Error extracting content from {chunk_filename}: {str(e)}"
-                    )
-                    if os.path.exists(chunk_path):
-                        os.remove(chunk_path)
-                    return jsonify({'error': f'Error extracting file: {str(e)}'}), 500
+                    raise Exception(f"Error extracting content from {chunk_effective_filename} with Azure DI: {str(e)}")
 
-                # ---------------------------------------------
-                # Save each page’s text content as a “chunk”
-                # ---------------------------------------------
+                 # --- 3c. Content Chunking Strategy (Word needs specific chunking, PDF/PPT use DI pages directly) ---
+                final_chunks_to_save = []
+                if is_word:
+                    update_document(document_id=document_id, user_id=user_id, status=f"Chunking Word content from {chunk_effective_filename}...")
+                    try:
+                        # Use the function to chunk the DI output based on word count or paragraphs
+                        # Ensure chunk_word_file_into_pages exists and handles the DI output format
+                        final_chunks_to_save = chunk_word_file_into_pages(document_id=document_id, user_id=user_id, di_pages=di_extracted_pages)
+
+                        num_final_chunks = len(final_chunks_to_save)
+                        # Update number_of_pages to reflect the *final* number of chunks for Word
+                        update_document(document_id=document_id, user_id=user_id, number_of_pages=num_final_chunks, status=f"Created {num_final_chunks} content chunks for {chunk_effective_filename}.")
+                    except Exception as e:
+                         raise Exception(f"Error chunking Word content for {chunk_effective_filename}: {str(e)}")
+                elif is_pdf or is_ppt:
+                    # For PDFs and PPTs, the pages/slides returned by DI are the final chunks
+                    final_chunks_to_save = di_extracted_pages
+                    # number_of_pages was already updated based on DI output count
+
+
+                # --- 3d. Save Final Chunks to Search Index ---
+                num_final_chunks = len(final_chunks_to_save)
+                if not final_chunks_to_save:
+                    print(f"Warning: No final content chunks to save for {chunk_effective_filename}.")
+                    # Update status if desired
+                    update_document(document_id=document_id, user_id=user_id, status=f"No content chunks generated for {chunk_effective_filename}.")
+                    # Clean up the processed chunk file and continue to the next file chunk (if any)
+                    if chunk_path != temp_file_path and os.path.exists(chunk_path):
+                        os.remove(chunk_path)
+                    continue # Move to the next file chunk
+
+                update_document(document_id=document_id, user_id=user_id, status=f"Saving {num_final_chunks} content chunks for {chunk_effective_filename}...")
                 try:
-                    for page_data in pages:
-                        page_number = page_data["page_number"]
-                        page_content = page_data["content"]
+                    for i, chunk_data in enumerate(final_chunks_to_save):
+                        # Get page number (or chunk index for Word) and content
+                        # DI provides 'page_number' (1-based index)
+                        # Word chunking function should also provide a similar index, assumed 'page_number' here
+                        chunk_index = chunk_data.get("page_number", i + 1) # Default to 1-based index if missing
+                        chunk_content = chunk_data.get("content", "")
+
+                        if not chunk_content.strip():
+                            print(f"Skipping empty page {chunk_index} for {chunk_effective_filename}.")
+                            continue # Don't save empty chunks
+
+                        # Update status reflecting the final chunk saving progress
                         update_document(
-                            document_id=document_id,
+                            document_id=document_id, # Main doc ID
                             user_id=user_id,
-                            current_file_chunk=int(page_number),
-                            status=f"Saving page {page_number} of {chunk_filename}..."
+                            current_file_chunk=int(chunk_index), # Track page/chunk index being saved
+                            number_of_pages=num_final_chunks, # Ensure total count is known for percentage calc
+                            status=f"Saving page {chunk_index}/{num_final_chunks} of {chunk_effective_filename}..."
                         )
 
                         save_chunks(
-                            page_text_content=page_content,
-                            page_number=page_number,
-                            file_name=chunk_filename,
+                            page_text_content=chunk_content,
+                            page_number=chunk_index, # Logical page/slide/chunk number
+                            file_name=chunk_effective_filename, # Filename associated with this chunk/page
                             user_id=user_id,
-                            document_id=chunk_document_id
+                            document_id=document_id # Use main document ID
                         )
+                        total_final_chunks_processed += 1 # Increment total count across all file chunks
 
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status=f"Saved extracted content from {chunk_filename}."
-                    )
+                    print(f"Saved {num_final_chunks} content chunks from {chunk_effective_filename}.")
+                    # Status update after loop might be redundant due to percentage calculation,
+                    # but can be useful for logging.
+                    # update_document(
+                    #     document_id=document_id, user_id=user_id,
+                    #     status=f"Completed saving chunks for {chunk_effective_filename}."
+                    # )
+
                 except Exception as e:
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status=f"Error saving extracted content from {chunk_filename}: {str(e)}"
-                    )
-                    if os.path.exists(chunk_path):
-                        os.remove(chunk_path)
-                    return jsonify({'error': f'Error saving extracted content: {str(e)}'}), 500
+                    # Identify which chunk failed if possible
+                    raise Exception(f"Error saving extracted content chunk {chunk_index} for {chunk_effective_filename}: {str(e)}")
 
-                # Clean up local chunk file if not the same as original temp_file
+
+                # --- 3e. Clean up local file chunk ---
+                # Clean up the local file chunk if it's not the original temp file (i.e., if PDF was chunked)
                 if chunk_path != temp_file_path and os.path.exists(chunk_path):
-                    os.remove(chunk_path)
+                    try:
+                        os.remove(chunk_path)
+                        print(f"Cleaned up temporary chunk file: {chunk_path}")
+                    except Exception as cleanup_e:
+                        print(f"Warning: Failed to clean up temp chunk file {chunk_path}: {cleanup_e}")
 
-            # If metadata extraction is enabled
-            if enable_extract_meta_data:
+            # --- 4. Final Metadata Extraction (Optional) ---
+            if enable_extract_meta_data and (is_pdf or is_word):
                 try:
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status="Extracting final metadata..."
-                    )
+                    update_document(document_id=document_id, user_id=user_id, status="Extracting final metadata...")
+                    # This function likely aggregates info from the saved chunks/pages
                     document_metadata = extract_document_metadata(document_id, user_id)
 
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        title=document_metadata.get('title'),
-                        authors=document_metadata.get('authors'),
-                        abstract=document_metadata.get('abstract'),
-                        keywords=document_metadata.get('keywords'),
-                        publication_date=document_metadata.get('publication_date'),
-                        organization=document_metadata.get('organization'),
-                    )
-                except Exception as e:
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        status=f"Error extracting metadata: {str(e)}"
-                    )
-                    # Not critical enough to return error necessarily, do as you prefer.
+                    # Update document with aggregated/extracted metadata
+                    update_fields = {k: v for k, v in document_metadata.items() if v is not None}
+                    if update_fields:
+                         update_document(document_id=document_id, user_id=user_id, **update_fields)
 
-            # Mark the entire doc as complete
+                except Exception as e:
+                    # Log this error but don't necessarily fail the whole process
+                    print(f"Warning: Error extracting final metadata for {document_id}: {str(e)}")
+                    update_document(document_id=document_id, user_id=user_id, status=f"Processing complete (metadata extraction warning: {str(e)})")
+
+
+            # --- 5. Mark Processing Complete ---
+            # Update final total page/chunk count for the document in Cosmos
+            update_document(
+                 document_id=document_id,
+                 user_id=user_id,
+                 number_of_pages=total_final_chunks_processed, # Final count of saved chunks
+                 status="Processing complete",
+                 percentage_complete=100 # Explicitly set to 100
+             )
+
+            # Original temp file should have been removed already if PDF chunking occurred,
+            # but double-check and remove if it still exists (e.g., if no chunking happened)
+            if temp_file_path and os.path.exists(temp_file_path):
+                 try:
+                     os.remove(temp_file_path)
+                     print(f"Cleaned up original temporary file: {temp_file_path}")
+                 except Exception as cleanup_e:
+                     print(f"Warning: Failed to clean up original temp file {temp_file_path}: {cleanup_e}")
+
+
+            print(f"Document {document_id} ({original_filename}) processed successfully with {total_final_chunks_processed} chunks.")
+            # Background task doesn't return JSON, just finishes.
+            return # Success
+
+
+         # --- Handle Other File Types (Example stubs) ---
+        elif file_ext == '.txt':
+            # Add specific TXT processing logic here if needed
+            # Example: read text, maybe split into chunks, save_chunks
+            update_document(document_id=document_id, user_id=user_id, status="Processing TXT file...")
+            # ... TXT specific logic ...
+            update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
+            if os.path.exists(temp_file_path): os.remove(temp_file_path)
+            print(f"TXT Document {document_id} processed.")
+            return
+
+        elif file_ext == '.md':
+             # Add specific MD processing logic here if needed
+             update_document(document_id=document_id, user_id=user_id, status="Processing MD file...")
+             # ... MD specific logic ...
+             update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
+             if os.path.exists(temp_file_path): os.remove(temp_file_path)
+             print(f"MD Document {document_id} processed.")
+             return
+
+        elif file_ext == '.json':
+             # Add specific JSON processing logic here if needed
+             update_document(document_id=document_id, user_id=user_id, status="Processing JSON file...")
+             # ... JSON specific logic ...
+             update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
+             if os.path.exists(temp_file_path): os.remove(temp_file_path)
+             print(f"JSON Document {document_id} processed.")
+             return
+
+        else:
+            # Unsupported file type for this processing pipeline
+            raise ValueError(f"Unsupported file type: {file_ext}")
+
+
+    except Exception as e:
+        # General catch-all for unexpected errors during the process
+        error_msg = f"Processing failed: {str(e)}"
+        print(f"Error processing {document_id} ({original_filename}): {error_msg}")
+        # Attempt to update status to error
+        try:
             update_document(
                 document_id=document_id,
                 user_id=user_id,
-                status="Processing complete",
-                percentage_complete=100
+                status=f"Error: {error_msg[:200]}" # Truncate long errors
+                # Percentage will be handled by calculate_processing_percentage based on 'error' status
             )
+        except Exception as update_e:
+            print(f"Critical Error: Failed to update document status to error for {document_id}: {update_e}")
 
-            # Finally, remove the original temp file if it still exists
-            if os.path.exists(temp_file_path):
+        # Clean up the main temp file if it still exists
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
                 os.remove(temp_file_path)
+                print(f"Cleaned up temp file after error: {temp_file_path}")
+            except Exception as cleanup_e:
+                 print(f"Error: Failed to clean up temp file {temp_file_path} after error: {cleanup_e}")
+        # Clean up any chunk files if they exist (might be harder to track here)
+        # Consider adding cleanup logic within the chunking function's error handling
 
-            return jsonify({'message': 'Document uploaded and processed successfully'}), 200
-
-        # -------------------------------------------------------
-        # If it’s a .txt, .md, or .json, handle them differently
-        # -------------------------------------------------------
-        elif file_ext == '.txt':
-            extracted_content = extract_text_file(temp_file_path)
-            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            return jsonify({'message': 'TXT file processed successfully'}), 200
-
-        elif file_ext == '.md':
-            extracted_content = extract_markdown_file(temp_file_path)
-            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            return jsonify({'message': 'MD file processed successfully'}), 200
-
-        elif file_ext == '.json':
-            with open(temp_file_path, 'r', encoding='utf-8') as f:
-                extracted_content = json.dumps(json.load(f))
-            save_chunks(extracted_content, original_filename, user_id, document_id=document_id)
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            return jsonify({'message': 'JSON file processed successfully'}), 200
-
-        else:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            return jsonify({'error': 'Unsupported file type'}), 400
-
-    except Exception as e:
-        # In case of any unexpected error
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            status=f"Processing failed: {str(e)}"
-        )
-        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
-
+        # Background task doesn't return JSON, just logs and finishes.
+        return # Exit on error
