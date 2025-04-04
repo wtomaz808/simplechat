@@ -15,8 +15,23 @@ import re
 import docx
 import fitz # PyMuPDF
 import math
+import mimetypes
+import openpyxl
+import xlrd
 
-from flask import Flask, flash, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
+from flask import (
+    Flask, 
+    flash, 
+    request, 
+    jsonify, 
+    render_template, 
+    redirect, 
+    url_for, 
+    session, 
+    send_from_directory, 
+    send_file, 
+    Markup
+)
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
 from functools import wraps
@@ -29,6 +44,12 @@ from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
 from flask_executor import Executor
 from io import BytesIO
+from bs4 import BeautifulSoup
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+    RecursiveJsonSplitter
+)
 
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
@@ -55,7 +76,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.369'
+app.config['VERSION'] = '0.207.376'
 Session(app)
 
 CLIENTS = {}

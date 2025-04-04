@@ -147,6 +147,7 @@ def register_route_frontend_chats(app):
             'conversation_id': conversation_id
         }), 200
     
+    # THIS IS THE OLD ROUTE, KEEPING IT FOR REFERENCE, WILL DELETE LATER
     @app.route("/view_pdf", methods=["GET"])
     @login_required
     @user_required
@@ -278,3 +279,186 @@ def register_route_frontend_chats(app):
             # (You can also do this in an after_request or teardown block.)
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
+
+    # --- Updated route ---
+    @app.route('/view_document')
+    @login_required
+    @user_required
+    @enabled_required("enable_user_workspace")
+    def view_document():
+        settings = get_settings()
+        download_location = tempfile.gettempdir()
+
+
+        doc_id = request.args.get("doc_id")
+        page_number = request.args.get("page", default=1, type=int) # Keep page, useful for PDFs
+
+        if not doc_id:
+            return jsonify({'error': 'doc_id parameter is required'}), 400
+
+        user_id = get_current_user_id()
+        if not user_id:
+             return jsonify({"error": "User not authenticated"}), 401 # Should be caught by @login_required anyway
+
+        # Fetch Document Metadata (assuming get_user_document handles user auth checks implicitly)
+        doc_response, status_code = get_user_document(user_id, doc_id)
+        if status_code != 200:
+            # Pass through the error response from get_user_document
+            return doc_response, status_code
+
+        raw_doc = doc_response.get_json() # Assuming get_user_document returns jsonify response
+        file_name = raw_doc.get('file_name')
+        owner_user_id = raw_doc.get('user_id') # Get owner user_id from doc metadata
+
+        if not file_name:
+             return jsonify({"error": "Internal server error: Document metadata incomplete."}), 500
+
+        # Construct blob name using the owner's user_id from the document record
+        blob_name = f"{owner_user_id}/{file_name}"
+        file_ext = os.path.splitext(file_name)[-1].lower()
+
+        # Ensure download location exists (good practice, especially if using mount)
+        try:
+            os.makedirs(download_location, exist_ok=True)
+        except OSError as e:
+             return jsonify({"error": "Internal server error: Cannot access storage location."}), 500
+
+        # Generate the SAS URL
+        try:
+            # Ensure CLIENTS dictionary and keys are correctly configured
+            blob_service_client = CLIENTS.get("office_docs_client")
+            storage_account_key = settings.get("office_docs_key")
+            storage_account_name = blob_service_client.account_name # Get from client
+            container_name = user_documents_container_name # From config
+
+            if not all([blob_service_client, storage_account_key, container_name]):
+                return jsonify({"error": "Internal server error: Storage access not configured."}), 500
+
+            sas_token = generate_blob_sas(
+                account_name=storage_account_name,
+                container_name=container_name,
+                blob_name=blob_name,
+                account_key=storage_account_key,
+                permission=BlobSasPermissions(read=True),
+                expiry=datetime.utcnow() + timedelta(minutes=10) # Short expiry for view access
+            )
+
+            # Construct signed URL based on Azure environment
+            endpoint_suffix = "blob.core.windows.net"
+            if AZURE_ENVIRONMENT == "usgovernment":
+                 endpoint_suffix = "blob.core.usgovcloudapi.net"
+            # Add other environments if needed (e.g., China)
+
+            signed_url = (
+                f"https://{storage_account_name}.{endpoint_suffix}"
+                f"/{container_name}/{blob_name}?{sas_token}"
+            )
+
+        except Exception as e:
+            return jsonify({"error": "Internal server error: Could not authorize document access."}), 500
+
+        # Define the target path within the download location
+        random_uuid = str(uuid.uuid4())
+        # Use a unique filename within the download location to avoid collisions
+        local_file_name = f"{random_uuid}_{secure_filename(file_name)}" # Use secure_filename here too
+        local_file_path = os.path.join(download_location, local_file_name)
+
+        # Define supported types for direct viewing/handling
+        is_pdf = file_ext == '.pdf'
+        is_word = file_ext in ('.docx', '.doc')
+        is_ppt = file_ext in ('.pptx', '.ppt')
+        is_image = file_ext in ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp') # Added more image types
+        is_text = file_ext in ('.txt', '.md', '.csv', '.json', '.log', '.xml', '.html', '.htm') # Common text-based types
+
+        try:
+            # Download the file to the specified location
+            r = requests.get(signed_url, timeout=60)
+            r.raise_for_status() # Raises HTTPError for bad responses (4xx or 5xx)
+            with open(local_file_path, "wb") as f:
+                f.write(r.content)
+
+            # --- PDF Handling ---
+            if is_pdf:
+                pdf_document = None # Initialize
+                extracted_pdf = None # Initialize
+                try:
+                    pdf_document = fitz.open(local_file_path)
+                    total_pages = pdf_document.page_count
+                    current_idx = page_number - 1 # PyMuPDF uses 0-based index
+
+                    if current_idx < 0 or current_idx >= total_pages:
+                        return jsonify({"error": f"Requested page ({page_number}) out of range (Total: {total_pages})"}), 400
+
+                    # Determine pages to extract (+/- 1 page)
+                    start_idx = max(0, current_idx - 1)
+                    end_idx = min(total_pages - 1, current_idx + 1)
+
+                    # Create new PDF with extracted pages
+                    extracted_pdf = fitz.open() # Create a new empty PDF
+                    extracted_pdf.insert_pdf(pdf_document, from_page=start_idx, to_page=end_idx)
+
+                    # Save the extracted PDF back to the *same path*, overwriting original download
+                    extracted_pdf.save(local_file_path, garbage=3, deflate=True) # garbage=3 is often sufficient
+
+                    # Determine new page number within the sub-document (1-based for URL fragment)
+                    # New index = original index - start index. Convert back to 1-based.
+                    new_page_number = (current_idx - start_idx) + 1
+
+                    # Send the processed (sub-)PDF from the download_location
+                    response = send_file(local_file_path, as_attachment=False, mimetype='application/pdf')
+                    response.headers["X-Sub-PDF-Page"] = str(new_page_number)
+                    # File will be cleaned up in 'finally' block after response is sent
+                    return response
+
+                except Exception as pdf_error:
+                     return jsonify({"error": "Failed to process PDF document"}), 500
+                finally:
+                    # Close PDF documents if they were opened
+                    if extracted_pdf:
+                        extracted_pdf.close()
+                    if pdf_document:
+                        pdf_document.close()
+                    # Cleanup handled in the outer finally block
+
+
+            # --- Image Handling (Send file directly) ---
+            elif is_image:
+                mimetype, _ = mimetypes.guess_type(local_file_path)
+                if not mimetype:
+                    mimetype = 'application/octet-stream' # Fallback generic type
+                # File will be cleaned up in 'finally' block after response is sent
+                return send_file(local_file_path, as_attachment=False, mimetype=mimetype)
+
+            # --- Fallback for unsupported types, PPTX, DOCX, etc. ---
+            elif is_word or is_ppt:
+                # For Word/PPT, you might want to convert to PDF first or handle differently
+                return jsonify({"error": f"Unsupported file type for viewing: {file_ext}"}), 415
+            else:
+                # Cleanup already downloaded file before returning error
+                # (Cleanup is handled in finally, no need to remove here explicitly)
+                return jsonify({"error": f"Unsupported file type for viewing: {file_ext}"}), 415
+
+
+        except requests.exceptions.RequestException as e:
+            # Handle download errors
+            # No need to clean up here, 'finally' will handle it if file exists
+            return jsonify({"error": "Failed to download document from storage"}), 500
+        except fitz.fitz.FileNotFoundError: # More specific exception name
+            # Specific error if fitz can't find the file (maybe deleted between download and open)
+            return jsonify({"error": "Internal processing error: File access issue"}), 500
+        except Exception as e:
+            # General error handling
+            # No need to clean up here, 'finally' will handle it
+            return jsonify({"error": f"An internal error occurred processing the document."}), 500
+        finally:
+            # --- CRITICAL CLEANUP ---
+            # Ensure the downloaded/processed file is removed after the request,
+            # regardless of success or failure, unless send_file is streaming it
+            # and handles cleanup itself (which it should for non-temporary files).
+            # Double-check existence before removing.
+            if os.path.exists(local_file_path):
+                try:
+                    os.remove(local_file_path)
+                except OSError as e:
+                    # Log error but don't prevent response from being sent
+                    print(f"Error cleaning up file {local_file_path}: {e}")

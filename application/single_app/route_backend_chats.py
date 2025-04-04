@@ -40,11 +40,9 @@ def register_route_backend_chats(app):
         conversation_history_limit = math.ceil(raw_conversation_history_limit)
         if conversation_history_limit % 2 != 0:
             conversation_history_limit += 1
-        summarize_content_history_beyond_limit = settings.get('summarize_older_history', True) # Use a dedicated setting if possible
-
-        # Search Summarization Settings (kept separate)
-        summarize_content_history_for_search = False # Or get from settings/request
-        summarize_content_history_for_search_limit = 5 # Or get from settings/request
+        enable_summarize_content_history_beyond_conversation_history_limit = settings.get('enable_summarize_content_history_beyond_conversation_history_limit', True) # Use a dedicated setting if possible
+        enable_summarize_content_history_for_search = settings.get('enable_summarize_content_history_for_search', False) # Use a dedicated setting if possible
+        number_of_historical_messages_to_summarize = settings.get('number_of_historical_messages_to_summarize', 10) # Number of messages to summarize for search context
 
         max_file_content_length = 50000 # 50KB
 
@@ -273,9 +271,9 @@ def register_route_backend_chats(app):
         if hybrid_search_enabled:
             
             # Optional: Summarize recent history *for search* (uses its own limit)
-            if summarize_content_history_for_search:
+            if enable_summarize_content_history_for_search:
                 # Fetch last N messages for search context
-                limit_n_search = summarize_content_history_for_search_limit * 2
+                limit_n_search = number_of_historical_messages_to_summarize * 2
                 query_search = f"SELECT TOP {limit_n_search} * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp DESC"
                 params_search = [{"name": "@conv_id", "value": conversation_id}]
                 
@@ -551,7 +549,7 @@ def register_route_backend_chats(app):
             older_messages_to_summarize = all_messages[:num_older_messages] # Messages before the recent ones
 
             # Summarize older messages if needed and present
-            if summarize_content_history_beyond_limit and older_messages_to_summarize:
+            if enable_summarize_content_history_beyond_conversation_history_limit and older_messages_to_summarize:
                 print(f"Summarizing {len(older_messages_to_summarize)} older messages for conversation {conversation_id}")
                 summary_prompt_older = (
                     "Summarize the following conversation history concisely (around 50-100 words), "

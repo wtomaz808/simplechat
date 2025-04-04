@@ -86,6 +86,9 @@ def get_settings():
 
             # Metadata Extraction
             'enable_extract_meta_data': False,
+            'enable_summarize_content_history_for_search': False,
+            'number_of_historical_messages_to_summarize': 10,
+            'enable_summarize_content_history_beyond_conversation_history_limit': False,
             # title, authors, publication date, keywords, summary
             'enable_document_classification': False,
             'document_classification_categories': [
@@ -105,6 +108,8 @@ def get_settings():
 
             # Enhanced Citations
             'enable_enhanced_citations': False,
+            'enable_enhanced_citations_mount': False,
+            'enhanced_citations_mount': '/view_documents',
             'office_docs_storage_account_url': '',
             'office_docs_authentication_type': 'key',
             'office_docs_key': '',

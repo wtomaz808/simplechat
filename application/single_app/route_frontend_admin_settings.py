@@ -233,13 +233,18 @@ def register_route_frontend_admin_settings(app):
                 'enable_video_file_support': enable_video_file_support,
                 'enable_audio_file_support': enable_audio_file_support,
                 'enable_extract_meta_data': enable_extract_meta_data,
-
+                'enable_summarize_content_history_for_search': form_data.get('enable_summarize_content_history_for_search') == 'on',
+                'enable_summarize_content_history_beyond_conversation_history_limit': form_data.get('enable_summarize_content_history_beyond_conversation_history_limit') == 'on',
+                'number_of_historical_messages_to_summarize': int(form_data.get('number_of_historical_messages_to_summarize', 10)),
+                
                 # *** Document Classification ***
                 'enable_document_classification': enable_document_classification,
                 'document_classification_categories': parsed_categories, # Store the PARSED LIST
 
                 # Enhanced Citations
                 'enable_enhanced_citations': enable_enhanced_citations,
+                'enable_enhanced_citations_mount': form_data.get('enable_enhanced_citations_mount') == 'on',
+                'enhanced_citations_mount': form_data.get('enhanced_citations_mount', '/view_documents').strip(),
                 'office_docs_storage_account_url': form_data.get('office_docs_storage_account_url', '').strip(),
                 'office_docs_authentication_type': form_data.get('office_docs_authentication_type', 'key'),
                 'office_docs_key': form_data.get('office_docs_key', '').strip(),

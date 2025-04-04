@@ -129,7 +129,7 @@ def calculate_processing_percentage(doc_metadata):
         calculated_pct = 5
 
     # Phase 3: Saving Pages (The main progress happens here: 10% -> 90%)
-    elif "saving page" in status: # Status indicating the loop saving pages is active
+    elif "saving page" in status or "saving chunk" in status: # Status indicating the loop saving pages is active
         if estimated_pages > 0:
             # Calculate progress ratio (0.0 to 1.0)
             # Ensure saved count doesn't exceed estimate for the ratio
@@ -1198,423 +1198,742 @@ def is_effectively_empty(value):
         return all(not item.strip() for item in value if isinstance(item, str))
     return False
 
-def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
-    """
-    Runs in a background thread via Flask-Executor.
-    Performs metadata extraction, file-level chunking (PDF only), Azure DI call,
-    page/content-level chunking (DI output for PDF/PPT, Word content),
-    upserts chunks into Search, and updates doc status in Cosmos.
-    Supports PDF, Word (.docx, .doc), and PowerPoint (.pptx, .ppt) file types via Azure DI.
-    """
-    settings = get_settings()
-    enable_enhanced_citations = settings.get('enable_enhanced_citations')
-    enable_extract_meta_data = settings.get('enable_extract_meta_data')
-    max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
-    # Azure Document Intelligence limits (check latest documentation)
-    # General: 500 MB per document, 4MB per page for images/PDFs. Timeout 30 mins.
-    # Layout model page limit: 2000 pages for PDF/TIFF.
-    di_limit_bytes = 500 * 1024 * 1024
-    di_page_limit = 2000
+# --- Helper function to estimate word count ---
+def estimate_word_count(text):
+    """Estimates the number of words in a string."""
+    if not text:
+        return 0
+    return len(text.split())
 
+# --- Helper function for uploading to blob storage ---
+def upload_to_blob(temp_file_path, user_id, document_id, blob_filename, update_callback):
+    """Uploads the file to Azure Blob Storage."""
     try:
-        file_ext = os.path.splitext(original_filename)[-1]
+        blob_path = f"{user_id}/{blob_filename}"
+        blob_service_client = CLIENTS.get("office_docs_client") # Assuming CLIENTS is accessible
+        if not blob_service_client:
+            raise Exception("Blob service client not available/configured.")
 
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            status=f"Processing file {original_filename}, file extension: {file_ext}"
+        # Assuming user_documents_container_name is accessible
+        blob_client = blob_service_client.get_blob_client(
+            container=user_documents_container_name,
+            blob=blob_path
         )
-    
+        blob_metadata = {"user_id": str(user_id), "document_id": str(document_id)}
+        update_callback(status=f"Uploading {blob_filename} to Blob Storage...")
+        with open(temp_file_path, "rb") as f:
+            blob_client.upload_blob(f, overwrite=True, metadata=blob_metadata)
+        print(f"Successfully uploaded {blob_filename} to blob storage at {blob_path}")
+        return blob_path # Return the path for potential use
     except Exception as e:
-        file_ext = os.path.splitext(temp_file_path)[-1]
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            status=f"Processing file using temp file path {temp_file_path}, file extension: {file_ext}"
-        )
+        print(f"Error uploading {blob_filename} to Blob Storage: {str(e)}")
+        # Decide if this should be a fatal error or just a warning
+        # For now, let's raise it to stop processing if upload fails when required
+        raise Exception(f"Error uploading {blob_filename} to Blob Storage: {str(e)}")
 
-    # We'll read metadata from the temp file
-    doc_title = ''
-    doc_author = ''
-    doc_subject = None
-    doc_keywords = None
-    doc_authors_list = [] # Initialize
+# --- Helper function to process TXT files ---
+def process_txt(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+    """Processes plain text files."""
+    update_callback(status="Processing TXT file...")
+    total_chunks_saved = 0
+    target_words_per_chunk = 400
+
+    if enable_enhanced_citations:
+        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
 
     try:
-        # --- 1. Metadata Extraction and Initial Checks ---
-        file_size = os.path.getsize(temp_file_path)
-        page_count = 0 # Initialize page count, only relevant for PDF pre-check
+        with open(temp_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
 
-        # Check overall max file size limit first
-        if file_size > max_file_size_bytes:
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                status=f"Error: File exceeds maximum allowed size ({max_file_size_bytes} bytes)."
+        words = content.split()
+        num_words = len(words)
+        num_chunks_estimated = math.ceil(num_words / target_words_per_chunk)
+        update_callback(number_of_pages=num_chunks_estimated) # Use number_of_pages for chunk count
+
+        for i in range(0, num_words, target_words_per_chunk):
+            chunk_words = words[i : i + target_words_per_chunk]
+            chunk_content = " ".join(chunk_words)
+            chunk_index = (i // target_words_per_chunk) + 1
+
+            if chunk_content.strip():
+                update_callback(
+                    current_file_chunk=chunk_index,
+                    status=f"Saving chunk {chunk_index}/{num_chunks_estimated}..."
+                )
+                save_chunks(
+                    page_text_content=chunk_content,
+                    page_number=chunk_index,
+                    file_name=original_filename,
+                    user_id=user_id,
+                    document_id=document_id
+                )
+                total_chunks_saved += 1
+
+    except Exception as e:
+        raise Exception(f"Failed processing TXT file {original_filename}: {e}")
+
+    return total_chunks_saved
+
+# --- Helper function to process HTML files ---
+def process_html(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+    """Processes HTML files."""
+    update_callback(status="Processing HTML file...")
+    total_chunks_saved = 0
+    target_chunk_words = 1200 # Target size based on requirement
+    min_chunk_words = 600 # Minimum size based on requirement
+
+    if enable_enhanced_citations:
+        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+
+    try:
+        # --- CHANGE HERE: Open in binary mode ('rb') ---
+        # Let BeautifulSoup handle the decoding based on meta tags or detection
+        with open(temp_file_path, 'rb') as f:
+            # --- CHANGE HERE: Pass the file object directly to BeautifulSoup ---
+            soup = BeautifulSoup(f, 'lxml') # or 'html.parser' if lxml not installed
+
+        # TODO: Advanced Table Handling - (Comment remains valid)
+        # ...
+
+        # Now process the soup object as before
+        text_content = soup.get_text(separator=" ", strip=True)
+
+        # Remainder of the chunking logic stays the same...
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=target_chunk_words * 6, # Approximation
+            chunk_overlap=target_chunk_words * 0.1 * 6, # 10% overlap approx
+            length_function=len,
+            is_separator_regex=False,
+        )
+
+        initial_chunks = text_splitter.split_text(text_content)
+
+        # Post-processing: Merge small chunks
+        final_chunks = []
+        buffer_chunk = ""
+        for i, chunk in enumerate(initial_chunks):
+            current_chunk_text = buffer_chunk + chunk
+            current_word_count = estimate_word_count(current_chunk_text)
+
+            if current_word_count >= min_chunk_words or i == len(initial_chunks) - 1:
+                if current_chunk_text.strip():
+                    final_chunks.append(current_chunk_text)
+                buffer_chunk = "" # Reset buffer
+            else:
+                # Chunk is too small, add to buffer and continue to next chunk
+                buffer_chunk = current_chunk_text + " " # Add space between merged chunks
+
+        num_chunks_final = len(final_chunks)
+        update_callback(number_of_pages=num_chunks_final) # Use number_of_pages for chunk count
+
+        for idx, chunk_content in enumerate(final_chunks, start=1):
+            update_callback(
+                current_file_chunk=idx,
+                status=f"Saving chunk {idx}/{num_chunks_final}..."
             )
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            # Assuming jsonify is available in the context this runs
-            # return jsonify({'error': f'File exceeds maximum size of {max_file_size_bytes} bytes.'}), 400
-            print(f"Error: File {document_id} exceeds maximum size.") # Use print or logging if jsonify not available
-            return # Exit processing
+            save_chunks(
+                page_text_content=chunk_content,
+                page_number=idx,
+                file_name=original_filename,
+                user_id=user_id,
+                document_id=document_id
+            )
+            total_chunks_saved += 1
 
-        is_pdf = file_ext == '.pdf'
-        is_word = file_ext in ('.docx', '.doc')
-        is_ppt = file_ext in ('.pptx', '.ppt')
+    except Exception as e:
+        # Catch potential BeautifulSoup errors too
+        raise Exception(f"Failed processing HTML file {original_filename}: {e}")
 
+    return total_chunks_saved
+
+
+# --- Helper function to process Markdown files ---
+def process_md(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+    """Processes Markdown files."""
+    update_callback(status="Processing Markdown file...")
+    total_chunks_saved = 0
+    target_chunk_words = 1200 # Target size based on requirement
+    min_chunk_words = 600 # Minimum size based on requirement
+
+    if enable_enhanced_citations:
+        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+
+    try:
+        with open(temp_file_path, 'r', encoding='utf-8') as f:
+            md_content = f.read()
+
+        headers_to_split_on = [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+        ]
+
+        # Use MarkdownHeaderTextSplitter first
+        md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, return_each_line=False)
+        md_header_splits = md_splitter.split_text(md_content)
+
+        initial_chunks_content = [doc.page_content for doc in md_header_splits]
+
+        # TODO: Advanced Table/Code Block Handling:
+        # - Table header replication requires identifying markdown tables (`|---|`),
+        #   detecting splits, and injecting headers.
+        # - Code block wrapping requires detecting ``` blocks split across chunks and
+        #   adding start/end fences.
+        # This requires complex regex or stateful parsing during/after splitting.
+        # For now, we focus on the text splitting and minimum size merging.
+
+        # Post-processing: Merge small chunks based on word count
+        final_chunks = []
+        buffer_chunk = ""
+        for i, chunk_text in enumerate(initial_chunks_content):
+            current_chunk_text = buffer_chunk + chunk_text # Combine with buffer first
+            current_word_count = estimate_word_count(current_chunk_text)
+
+            # Merge if current chunk alone (without buffer) is too small, UNLESS it's the last one
+            # Or, more simply, accumulate until the buffer meets the minimum size
+            if current_word_count >= min_chunk_words or i == len(initial_chunks_content) - 1:
+                 # If the combined chunk meets min size OR it's the last chunk, save it
+                if current_chunk_text.strip():
+                     final_chunks.append(current_chunk_text)
+                buffer_chunk = "" # Reset buffer
+            else:
+                # Accumulate in buffer if below min size and not the last chunk
+                buffer_chunk = current_chunk_text + "\n\n" # Add separator when buffering
+
+        num_chunks_final = len(final_chunks)
+        update_callback(number_of_pages=num_chunks_final)
+
+        for idx, chunk_content in enumerate(final_chunks, start=1):
+            update_callback(
+                current_file_chunk=idx,
+                status=f"Saving chunk {idx}/{num_chunks_final}..."
+            )
+            save_chunks(
+                page_text_content=chunk_content, # Save the raw markdown chunk
+                page_number=idx,
+                file_name=original_filename,
+                user_id=user_id,
+                document_id=document_id
+            )
+            total_chunks_saved += 1
+
+    except Exception as e:
+        raise Exception(f"Failed processing Markdown file {original_filename}: {e}")
+
+    return total_chunks_saved
+
+
+# --- Helper function to process JSON files ---
+def process_json(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+    """Processes JSON files using RecursiveJsonSplitter."""
+    update_callback(status="Processing JSON file...")
+    total_chunks_saved = 0
+    # Reflects character count limit for the splitter
+    max_chunk_size_chars = 600 # As per original requirement
+
+    if enable_enhanced_citations:
+        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+
+    try:
+        # Load the JSON data first to ensure it's valid
+        try:
+            with open(temp_file_path, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+        except json.JSONDecodeError as e:
+             raise Exception(f"Invalid JSON structure in {original_filename}: {e}")
+        except Exception as e: # Catch other file reading errors
+             raise Exception(f"Error reading JSON file {original_filename}: {e}")
+
+        # Initialize the splitter - convert_lists does NOT go here
+        json_splitter = RecursiveJsonSplitter(max_chunk_size=max_chunk_size_chars)
+
+        # Perform the splitting using split_json
+        # --- CHANGE HERE: Add convert_lists=True to the splitting method call ---
+        # This tells the splitter to handle lists by converting them internally during splitting
+        final_json_chunks_structured = json_splitter.split_json(
+            json_data=json_data,
+            convert_lists=True # Use the feature here as per documentation
+        )
+
+        # Convert each structured chunk (which are dicts/lists) back into a JSON string for saving
+        # Using ensure_ascii=False is safer for preserving original characters if any non-ASCII exist
+        final_chunks_text = [json.dumps(chunk, ensure_ascii=False) for chunk in final_json_chunks_structured]
+
+        initial_chunk_count = len(final_chunks_text)
+        update_callback(number_of_pages=initial_chunk_count) # Initial estimate
+
+        for idx, chunk_content in enumerate(final_chunks_text, start=1):
+            # Skip potentially empty or trivial chunks (e.g., "{}" or "[]" or just "")
+            # Stripping allows checking for empty strings potentially generated
+            if not chunk_content or chunk_content == '""' or chunk_content == '{}' or chunk_content == '[]' or not chunk_content.strip('{}[]" '):
+                print(f"Skipping empty or trivial JSON chunk {idx}/{initial_chunk_count}")
+                continue # Skip saving this chunk
+
+            update_callback(
+                current_file_chunk=idx, # Use original index for progress display
+                # Keep number_of_pages as initial estimate during saving loop
+                status=f"Saving chunk {idx}/{initial_chunk_count}..."
+            )
+            save_chunks(
+                page_text_content=chunk_content, # Save the JSON string chunk
+                page_number=total_chunks_saved + 1, # Use sequential numbering for saved chunks
+                file_name=original_filename,
+                user_id=user_id,
+                document_id=document_id
+            )
+            total_chunks_saved += 1 # Increment only when a chunk is actually saved
+
+        # Final update with the actual number of chunks saved
+        if total_chunks_saved != initial_chunk_count:
+            update_callback(number_of_pages=total_chunks_saved)
+            print(f"Adjusted final chunk count from {initial_chunk_count} to {total_chunks_saved} after skipping empty chunks.")
+
+
+    except Exception as e:
+        # Catch errors during loading, splitting, or saving
+        # Avoid catching the specific JSONDecodeError again if already handled
+        if not isinstance(e, json.JSONDecodeError):
+             print(f"Error during JSON processing for {original_filename}: {type(e).__name__}: {e}")
+        # Re-raise wrapped exception for the main handler
+        raise Exception(f"Failed processing JSON file {original_filename}: {e}")
+
+    # Return the count of chunks actually saved
+    return total_chunks_saved
+
+
+# --- Helper function to process a single Tabular sheet (CSV or Excel tab) ---
+def process_single_tabular_sheet(df, document_id, user_id, effective_filename, update_callback):
+    """Chunks a pandas DataFrame from a CSV or Excel sheet."""
+    total_chunks_saved = 0
+    target_chunk_size_chars = 800 # Requirement: "800 size chunk" (assuming characters)
+
+    if df.empty:
+        print(f"Skipping empty sheet/file: {effective_filename}")
+        return 0
+
+    # Get header
+    header = df.columns.tolist()
+    header_string = ",".join(map(str, header)) + "\n" # CSV representation of header
+
+    # Prepare rows as strings (e.g., CSV format)
+    rows_as_strings = []
+    for _, row in df.iterrows():
+        # Convert row to string, handling potential NaNs and types
+        row_string = ",".join(map(lambda x: str(x) if pd.notna(x) else "", row.tolist())) + "\n"
+        rows_as_strings.append(row_string)
+
+    # Chunk rows based on character count
+    final_chunks_content = []
+    current_chunk_rows = []
+    current_chunk_char_count = 0
+
+    for row_str in rows_as_strings:
+        row_len = len(row_str)
+        # If adding the current row exceeds the limit AND the chunk already has content
+        if current_chunk_char_count + row_len > target_chunk_size_chars and current_chunk_rows:
+            # Finalize the current chunk
+            final_chunks_content.append("".join(current_chunk_rows))
+            # Start a new chunk with the current row
+            current_chunk_rows = [row_str]
+            current_chunk_char_count = row_len
+        else:
+            # Add row to the current chunk
+            current_chunk_rows.append(row_str)
+            current_chunk_char_count += row_len
+
+    # Add the last remaining chunk if it has content
+    if current_chunk_rows:
+        final_chunks_content.append("".join(current_chunk_rows))
+
+    num_chunks_final = len(final_chunks_content)
+    # Update total pages estimate once at the start of processing this sheet
+    # Note: This might overwrite previous updates if called multiple times for excel sheets.
+    # Consider accumulating page count in the caller if needed.
+    update_callback(number_of_pages=num_chunks_final)
+
+    # Save chunks, prepending the header to each
+    for idx, chunk_rows_content in enumerate(final_chunks_content, start=1):
+        # Prepend header - header length does not count towards chunk size limit
+        chunk_with_header = header_string + chunk_rows_content
+
+        update_callback(
+            current_file_chunk=idx,
+            status=f"Saving chunk {idx}/{num_chunks_final} from {effective_filename}..."
+        )
+        save_chunks(
+            page_text_content=chunk_with_header, # Save rows including header
+            page_number=idx, # Use chunk index as page number
+            file_name=effective_filename, # Use filename possibly including sheet name
+            user_id=user_id,
+            document_id=document_id
+        )
+        total_chunks_saved += 1
+
+    return total_chunks_saved
+
+
+# --- Helper function to process Tabular files (CSV, XLSX, XLS) ---
+def process_tabular(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback):
+    """Processes CSV, XLSX, or XLS files using pandas."""
+    update_callback(status=f"Processing Tabular file ({file_ext})...")
+    total_chunks_saved = 0
+
+    # Upload the original file once if enhanced citations are enabled
+    if enable_enhanced_citations:
+        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+
+    try:
+        if file_ext == '.csv':
+            # Process CSV
+             # Read CSV, attempt to infer header, keep data as string initially
+            df = pd.read_csv(temp_file_path, keep_default_na=False, dtype=str)
+            total_chunks_saved = process_single_tabular_sheet(
+                df, document_id, user_id, original_filename, update_callback
+            )
+        elif file_ext in ('.xlsx', '.xls'):
+            # Process Excel (potentially multiple sheets)
+            excel_file = pd.ExcelFile(temp_file_path, engine='openpyxl' if file_ext == '.xlsx' else 'xlrd')
+            sheet_names = excel_file.sheet_names
+            base_name, ext = os.path.splitext(original_filename)
+
+            accumulated_total_chunks = 0
+            for sheet_name in sheet_names:
+                 update_callback(status=f"Processing sheet '{sheet_name}'...")
+                 # Read specific sheet, get values (not formulas), keep data as string
+                 # Note: pandas typically reads values, not formulas by default.
+                 df = excel_file.parse(sheet_name, keep_default_na=False, dtype=str)
+
+                 # Create effective filename for this sheet
+                 effective_filename = f"{base_name}-{sheet_name}{ext}" if len(sheet_names) > 1 else original_filename
+
+                 chunks_from_sheet = process_single_tabular_sheet(
+                     df, document_id, user_id, effective_filename, update_callback
+                 )
+                 accumulated_total_chunks += chunks_from_sheet
+            total_chunks_saved = accumulated_total_chunks # Total across all sheets
+
+
+    except pd.errors.EmptyDataError:
+        print(f"Warning: Tabular file or sheet is empty: {original_filename}")
+        update_callback(status=f"Warning: File/sheet is empty - {original_filename}", number_of_pages=0)
+    except Exception as e:
+        raise Exception(f"Failed processing Tabular file {original_filename}: {e}")
+
+    return total_chunks_saved
+
+
+# --- Helper function for DI-supported types (PDF, DOCX, PPT, Image) ---
+# This function encapsulates the original logic for these file types
+def process_di_document(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback):
+    """Processes documents supported by Azure Document Intelligence (PDF, Word, PPT, Image)."""
+    # --- Extracted Metadata logic ---
+    doc_title, doc_author, doc_subject, doc_keywords = '', '', None, None
+    doc_authors_list = []
+    page_count = 0 # For PDF pre-check
+
+    is_pdf = file_ext == '.pdf'
+    is_word = file_ext in ('.docx', '.doc')
+    is_ppt = file_ext in ('.pptx', '.ppt')
+    is_image = file_ext in ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif')
+
+    try:
         if is_pdf:
-            update_document(document_id=document_id, user_id=user_id, status=f"Processing PDF file...")
             doc_title, doc_author, doc_subject, doc_keywords = extract_pdf_metadata(temp_file_path)
             doc_authors_list = parse_authors(doc_author)
-            page_count = get_pdf_page_count(temp_file_path) # Get PDF page count early
+            page_count = get_pdf_page_count(temp_file_path)
         elif is_word:
-            update_document(document_id=document_id, user_id=user_id, status=f"Processing Word file...")
             doc_title, doc_author = extract_docx_metadata(temp_file_path)
             doc_authors_list = parse_authors(doc_author)
-            # page_count remains 0, Word page count isn't reliable pre-DI
-        elif is_ppt: # <-- ADDED PPT block
-            update_document(document_id=document_id, user_id=user_id, status=f"Processing PowerPoint file...")
-        
-            # page_count remains 0, Word page count isn't reliable pre-DI
+        # PPT and Image metadata extraction might be added here if needed/possible
 
-        # Update cosmos doc with known metadata (if found)
-        update_fields = {}
+        update_fields = {'status': "Extracted initial metadata"}
         if doc_title: update_fields['title'] = doc_title
-        # Use authors_list if available and parsed, otherwise fallback to raw string
         if doc_authors_list: update_fields['authors'] = doc_authors_list
-        elif doc_author: update_fields['authors'] = [doc_author] # Store as list even if single string found
-        if doc_subject: update_fields['abstract'] = doc_subject # Assuming subject maps to abstract
-        if doc_keywords: update_fields['keywords'] = doc_keywords # Handle parsing if needed
-        if update_fields:
-            update_fields['status'] = "Extracted initial metadata"
-            update_document(document_id=document_id, user_id=user_id, **update_fields)
-
-        # --- 2. Determine File Chunking Strategy (PDF only) & Enhanced Citations ---
-        file_paths_to_process = [temp_file_path] # Default: process the single uploaded file
-        needs_pdf_file_chunking = False
-        use_enhanced_citations = False # Default
-
-        # Check if DI processing is applicable (PDF, Word, PPT)
-        if is_pdf or is_word or is_ppt:
-            if not enable_enhanced_citations:
-                # Non-enhanced mode: Check DI size limit. Page limit mainly for PDF pre-check.
-                if file_size > di_limit_bytes:
-                     raise ValueError(f"File size ({file_size} bytes) exceeds Document Intelligence limit ({di_limit_bytes} bytes) for non-enhanced mode.")
-                if is_pdf and page_count > di_page_limit:
-                     raise ValueError(f"PDF page count ({page_count}) exceeds Document Intelligence limit ({di_page_limit}) for non-enhanced mode.")
-                # No file-level chunking needed here. DI handles the single file.
-                use_enhanced_citations = False
-                update_document(document_id=document_id, user_id=user_id, enhanced_citations=False, status="Enhanced citations disabled")
-
-            else:
-                # Enhanced citations mode enabled globally - applies to PDF and PPT for blob storage link
-                if is_pdf or is_ppt:
-                    use_enhanced_citations = True
-                    update_document(document_id=document_id, user_id=user_id, enhanced_citations=True, status=f"Enhanced citations enabled for {file_ext}")
-                    # Check if PDF needs *file-level* chunking before DI call due to strict limits
-                    if is_pdf and (file_size > di_limit_bytes or page_count > di_page_limit):
-                        needs_pdf_file_chunking = True
-                elif is_word:
-                    # Word files currently don't use the blob storage link part of enhanced citations in this flow
-                    use_enhanced_citations = False # Keep it False for Word specific logic downstream if needed
-                    update_document(document_id=document_id, user_id=user_id, enhanced_citations=False, status="Enhanced citations (blob link) not used for Word files")
-                    # Check Word file size against DI limit
-                    if file_size > di_limit_bytes:
-                         raise ValueError(f"Word file size ({file_size} bytes) exceeds Document Intelligence limit ({di_limit_bytes} bytes).")
-
-                # Perform PDF file chunking if needed (only for PDF)
-                if needs_pdf_file_chunking:
-                    try:
-                        update_document(document_id=document_id, user_id=user_id, status="Chunking large PDF file...")
-                        # Adjust max_pages as needed, ensure it respects DI limits comfortably
-                        pdf_chunk_max_pages = di_page_limit // 4 if di_page_limit > 4 else 500 # Example: chunk into 500-page segments
-                        file_paths_to_process = chunk_pdf(temp_file_path, max_pages=pdf_chunk_max_pages)
-
-                        if not file_paths_to_process: # Handle chunking failure
-                             raise Exception("PDF chunking failed to produce output files.")
-                        # Clean up the original large PDF if chunking was successful
-                        if os.path.exists(temp_file_path):
-                            os.remove(temp_file_path)
-                        print(f"Successfully chunked large PDF into {len(file_paths_to_process)} files.")
-                    except Exception as e:
-                        raise Exception(f"Failed to chunk PDF file: {str(e)}")
-
-
-
-            # Update doc with the number of *file* chunks being processed
-            num_file_chunks = len(file_paths_to_process)
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                num_file_chunks=num_file_chunks,
-                status=f"Processing {original_filename} in {num_file_chunks} file chunk(s)"
-            )
-
-            # --- 3. Process Each File Chunk (usually just one unless PDF was chunked) ---
-            total_final_chunks_processed = 0 # Track total final chunks (pages/slides/word-chunks) across file parts
-            for idx, chunk_path in enumerate(file_paths_to_process, start=1):
-                chunk_base_name, chunk_ext_loop = os.path.splitext(original_filename)
-                # Use original filename for metadata/search unless it's a chunked PDF part
-                chunk_effective_filename = original_filename
-                if num_file_chunks > 1:
-                    # Create a filename reflecting the chunk index for chunked PDFs
-                    chunk_effective_filename = f"{chunk_base_name}_chunk_{idx}{chunk_ext_loop}"
-                    print(f"Processing PDF chunk {idx}/{num_file_chunks}: {chunk_effective_filename}")
-                else:
-                     print(f"Processing file: {chunk_effective_filename}")
-
-
-                update_document(
-                    document_id=document_id, # Update main doc status
-                    user_id=user_id,
-                    status=f"Processing file chunk {idx}/{num_file_chunks}: {chunk_effective_filename}"
-                )
-
-
-                # --- 3a. Upload to Blob for Enhanced Citations (PDF and PPT only) ---
-                # Upload the *original* or *chunked PDF part* to blob storage
-                if use_enhanced_citations and (is_pdf or is_ppt):
-                    try:
-                        # Use the effective filename for the blob path to match chunk if needed
-                        blob_path = f"{user_id}/{chunk_effective_filename}"
-                        blob_service_client = CLIENTS.get("office_docs_client")
-                        if not blob_service_client:
-                             raise Exception("Blob service client not available/configured.")
-
-                        blob_client = blob_service_client.get_blob_client(
-                            container=user_documents_container_name, # Ensure this is defined in config
-                            blob=blob_path
-                        )
-                        # Metadata for linking blob back to document
-                        blob_metadata = {"user_id": str(user_id), "document_id": str(document_id)}
-                        update_document(document_id=document_id, user_id=user_id, status=f"Uploading {chunk_effective_filename} to Blob Storage...")
-                        with open(chunk_path, "rb") as f:
-                            blob_client.upload_blob(f, overwrite=True, metadata=blob_metadata)
-                        print(f"Successfully uploaded {chunk_effective_filename} to blob storage at {blob_path}")
-                    except Exception as e:
-                        # Log error, decide if it's critical (e.g., network issue vs config issue)
-                        raise Exception(f"Error uploading {chunk_effective_filename} to Blob Storage: {str(e)}")
-
-                # --- 3b. Send chunk to Azure DI ---
-                update_document(document_id=document_id, user_id=user_id, status=f"Sending {chunk_effective_filename} to Azure Document Intelligence...")
-                di_extracted_pages = [] # Initialize
-                try:
-                    # extract_content_with_azure_di should handle PDF, DOCX, PPTX, PPT
-                    # It should return a list of page-like objects, e.g., [{"page_number": 1, "content": "..."}, ...]
-                    # For PPTX/PPT, page_number corresponds to slide number.
-                    di_extracted_pages = extract_content_with_azure_di(document_id=document_id, user_id=user_id, file_path=chunk_path)
-
-                    if not di_extracted_pages:
-                         # Log a warning, might not be an error if file is empty/unsupported by DI model
-                         print(f"Warning: Azure DI returned no content for {chunk_effective_filename}.")
-                         # Update status to reflect no content found for this chunk/file
-                         update_document(
-                            document_id=document_id,
-                            user_id=user_id,
-                            status=f"Azure DI found no content in {chunk_effective_filename}."
-                         )
-                         # Decide whether to continue to next file chunk (if any) or stop
-                         # For now, let's continue if there are more file chunks
-                         # If this was the only file chunk, the process will end with 0 pages.
-
-                    num_di_pages = len(di_extracted_pages)
-                    update_document(
-                        document_id=document_id,
-                        user_id=user_id,
-                        # Store the number of pages/slides/sections DI found for this chunk
-                        # If multiple file chunks, this gets overwritten; final count updated later.
-                        number_of_pages=num_di_pages, # Temporary update for progress calculation
-                        status=f"Received {num_di_pages} pages/slides from Azure DI for {chunk_effective_filename}."
-                    )
-                except Exception as e:
-                    raise Exception(f"Error extracting content from {chunk_effective_filename} with Azure DI: {str(e)}")
-
-                 # --- 3c. Content Chunking Strategy (Word needs specific chunking, PDF/PPT use DI pages directly) ---
-                final_chunks_to_save = []
-                if is_word:
-                    update_document(document_id=document_id, user_id=user_id, status=f"Chunking Word content from {chunk_effective_filename}...")
-                    try:
-                        # Use the function to chunk the DI output based on word count or paragraphs
-                        # Ensure chunk_word_file_into_pages exists and handles the DI output format
-                        final_chunks_to_save = chunk_word_file_into_pages(document_id=document_id, user_id=user_id, di_pages=di_extracted_pages)
-
-                        num_final_chunks = len(final_chunks_to_save)
-                        # Update number_of_pages to reflect the *final* number of chunks for Word
-                        update_document(document_id=document_id, user_id=user_id, number_of_pages=num_final_chunks, status=f"Created {num_final_chunks} content chunks for {chunk_effective_filename}.")
-                    except Exception as e:
-                         raise Exception(f"Error chunking Word content for {chunk_effective_filename}: {str(e)}")
-                elif is_pdf or is_ppt:
-                    # For PDFs and PPTs, the pages/slides returned by DI are the final chunks
-                    final_chunks_to_save = di_extracted_pages
-                    # number_of_pages was already updated based on DI output count
-
-
-                # --- 3d. Save Final Chunks to Search Index ---
-                num_final_chunks = len(final_chunks_to_save)
-                if not final_chunks_to_save:
-                    print(f"Warning: No final content chunks to save for {chunk_effective_filename}.")
-                    # Update status if desired
-                    update_document(document_id=document_id, user_id=user_id, status=f"No content chunks generated for {chunk_effective_filename}.")
-                    # Clean up the processed chunk file and continue to the next file chunk (if any)
-                    if chunk_path != temp_file_path and os.path.exists(chunk_path):
-                        os.remove(chunk_path)
-                    continue # Move to the next file chunk
-
-                update_document(document_id=document_id, user_id=user_id, status=f"Saving {num_final_chunks} content chunks for {chunk_effective_filename}...")
-                try:
-                    for i, chunk_data in enumerate(final_chunks_to_save):
-                        # Get page number (or chunk index for Word) and content
-                        # DI provides 'page_number' (1-based index)
-                        # Word chunking function should also provide a similar index, assumed 'page_number' here
-                        chunk_index = chunk_data.get("page_number", i + 1) # Default to 1-based index if missing
-                        chunk_content = chunk_data.get("content", "")
-
-                        if not chunk_content.strip():
-                            print(f"Skipping empty page {chunk_index} for {chunk_effective_filename}.")
-                            continue # Don't save empty chunks
-
-                        # Update status reflecting the final chunk saving progress
-                        update_document(
-                            document_id=document_id, # Main doc ID
-                            user_id=user_id,
-                            current_file_chunk=int(chunk_index), # Track page/chunk index being saved
-                            number_of_pages=num_final_chunks, # Ensure total count is known for percentage calc
-                            status=f"Saving page {chunk_index}/{num_final_chunks} of {chunk_effective_filename}..."
-                        )
-
-                        save_chunks(
-                            page_text_content=chunk_content,
-                            page_number=chunk_index, # Logical page/slide/chunk number
-                            file_name=chunk_effective_filename, # Filename associated with this chunk/page
-                            user_id=user_id,
-                            document_id=document_id # Use main document ID
-                        )
-                        total_final_chunks_processed += 1 # Increment total count across all file chunks
-
-                    print(f"Saved {num_final_chunks} content chunks from {chunk_effective_filename}.")
-                    # Status update after loop might be redundant due to percentage calculation,
-                    # but can be useful for logging.
-                    # update_document(
-                    #     document_id=document_id, user_id=user_id,
-                    #     status=f"Completed saving chunks for {chunk_effective_filename}."
-                    # )
-
-                except Exception as e:
-                    # Identify which chunk failed if possible
-                    raise Exception(f"Error saving extracted content chunk {chunk_index} for {chunk_effective_filename}: {str(e)}")
-
-
-                # --- 3e. Clean up local file chunk ---
-                # Clean up the local file chunk if it's not the original temp file (i.e., if PDF was chunked)
-                if chunk_path != temp_file_path and os.path.exists(chunk_path):
-                    try:
-                        os.remove(chunk_path)
-                        print(f"Cleaned up temporary chunk file: {chunk_path}")
-                    except Exception as cleanup_e:
-                        print(f"Warning: Failed to clean up temp chunk file {chunk_path}: {cleanup_e}")
-
-            # --- 4. Final Metadata Extraction (Optional) ---
-            if enable_extract_meta_data and (is_pdf or is_word):
-                try:
-                    update_document(document_id=document_id, user_id=user_id, status="Extracting final metadata...")
-                    # This function likely aggregates info from the saved chunks/pages
-                    document_metadata = extract_document_metadata(document_id, user_id)
-
-                    # Update document with aggregated/extracted metadata
-                    update_fields = {k: v for k, v in document_metadata.items() if v is not None}
-                    if update_fields:
-                         update_document(document_id=document_id, user_id=user_id, **update_fields)
-
-                except Exception as e:
-                    # Log this error but don't necessarily fail the whole process
-                    print(f"Warning: Error extracting final metadata for {document_id}: {str(e)}")
-                    update_document(document_id=document_id, user_id=user_id, status=f"Processing complete (metadata extraction warning: {str(e)})")
-
-
-            # --- 5. Mark Processing Complete ---
-            # Update final total page/chunk count for the document in Cosmos
-            update_document(
-                 document_id=document_id,
-                 user_id=user_id,
-                 number_of_pages=total_final_chunks_processed, # Final count of saved chunks
-                 status="Processing complete",
-                 percentage_complete=100 # Explicitly set to 100
-             )
-
-            # Original temp file should have been removed already if PDF chunking occurred,
-            # but double-check and remove if it still exists (e.g., if no chunking happened)
-            if temp_file_path and os.path.exists(temp_file_path):
-                 try:
-                     os.remove(temp_file_path)
-                     print(f"Cleaned up original temporary file: {temp_file_path}")
-                 except Exception as cleanup_e:
-                     print(f"Warning: Failed to clean up original temp file {temp_file_path}: {cleanup_e}")
-
-
-            print(f"Document {document_id} ({original_filename}) processed successfully with {total_final_chunks_processed} chunks.")
-            # Background task doesn't return JSON, just finishes.
-            return # Success
-
-
-         # --- Handle Other File Types (Example stubs) ---
-        elif file_ext == '.txt':
-            # Add specific TXT processing logic here if needed
-            # Example: read text, maybe split into chunks, save_chunks
-            update_document(document_id=document_id, user_id=user_id, status="Processing TXT file...")
-            # ... TXT specific logic ...
-            update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
-            if os.path.exists(temp_file_path): os.remove(temp_file_path)
-            print(f"TXT Document {document_id} processed.")
-            return
-
-        elif file_ext == '.md':
-             # Add specific MD processing logic here if needed
-             update_document(document_id=document_id, user_id=user_id, status="Processing MD file...")
-             # ... MD specific logic ...
-             update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
-             if os.path.exists(temp_file_path): os.remove(temp_file_path)
-             print(f"MD Document {document_id} processed.")
-             return
-
-        elif file_ext == '.json':
-             # Add specific JSON processing logic here if needed
-             update_document(document_id=document_id, user_id=user_id, status="Processing JSON file...")
-             # ... JSON specific logic ...
-             update_document(document_id=document_id, user_id=user_id, status="Processing complete", percentage_complete=100)
-             if os.path.exists(temp_file_path): os.remove(temp_file_path)
-             print(f"JSON Document {document_id} processed.")
-             return
-
-        else:
-            # Unsupported file type for this processing pipeline
-            raise ValueError(f"Unsupported file type: {file_ext}")
-
+        elif doc_author: update_fields['authors'] = [doc_author]
+        if doc_subject: update_fields['abstract'] = doc_subject
+        if doc_keywords: update_fields['keywords'] = doc_keywords
+        update_callback(**update_fields)
 
     except Exception as e:
-        # General catch-all for unexpected errors during the process
+        print(f"Warning: Failed to extract initial metadata for {original_filename}: {e}")
+        # Continue processing even if metadata fails
+
+    # --- DI Processing Logic ---
+    settings = get_settings() # Assuming get_settings is accessible
+    di_limit_bytes = 500 * 1024 * 1024
+    di_page_limit = 2000
+    file_size = os.path.getsize(temp_file_path)
+
+    file_paths_to_process = [temp_file_path]
+    needs_pdf_file_chunking = False
+    use_enhanced_citations_di = False # Specific flag for DI types
+
+    if enable_enhanced_citations:
+        # Enhanced citations involve blob link for PDF, PPT, Word, Image in this flow
+        use_enhanced_citations_di = True
+        update_callback(enhanced_citations=True, status=f"Enhanced citations enabled for {file_ext}")
+        # Check if PDF needs *file-level* chunking before DI/Upload
+        if is_pdf and (file_size > di_limit_bytes or (page_count > 0 and page_count > di_page_limit)):
+            needs_pdf_file_chunking = True
+    else:
+        update_callback(enhanced_citations=False, status="Enhanced citations disabled")
+
+    if needs_pdf_file_chunking:
+        try:
+            update_callback(status="Chunking large PDF file...")
+            pdf_chunk_max_pages = di_page_limit // 4 if di_page_limit > 4 else 500
+            file_paths_to_process = chunk_pdf(temp_file_path, max_pages=pdf_chunk_max_pages)
+            if not file_paths_to_process:
+                raise Exception("PDF chunking failed to produce output files.")
+            if os.path.exists(temp_file_path): os.remove(temp_file_path) # Remove original large PDF
+            print(f"Successfully chunked large PDF into {len(file_paths_to_process)} files.")
+        except Exception as e:
+            raise Exception(f"Failed to chunk PDF file: {str(e)}")
+
+    num_file_chunks = len(file_paths_to_process)
+    update_callback(num_file_chunks=num_file_chunks, status=f"Processing {original_filename} in {num_file_chunks} file chunk(s)")
+
+    total_final_chunks_processed = 0
+    for idx, chunk_path in enumerate(file_paths_to_process, start=1):
+        chunk_base_name, chunk_ext_loop = os.path.splitext(original_filename)
+        chunk_effective_filename = original_filename
+        if num_file_chunks > 1:
+            chunk_effective_filename = f"{chunk_base_name}_chunk_{idx}{chunk_ext_loop}"
+        print(f"Processing DI file chunk {idx}/{num_file_chunks}: {chunk_effective_filename}")
+
+        update_callback(status=f"Processing file chunk {idx}/{num_file_chunks}: {chunk_effective_filename}")
+
+        # Upload to Blob (if enhanced citations enabled for these types)
+        if use_enhanced_citations_di:
+            upload_to_blob(chunk_path, user_id, document_id, chunk_effective_filename, update_callback)
+
+        # Send chunk to Azure DI
+        update_callback(status=f"Sending {chunk_effective_filename} to Azure Document Intelligence...")
+        di_extracted_pages = []
+        try:
+            di_extracted_pages = extract_content_with_azure_di(document_id=document_id, user_id=user_id, file_path=chunk_path)
+            num_di_pages = len(di_extracted_pages)
+            conceptual_pages = num_di_pages if not is_image else 1 # Image is one conceptual item
+
+            if not di_extracted_pages and not is_image:
+                print(f"Warning: Azure DI returned no content pages for {chunk_effective_filename}.")
+                status_msg = f"Azure DI found no content in {chunk_effective_filename}."
+                # Update page count to 0 if nothing found, otherwise keep previous estimate or conceptual count
+                update_callback(number_of_pages=0 if idx == num_file_chunks else conceptual_pages, status=status_msg)
+            elif not di_extracted_pages and is_image:
+                print(f"Info: Azure DI processed image {chunk_effective_filename}, but extracted no text.")
+                update_callback(number_of_pages=conceptual_pages, status=f"Processed image {chunk_effective_filename} (no text found).")
+            else:
+                 update_callback(number_of_pages=conceptual_pages, status=f"Received {num_di_pages} content page(s)/slide(s) from Azure DI for {chunk_effective_filename}.")
+
+        except Exception as e:
+            raise Exception(f"Error extracting content from {chunk_effective_filename} with Azure DI: {str(e)}")
+
+        # Content Chunking Strategy (Word needs specific handling)
+        final_chunks_to_save = []
+        if is_word:
+            update_callback(status=f"Chunking Word content from {chunk_effective_filename}...")
+            try:
+                final_chunks_to_save = chunk_word_file_into_pages(document_id=document_id, user_id=user_id, di_pages=di_extracted_pages)
+                num_final_chunks = len(final_chunks_to_save)
+                # Update number_of_pages again for Word to reflect final chunk count
+                update_callback(number_of_pages=num_final_chunks, status=f"Created {num_final_chunks} content chunks for {chunk_effective_filename}.")
+            except Exception as e:
+                 raise Exception(f"Error chunking Word content for {chunk_effective_filename}: {str(e)}")
+        elif is_pdf or is_ppt:
+            final_chunks_to_save = di_extracted_pages # Use DI pages/slides directly
+        elif is_image:
+            if di_extracted_pages:
+                 if 'page_number' not in di_extracted_pages[0]: di_extracted_pages[0]['page_number'] = 1
+                 final_chunks_to_save = di_extracted_pages
+            else: final_chunks_to_save = [] # No text extracted
+
+        # Save Final Chunks to Search Index
+        num_final_chunks = len(final_chunks_to_save)
+        if not final_chunks_to_save:
+            print(f"Info: No final content chunks to save for {chunk_effective_filename}.")
+        else:
+            update_callback(status=f"Saving {num_final_chunks} content chunk(s) for {chunk_effective_filename}...")
+            doc_metadata_temp = get_document_metadata(document_id, user_id) # Get latest count for progress
+            estimated_total_items = doc_metadata_temp.get('number_of_pages', num_final_chunks) if doc_metadata_temp else num_final_chunks
+
+            try:
+                for i, chunk_data in enumerate(final_chunks_to_save):
+                    chunk_index = chunk_data.get("page_number", i + 1) # Ensure page number exists
+                    chunk_content = chunk_data.get("content", "")
+
+                    if not chunk_content.strip():
+                        print(f"Skipping empty chunk index {chunk_index} for {chunk_effective_filename}.")
+                        continue
+
+                    update_callback(
+                        current_file_chunk=int(chunk_index),
+                        number_of_pages=estimated_total_items,
+                        status=f"Saving page/chunk {chunk_index}/{estimated_total_items} of {chunk_effective_filename}..."
+                    )
+                    save_chunks(
+                        page_text_content=chunk_content,
+                        page_number=chunk_index,
+                        file_name=chunk_effective_filename,
+                        user_id=user_id,
+                        document_id=document_id
+                    )
+                    total_final_chunks_processed += 1
+                print(f"Saved {num_final_chunks} content chunk(s) from {chunk_effective_filename}.")
+            except Exception as e:
+                raise Exception(f"Error saving extracted content chunk index {chunk_index} for {chunk_effective_filename}: {str(e)}")
+
+        # Clean up local file chunk (if it's not the original temp file)
+        if chunk_path != temp_file_path and os.path.exists(chunk_path):
+            try:
+                os.remove(chunk_path)
+                print(f"Cleaned up temporary chunk file: {chunk_path}")
+            except Exception as cleanup_e:
+                print(f"Warning: Failed to clean up temp chunk file {chunk_path}: {cleanup_e}")
+
+    # --- Final Metadata Extraction (Optional, moved outside loop) ---
+    settings = get_settings() # Re-get in case it changed? Or pass it down.
+    enable_extract_meta_data = settings.get('enable_extract_meta_data')
+    if enable_extract_meta_data and total_final_chunks_processed > 0:
+        try:
+            update_callback(status="Extracting final metadata...")
+            document_metadata = extract_document_metadata(document_id, user_id)
+            update_fields = {k: v for k, v in document_metadata.items() if v is not None and v != ""}
+            if update_fields:
+                 update_fields['status'] = "Final metadata extracted"
+                 update_callback(**update_fields)
+            else:
+                 update_callback(status="Final metadata extraction yielded no new info")
+        except Exception as e:
+            print(f"Warning: Error extracting final metadata for {document_id}: {str(e)}")
+            # Don't fail the whole process, just update status
+            update_callback(status=f"Processing complete (metadata extraction warning)")
+
+    return total_final_chunks_processed
+
+def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
+    """
+    Main background task dispatcher for document processing.
+    Handles various file types with specific chunking and processing logic.
+    Integrates enhanced citations (blob upload) for all supported types.
+    """
+    settings = get_settings()
+    enable_enhanced_citations = settings.get('enable_enhanced_citations', False) # Default to False if missing
+    enable_extract_meta_data = settings.get('enable_extract_meta_data', False) # Used by DI flow
+    max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
+
+    # --- Define update_document callback wrapper ---
+    # This makes it easier to pass the update function to helpers without repeating args
+    def update_doc_callback(**kwargs):
+        update_document(document_id=document_id, user_id=user_id, **kwargs)
+
+    total_chunks_saved = 0
+    file_ext = '' # Initialize
+
+    try:
+        # --- 0. Initial Setup & Validation ---
+        if not temp_file_path or not os.path.exists(temp_file_path):
+             raise FileNotFoundError(f"Temporary file path not found or invalid: {temp_file_path}")
+
+        file_ext = os.path.splitext(original_filename)[-1].lower()
+        if not file_ext:
+            raise ValueError("Could not determine file extension from original filename.")
+
+        if not allowed_file(original_filename): # Assuming allowed_file checks the extension
+             raise ValueError(f"File type {file_ext} is not allowed.")
+
+        file_size = os.path.getsize(temp_file_path)
+        if file_size > max_file_size_bytes:
+            raise ValueError(f"File exceeds maximum allowed size ({max_file_size_bytes / (1024*1024):.1f} MB).")
+
+        update_doc_callback(status=f"Processing file {original_filename}, type: {file_ext}")
+
+        # --- 1. Dispatch to appropriate handler based on file type ---
+        di_supported_extensions = ('.pdf', '.docx', '.doc', '.pptx', '.ppt', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif')
+        tabular_extensions = ('.csv', '.xlsx', '.xls')
+
+        if file_ext == '.txt':
+            total_chunks_saved = process_txt(
+                document_id, user_id, temp_file_path, original_filename,
+                enable_enhanced_citations, update_doc_callback
+            )
+        elif file_ext == '.html':
+             total_chunks_saved = process_html(
+                 document_id, user_id, temp_file_path, original_filename,
+                 enable_enhanced_citations, update_doc_callback
+            )
+        elif file_ext == '.md':
+             total_chunks_saved = process_md(
+                 document_id, user_id, temp_file_path, original_filename,
+                 enable_enhanced_citations, update_doc_callback
+             )
+        elif file_ext == '.json':
+            total_chunks_saved = process_json(
+                 document_id, user_id, temp_file_path, original_filename,
+                 enable_enhanced_citations, update_doc_callback
+             )
+        elif file_ext in tabular_extensions:
+            total_chunks_saved = process_tabular(
+                document_id, user_id, temp_file_path, original_filename, file_ext,
+                enable_enhanced_citations, update_doc_callback
+            )
+        elif file_ext in di_supported_extensions:
+            # Use the dedicated handler for DI types (which includes metadata, DI call, etc.)
+            total_chunks_saved = process_di_document(
+                document_id, user_id, temp_file_path, original_filename, file_ext,
+                enable_enhanced_citations, update_doc_callback
+            )
+        else:
+            # This case should technically be caught by allowed_file, but good to have fallback
+            raise ValueError(f"Unsupported file type for processing: {file_ext}")
+
+
+        # --- 2. Final Status Update ---
+        final_status = "Processing complete"
+        if total_chunks_saved == 0:
+             # Provide more specific status if no chunks were saved
+             if file_ext in ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif'):
+                 final_status = "Processing complete - no text found in image"
+             elif file_ext in tabular_extensions:
+                 final_status = "Processing complete - no data rows found or file empty"
+             else:
+                 final_status = "Processing complete - no content indexed"
+
+        # Final update uses the total chunks saved across all steps/sheets
+        # For DI types, number_of_pages might have been updated during DI processing,
+        # but let's ensure the final update reflects the *saved* chunk count accurately.
+        update_doc_callback(
+             number_of_pages=total_chunks_saved, # Final count of SAVED chunks
+             status=final_status,
+             percentage_complete=100,
+             current_file_chunk=None # Clear current chunk tracking
+         )
+
+        print(f"Document {document_id} ({original_filename}) processed successfully with {total_chunks_saved} chunks saved.")
+
+    except Exception as e:
         error_msg = f"Processing failed: {str(e)}"
         print(f"Error processing {document_id} ({original_filename}): {error_msg}")
-        # Attempt to update status to error
+        # Attempt to update status to Error
         try:
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                status=f"Error: {error_msg[:200]}" # Truncate long errors
-                # Percentage will be handled by calculate_processing_percentage based on 'error' status
+            update_doc_callback(
+                status=f"Error: {error_msg[:250]}", # Limit error message length
+                percentage_complete=0 # Indicate failure
             )
         except Exception as update_e:
             print(f"Critical Error: Failed to update document status to error for {document_id}: {update_e}")
 
-        # Clean up the main temp file if it still exists
+    finally:
+        # --- 3. Cleanup ---
+        # Clean up the original temporary file path regardless of success or failure
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.remove(temp_file_path)
-                print(f"Cleaned up temp file after error: {temp_file_path}")
+                print(f"Cleaned up original temporary file: {temp_file_path}")
             except Exception as cleanup_e:
-                 print(f"Error: Failed to clean up temp file {temp_file_path} after error: {cleanup_e}")
-        # Clean up any chunk files if they exist (might be harder to track here)
-        # Consider adding cleanup logic within the chunking function's error handling
+                 print(f"Warning: Failed to clean up original temp file {temp_file_path}: {cleanup_e}")
 
-        # Background task doesn't return JSON, just logs and finishes.
-        return # Exit on error
+    # Return value is typically not used by Flask-Executor, but can be helpful for direct calls/testing
+    # return total_chunks_saved # Or None/True/False depending on convention
