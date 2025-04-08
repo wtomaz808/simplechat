@@ -159,7 +159,7 @@ if (docMetadataForm && docMetadataModalEl) { // Check both exist
 
         // Add classification if enabled AND selected (handle 'none' value)
         // Use the window flag to check if classification is enabled
-        if (window.enable_document_classification === true) {
+        if (window.enable_document_classification === true || window.enable_document_classification === "true") {
             const classificationSelect = document.getElementById("doc-classification");
             let selectedClassification = classificationSelect?.value || null;
             // Treat 'none' selection as null/empty on the backend
@@ -412,8 +412,8 @@ function renderDocumentRow(doc) {
         detailsRow.style.display = "none"; // Initially hidden
 
         let classificationDisplayHTML = '';
-        // Check window flag before rendering classification
-        if (window.enable_document_classification === true) {
+        // Check window flag before rendering classification - CORRECTED CHECK
+        if (window.enable_document_classification === true || window.enable_document_classification === "true") {
                 classificationDisplayHTML += `<p class="mb-1"><strong>Classification:</strong> `;
                 const currentLabel = doc.document_classification || null; // Treat empty string or null as no classification
                 const categories = window.classification_categories || [];
@@ -450,8 +450,8 @@ function renderDocumentRow(doc) {
                          </button>
         `;
 
-        // Check window flag before rendering extract button
-        if (window.enable_extract_meta_data === true) {
+        // Check window flag before rendering extract button - CORRECTED CHECK
+        if (window.enable_extract_meta_data === true || window.enable_extract_meta_data === "true") {
             detailsHtml += `
                 <button class="btn btn-sm btn-warning" onclick="window.onExtractMetadata('${docId}', event)" title="Re-run Metadata Extraction">
                     <i class="bi bi-magic"></i> Extract Metadata
@@ -726,8 +726,8 @@ window.onEditDocument = function(docId) {
             if (docPubDateInput) docPubDateInput.value = doc.publication_date || "";
             if (docAuthorsInput) docAuthorsInput.value = Array.isArray(doc.authors) ? doc.authors.join(", ") : (doc.authors || "");
 
-            // Handle classification dropdown visibility and value based on the window flag
-            if (window.enable_document_classification === true && classificationSelect) {
+            // Handle classification dropdown visibility and value based on the window flag - CORRECTED CHECK
+            if ((window.enable_document_classification === true || window.enable_document_classification === "true") && classificationSelect) {
                  // Set value to 'none' if classification is null/empty/undefined, otherwise set to the label
                  const currentClassification = doc.document_classification || 'none';
                  classificationSelect.value = currentClassification;
@@ -752,8 +752,8 @@ window.onEditDocument = function(docId) {
 
 
 window.onExtractMetadata = function (docId, event) {
-    // Check window flag
-    if (window.enable_extract_meta_data !== true) {
+    // Check window flag - CORRECTED CHECK
+    if (!(window.enable_extract_meta_data === true || window.enable_extract_meta_data === "true")) {
         alert("Metadata extraction is not enabled."); return;
     }
     if (!confirm("Run metadata extraction for this document? This may overwrite existing metadata.")) return;

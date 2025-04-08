@@ -17,8 +17,8 @@ def register_route_backend_feedback(app):
           JSON body: { messageId, conversationId, feedbackType, reason }
         """
         data = request.get_json()
-        messageId = data.get("messageId")
-        conversationId = data.get("conversationId")
+        messageId = data.get("messageId")          # This is the ID of the specific AI message
+        conversationId = data.get("conversationId") # This is the ID of the conversation
         feedbackType = data.get("feedbackType")
         reason = data.get("reason", "")
         user_id = None
@@ -28,52 +28,91 @@ def register_route_backend_feedback(app):
         if not messageId or not conversationId or not feedbackType:
             return jsonify({"error": "Missing required fields"}), 400
 
-        try:
-            conversation_doc = container.read_item(
-                item=conversationId, partition_key=conversationId
-            )
-        except:
-            return jsonify({"error": "Conversation not found"}), 404
-
         ai_message_text = None
         user_prompt_text = None
+        all_messages = [] # Initialize an empty list for messages
 
-        all_messages = conversation_doc.get("messages", [])
-        # Find the AI message corresponding to the messageId
-        ai_msg_index = -1
-        for i, msg in enumerate(all_messages):
-            if msg["role"] == "assistant" and msg.get("message_id") == messageId:
-                ai_message_text = msg["content"]
-                ai_msg_index = i
-                break
+        try:
+            # --- CORRECTED PART ---
+            # Query the messages_container for all messages in this conversation
+            # Order by timestamp to find the preceding message correctly
+            query = "SELECT * FROM c WHERE c.conversation_id = @conversationId ORDER BY c.timestamp ASC"
+            parameters = [{"name": "@conversationId", "value": conversationId}]
 
-        # Find the user message immediately preceding the AI message
-        if ai_msg_index > 0:
-            for i in range(ai_msg_index - 1, -1, -1):
-                 if all_messages[i]["role"] == "user":
-                     user_prompt_text = all_messages[i]["content"]
-                     break # Found the closest preceding user prompt
+            # Execute the query against the messages_container, specifying the partition key
+            message_items = list(messages_container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=conversationId # Use the partition key for efficiency
+                # enable_cross_partition_query=False # Not needed if partition_key is specified
+            ))
+            # --- END CORRECTED PART ---
 
+            if not message_items:
+                # No messages found for this conversation ID, which is unexpected if feedback is given
+                # You might want to log this or handle it differently
+                print(f"Warning: No messages found for conversationId {conversationId} during feedback submission.")
+                # Keep ai_message_text and user_prompt_text as None initially
+
+            all_messages = message_items # Assign the query results to all_messages
+
+            # Find the AI message corresponding to the messageId
+            ai_msg_index = -1
+            for i, msg in enumerate(all_messages):
+                # **** IMPORTANT ASSUMPTION ****
+                # Assuming the 'messageId' sent from the frontend corresponds to the 'id' field
+                # of the message document in messages_container.
+                # If your message documents use a different field like 'message_id', change 'msg.get("id")' below.
+                if msg.get("role") == "assistant" and msg.get("id") == messageId:
+                    ai_message_text = msg.get("content")
+                    ai_msg_index = i
+                    break
+
+            # Find the user message immediately preceding the AI message
+            if ai_msg_index > 0:
+                 # Iterate backwards from the message before the AI's message
+                 for i in range(ai_msg_index - 1, -1, -1):
+                      if all_messages[i].get("role") == "user":
+                          user_prompt_text = all_messages[i].get("content")
+                          break # Found the closest preceding user prompt
+
+            # Fallback if direct preceding message not found (or AI message was first)
+            if not user_prompt_text and all_messages:
+                # Find the *last* user message in the conversation up to the AI message index
+                # (or the very last if AI message wasn't found)
+                search_limit = ai_msg_index if ai_msg_index != -1 else len(all_messages)
+                for i in range(search_limit -1, -1, -1):
+                     if all_messages[i].get("role") == "user":
+                          user_prompt_text = all_messages[i].get("content")
+                          break
+
+
+        except exceptions.CosmosResourceNotFoundError:
+             # This specific exception might not be raised by query_items if the container exists but no items match.
+             # A query returning empty is more likely. Handle general exceptions.
+             print(f"Error querying messages for conversation {conversationId}: Resource not found (unexpected).")
+             # Decide how to handle - maybe proceed with default text?
+        except Exception as e:
+            print(f"Error querying messages for conversation {conversationId}: {e}")
+            # Log the error, maybe return a 500 or proceed with default text
+            # For now, let the default text logic below handle it.
+            pass # Allow execution to continue to the default text part
+
+        # Set default text if messages weren't found
         if not ai_message_text:
-            ai_message_text = "[AI response text not found]"
+            ai_message_text = "[AI response text not found in messages_container]"
 
         if not user_prompt_text:
-            # Fallback: Try finding the *last* user message if direct preceding one isn't found
-            # (This logic might need refinement based on exact conversation structure needs)
-            reversed_messages = list(reversed(all_messages))
-            for msg in reversed_messages:
-                if msg["role"] == "user":
-                    user_prompt_text = msg["content"]
-                    break
-            if not user_prompt_text:
-                user_prompt_text = "[User prompt not found]"
+            user_prompt_text = "[User prompt not found in messages_container]"
 
-
+        # --- Rest of the feedback saving logic remains the same ---
         feedback_id = str(uuid.uuid4())
         item = {
             "id": feedback_id,
             "partitionKey": feedback_id, # Explicitly set partition key if it's the ID
             "userId": user_id,
+            "conversationId": conversationId, # Good practice to store the conversation ID too
+            "messageId": messageId, # Store the ID of the message being reviewed
             "prompt": user_prompt_text,
             "aiResponse": ai_message_text,
             "feedbackType": feedbackType,
@@ -89,9 +128,12 @@ def register_route_backend_feedback(app):
             }
         }
 
-        feedback_container.upsert_item(item)
-
-        return jsonify({"success": True, "feedbackId": feedback_id})
+        try:
+            feedback_container.upsert_item(item)
+            return jsonify({"success": True, "feedbackId": feedback_id})
+        except Exception as e:
+            print(f"Error saving feedback item {feedback_id}: {e}")
+            return jsonify({"error": "Failed to save feedback"}), 500
     
 
     @app.route("/feedback/review", methods=["GET"])
