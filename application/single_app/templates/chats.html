@@ -150,8 +150,39 @@
     </div> 
 </div> 
 
-<!-- Feedback Modal -->
+<!-- Modal for collecting thumbs-down reason -->
 <div class="modal fade" id="feedback-modal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="feedback-form">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="feedbackModalLabel">Optional: Provide a reason</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="feedback-ai-response-id" name="aiResponseId" />
+            <input type="hidden" id="feedback-conversation-id" name="conversationId" />
+            <input type="hidden" id="feedback-type" name="feedbackType" />
+            
+            <div class="mb-3">
+              <label for="feedback-reason" class="form-label">
+                Reason (optional)
+              </label>
+              <textarea 
+                class="form-control" 
+                id="feedback-reason"
+                name="reason"
+                rows="3"
+                placeholder="e.g., incomplete answer, incorrect details..."
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Submit Feedback</button>
+          </div>
+        </div>
+      </form>
+    </div>
 </div>
 <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
 

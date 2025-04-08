@@ -1713,7 +1713,7 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
         update_callback(status=f"Sending {chunk_effective_filename} to Azure Document Intelligence...")
         di_extracted_pages = []
         try:
-            di_extracted_pages = extract_content_with_azure_di(document_id=document_id, user_id=user_id, file_path=chunk_path)
+            di_extracted_pages = extract_content_with_azure_di(chunk_path)
             num_di_pages = len(di_extracted_pages)
             conceptual_pages = num_di_pages if not is_image else 1 # Image is one conceptual item
 

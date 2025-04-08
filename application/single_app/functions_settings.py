@@ -3,6 +3,127 @@
 from config import *
 from functions_authentication import *
 
+def compare_versions(v1_str, v2_str):
+    """
+    Manually compares two version strings (e.g., "1.0.0", "1.1").
+    Returns:
+        1 if v1 > v2
+       -1 if v1 < v2
+        0 if v1 == v2
+       None if parsing fails or formats are invalid.
+    """
+    if not v1_str or not v2_str:
+        return None # Cannot compare empty strings
+
+    # Basic cleanup (remove potential 'v' prefix and whitespace)
+    v1_str = v1_str.strip().lstrip('vV')
+    v2_str = v2_str.strip().lstrip('vV')
+
+    try:
+        # Use regex to ensure parts are only digits before converting
+        if not re.match(r'^\d+(\.\d+)*$', v1_str) or not re.match(r'^\d+(\.\d+)*$', v2_str):
+             raise ValueError("Invalid characters in version string")
+        v1_parts = [int(part) for part in v1_str.split('.')]
+        v2_parts = [int(part) for part in v2_str.split('.')]
+    except ValueError:
+        # Handle cases where parts are not integers or contain invalid chars
+        print(f"Invalid version format encountered: '{v1_str}' or '{v2_str}'")
+        return None
+
+    # Compare parts element by element
+    len_v1 = len(v1_parts)
+    len_v2 = len(v2_parts)
+    max_len = max(len_v1, len_v2)
+
+    for i in range(max_len):
+        part1 = v1_parts[i] if i < len_v1 else 0 # Treat missing parts as 0
+        part2 = v2_parts[i] if i < len_v2 else 0
+
+        if part1 > part2:
+            return 1
+        if part1 < part2:
+            return -1
+
+    # If all compared parts are equal, they are the same version
+    return 0
+# --- End of compare_versions function ---
+
+
+def extract_latest_version_from_html(html_content):
+    """
+    Parses HTML content (expected from GitHub releases page) to find the latest version tag.
+
+    Args:
+        html_content (str): The HTML content as a string.
+
+    Returns:
+        str: The latest version string (e.g., "0.203.16") found, or None if no
+             valid versions are found or an error occurs.
+    """
+    if not html_content:
+        print("HTML content is empty.")
+        return None
+
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        versions_found = set() # Use a set to store unique version strings
+
+        # Find all <a> tags which are likely candidates for version tags
+        # Looking for links with '/releases/tag/v' in href seems most reliable
+        links = soup.find_all('a', href=True)
+
+        for link in links:
+            href = link.get('href')
+            # Check if the link points to a release tag URL
+            if href and '/releases/tag/v' in href:
+                try:
+                    # Extract the part after '/tag/' which should be like 'vX.Y.Z'
+                    tag_part = href.split('/tag/')[-1]
+                    # Ensure it starts with 'v' and has content after 'v'
+                    if tag_part.startswith('v') and len(tag_part) > 1:
+                        version_str = tag_part[1:] # Remove the leading 'v'
+                        # Validate the format (digits and dots only) using regex
+                        if re.match(r'^\d+(\.\d+)*$', version_str):
+                            versions_found.add(version_str)
+                        # else:
+                        #     print(f"Skipping invalid version format from href '{href}': '{version_str}'")
+
+                except (IndexError, ValueError):
+                    # Ignore links where splitting or processing fails
+                    # print(f"Could not process href: {href}")
+                    continue # Skip to the next link
+
+        if not versions_found:
+            print("No valid version tags found in HTML matching the pattern.")
+            return None
+
+        # Now compare the found versions to find the latest
+        latest_version = None
+        for current_version in versions_found:
+            if latest_version is None:
+                latest_version = current_version
+                # print(f"Initial latest version set to: {latest_version}")
+            else:
+                # print(f"Comparing '{current_version}' with current latest '{latest_version}'")
+                comparison_result = compare_versions(current_version, latest_version)
+
+                if comparison_result == 1: # current_version > latest_version
+                    # print(f"  -> New latest version: {current_version}")
+                    latest_version = current_version
+                elif comparison_result is None:
+                     # Log if comparison fails, but continue trying others
+                     print(f"Warning: Could not compare version '{current_version}' with '{latest_version}'. Skipping this comparison.")
+                # else: comparison is -1 or 0, keep existing latest_version
+                #     print(f"  -> '{latest_version}' remains latest.")
+
+
+        print(f"Latest version identified from HTML: {latest_version}")
+        return latest_version
+
+    except Exception as e:
+        print(f"Error parsing HTML or finding latest version: {e}")
+        return None
+
 def get_settings():
     try:
         settings_item = settings_container.read_item(
@@ -10,6 +131,49 @@ def get_settings():
             partition_key="app_settings"
         )
         print("Successfully retrieved settings.")
+
+        # --- NEW: Ensure version_check exists ---
+        needs_update = False
+        if 'version_check' not in settings_item:
+            print("Existing settings document missing 'version_check'. Adding default.")
+            default_version_check = {
+                "last_checked_datetime": "None",
+                "latest_release_version": '',
+                'url': 'https://github.com/microsoft/simplechat/releases'
+            }
+            settings_item['version_check'] = default_version_check
+            needs_update = True
+        elif not isinstance(settings_item.get('version_check'), dict):
+             print("Existing 'version_check' field is not a dictionary. Resetting to default.")
+             default_version_check = {
+                "last_checked_datetime": "None",
+                "latest_release_version": '',
+                'url': 'https://github.com/microsoft/simplechat/releases'
+             }
+             settings_item['version_check'] = default_version_check
+             needs_update = True
+        # Optional: Add checks for sub-keys like 'url' if needed
+        elif 'url' not in settings_item['version_check']:
+             print("Existing 'version_check' dictionary missing 'url'. Adding default URL.")
+             settings_item['version_check']['url'] = 'https://github.com/microsoft/simplechat/releases'
+             # Add defaults for other keys if necessary
+             if 'last_checked_datetime' not in settings_item['version_check']:
+                 settings_item['version_check']['last_checked_datetime'] = "None"
+             if 'latest_release_version' not in settings_item['version_check']:
+                 settings_item['version_check']['latest_release_version'] = ""
+             needs_update = True
+
+
+        if needs_update:
+            try:
+                # Update the item in Cosmos DB to persist the change
+                settings_container.upsert_item(body=settings_item)
+                print("'version_check' field updated/added and saved to settings document.")
+            except Exception as update_err:
+                print(f"Error saving updated settings with version_check field: {update_err}")
+                # Proceed with the in-memory update for this request, but log the save error
+        # --- END NEW ---
+
         return settings_item
     except CosmosResourceNotFoundError:
         default_settings = {
@@ -160,15 +324,30 @@ def get_settings():
             'max_file_size_mb': 150,
             'conversation_history_limit': 10,
             'default_system_prompt': '',
-            'enable_file_processing_logs': True
+            'enable_file_processing_logs': True,
+            'version_check': {
+                "last_checked_datetime": "None",
+                "latest_release_version": '',
+                'url': 'https://github.com/microsoft/simplechat/releases'
+            }
         }
 
-        settings_container.create_item(body=default_settings)
-        print("Default settings created and returned.")
-        return default_settings
+        try:
+            settings_container.create_item(body=default_settings)
+            print("Default settings created and returned.")
+            return default_settings
+        except Exception as create_err:
+             print(f"Error creating default settings document: {create_err}")
+             # Return the defaults in memory even if creation failed, but log error
+             return default_settings
     except Exception as e:
         print(f"Error retrieving settings: {str(e)}")
-        return None
+        return { # Return minimal structure on generic error
+            'id': 'app_settings',
+            'app_title': 'Error Loading Settings',
+            'version_check': { "url": "", "latest_release_version": "" }
+            # Add other essential keys with safe defaults if needed
+        }
 
 
 def update_settings(new_settings):
