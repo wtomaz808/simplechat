@@ -18,6 +18,7 @@ import math
 import mimetypes
 import openpyxl
 import xlrd
+import shutil
 
 from flask import (
     Flask, 
@@ -76,7 +77,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.385'
+app.config['VERSION'] = '0.207.404'
 Session(app)
 
 CLIENTS = {}
@@ -87,6 +88,7 @@ ALLOWED_EXTENSIONS = {
 }
 ALLOWED_EXTENSIONS_IMG = {'png', 'jpg', 'jpeg'}
 MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 16 MB
+ITEMS_PER_PAGE = 10
 
 # Azure AD Configuration
 CLIENT_ID = os.getenv("CLIENT_ID")

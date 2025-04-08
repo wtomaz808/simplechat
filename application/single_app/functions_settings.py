@@ -183,7 +183,7 @@ def get_settings():
             'app_title': 'Simple Chat',
             'landing_page_text': 'You can add text here and it supports Markdown. You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
             'show_logo': False,
-            'logo_path': 'images/logo.svg',
+            'logo_path': 'images/logo.png',
 
             # GPT Settings
             'enable_gpt_apim': False,

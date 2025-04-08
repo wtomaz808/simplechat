@@ -2,20 +2,38 @@
 
 import { escapeHtml } from "./workspace-utils.js";
 
-// ... (keep existing variables like currentPage, pageSize, activePolls, DOM elements) ...
-let currentPage = 1;
-let pageSize = 10;
+// ------------- State Variables -------------
+let docsCurrentPage = 1;
+let docsPageSize = 10;
+let docsSearchTerm = '';
+let docsClassificationFilter = '';
+let docsAuthorFilter = ''; // Added for Author filter
+let docsKeywordsFilter = ''; // Added for Keywords filter
+let docsAbstractFilter = ''; // Added for Abstract filter
 const activePolls = new Set();
 
-const paginationContainer = document.getElementById("pagination-container");
-const pageSizeSelect = document.getElementById("page-size-select");
+// ------------- DOM Elements (Documents Tab) -------------
+const documentsTableBody = document.querySelector("#documents-table tbody");
+const docsPaginationContainer = document.getElementById("docs-pagination-container");
+const docsPageSizeSelect = document.getElementById("docs-page-size-select");
 const fileInput = document.getElementById("file-input");
 const uploadBtn = document.getElementById("upload-btn");
 const uploadStatusSpan = document.getElementById("upload-status");
-const documentsTableBody = document.querySelector("#documents-table tbody");
 const docMetadataModalEl = document.getElementById("docMetadataModal") ? new bootstrap.Modal(document.getElementById("docMetadataModal")) : null;
 const docMetadataForm = document.getElementById("doc-metadata-form");
 
+// --- Filter elements ---
+const docsSearchInput = document.getElementById('docs-search-input');
+// Conditionally get elements based on flags passed from template
+const docsClassificationFilterSelect = window.enable_document_classification === true ? document.getElementById('docs-classification-filter') : null;
+const docsAuthorFilterInput = window.enable_extract_meta_data === true ? document.getElementById('docs-author-filter') : null;
+const docsKeywordsFilterInput = window.enable_extract_meta_data === true ? document.getElementById('docs-keywords-filter') : null;
+const docsAbstractFilterInput = window.enable_extract_meta_data === true ? document.getElementById('docs-abstract-filter') : null;
+// Buttons (get them regardless, they might be rendered in different places)
+const docsApplyFiltersBtn = document.getElementById('docs-apply-filters-btn');
+const docsClearFiltersBtn = document.getElementById('docs-clear-filters-btn');
+
+// ------------- Helper Functions -------------
 function isColorLight(hexColor) {
     if (!hexColor) return true; // Default to light if no color
     const cleanHex = hexColor.startsWith('#') ? hexColor.substring(1) : hexColor;
@@ -41,21 +59,80 @@ function isColorLight(hexColor) {
 
     if (isNaN(r) || isNaN(g) || isNaN(b)) return true; // Parsing failed
 
-    // Calculate luminance using the standard formula (perceived brightness)
     const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    // console.log(`Color: ${hexColor}, R:${r} G:${g} B:${b}, Lum: ${luminance.toFixed(3)}`);
-    return luminance > 0.5; // Threshold can be adjusted (0.5 is common)
+    return luminance > 0.5;
 }
 
 // ------------- Event Listeners -------------
-if (pageSizeSelect) {
-    pageSizeSelect.addEventListener("change", (e) => {
-        pageSize = parseInt(e.target.value, 10);
-        currentPage = 1;
+
+// Page Size
+if (docsPageSizeSelect) {
+    docsPageSizeSelect.addEventListener("change", (e) => {
+        docsPageSize = parseInt(e.target.value, 10);
+        docsCurrentPage = 1; // Reset to first page
         fetchUserDocuments();
     });
 }
 
+// Filters - Apply Button
+if (docsApplyFiltersBtn) {
+    docsApplyFiltersBtn.addEventListener('click', () => {
+        // Read values from all potentially available filter inputs
+        docsSearchTerm = docsSearchInput ? docsSearchInput.value.trim() : '';
+        docsClassificationFilter = docsClassificationFilterSelect ? docsClassificationFilterSelect.value : '';
+        docsAuthorFilter = docsAuthorFilterInput ? docsAuthorFilterInput.value.trim() : '';
+        docsKeywordsFilter = docsKeywordsFilterInput ? docsKeywordsFilterInput.value.trim() : '';
+        docsAbstractFilter = docsAbstractFilterInput ? docsAbstractFilterInput.value.trim() : '';
+
+        docsCurrentPage = 1; // Reset to first page
+        fetchUserDocuments();
+    });
+}
+
+// Filters - Clear Button
+if (docsClearFiltersBtn) {
+    docsClearFiltersBtn.addEventListener('click', () => {
+        // Clear all potentially available filter inputs and state variables
+        if (docsSearchInput) docsSearchInput.value = '';
+        if (docsClassificationFilterSelect) docsClassificationFilterSelect.value = '';
+        if (docsAuthorFilterInput) docsAuthorFilterInput.value = '';
+        if (docsKeywordsFilterInput) docsKeywordsFilterInput.value = '';
+        if (docsAbstractFilterInput) docsAbstractFilterInput.value = '';
+
+        docsSearchTerm = '';
+        docsClassificationFilter = '';
+        docsAuthorFilter = '';
+        docsKeywordsFilter = '';
+        docsAbstractFilter = '';
+
+        docsCurrentPage = 1; // Reset to first page
+        fetchUserDocuments();
+    });
+}
+
+// Optional: Trigger search on Enter key in primary search input
+if (docsSearchInput) {
+    docsSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent default form submission if it's in a form
+            if (docsApplyFiltersBtn) docsApplyFiltersBtn.click(); // Trigger the apply button click
+        }
+    });
+}
+// Add similar listeners for metadata inputs if desired
+[docsAuthorFilterInput, docsKeywordsFilterInput, docsAbstractFilterInput].forEach(input => {
+    if (input) {
+         input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (docsApplyFiltersBtn) docsApplyFiltersBtn.click();
+            }
+        });
+    }
+});
+
+
+// Metadata Modal Form Submission
 if (docMetadataForm && docMetadataModalEl) { // Check both exist
     docMetadataForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -73,22 +150,23 @@ if (docMetadataForm && docMetadataModalEl) { // Check both exist
             authors: document.getElementById("doc-authors")?.value.trim() || null,
         };
 
-        // Process keywords and authors into arrays
         if (payload.keywords) {
             payload.keywords = payload.keywords.split(",").map(kw => kw.trim()).filter(Boolean);
-        } else {
-             payload.keywords = []; // Ensure it's an array or null if backend expects it
-        }
+        } else { payload.keywords = []; }
         if (payload.authors) {
             payload.authors = payload.authors.split(",").map(a => a.trim()).filter(Boolean);
-        } else {
-             payload.authors = []; // Ensure it's an array or null
-        }
+        } else { payload.authors = []; }
 
-        // Add classification if enabled
-        if (window.enable_document_classification === 'true') { // Check boolean true
+        // Add classification if enabled AND selected (handle 'none' value)
+        // Use the window flag to check if classification is enabled
+        if (window.enable_document_classification === true) {
             const classificationSelect = document.getElementById("doc-classification");
-            payload.document_classification = classificationSelect?.value || null;
+            let selectedClassification = classificationSelect?.value || null;
+            // Treat 'none' selection as null/empty on the backend
+            if (selectedClassification === 'none') {
+                selectedClassification = null;
+            }
+             payload.document_classification = selectedClassification;
         }
 
         fetch(`/api/documents/${docId}`, {
@@ -112,7 +190,7 @@ if (docMetadataForm && docMetadataModalEl) { // Check both exist
     });
 }
 
-// *** MODIFIED UPLOAD BUTTON HANDLER ***
+// Upload Button Handler
 if (uploadBtn && fileInput && uploadStatusSpan) {
     uploadBtn.addEventListener("click", async () => {
         const files = fileInput.files;
@@ -127,18 +205,13 @@ if (uploadBtn && fileInput && uploadStatusSpan) {
 
         const formData = new FormData();
         const filesToUpload = [];
-        let conversionErrors = 0;
         let filesProcessed = 0;
 
         for (const file of files) {
             filesProcessed++;
-            
             uploadStatusSpan.textContent = `Preparing file: ${escapeHtml(file.name)} (${filesProcessed}/${files.length})...`;
             filesToUpload.push(file);
-        } // End file processing loop
-
-        // --- Rest of the upload logic (check filesToUpload, append, fetch, handle response, finally) ---
-        // (This part remains the same as in the previous version)
+        }
 
          if (filesToUpload.length === 0) {
             uploadStatusSpan.textContent = "No files selected or processed.";
@@ -171,17 +244,37 @@ if (uploadBtn && fileInput && uploadStatusSpan) {
 
             if (successCount > 0) {
                 console.log(`Successfully started server processing for ${successCount} document(s).`);
-                fetchUserDocuments();
+                // Reset filters and go to page 1 after successful upload to ensure user sees the new docs
+                // Simulate click on clear button to reset all filters and state
+                 if (docsClearFiltersBtn) {
+                    docsClearFiltersBtn.click(); // This also triggers fetchUserDocuments
+                 } else {
+                    // Fallback if clear button isn't found for some reason
+                    docsSearchTerm = '';
+                    docsClassificationFilter = '';
+                    docsAuthorFilter = '';
+                    docsKeywordsFilter = '';
+                    docsAbstractFilter = '';
+                    if(docsSearchInput) docsSearchInput.value = '';
+                    if(docsClassificationFilterSelect) docsClassificationFilterSelect.value = '';
+                    if(docsAuthorFilterInput) docsAuthorFilterInput.value = '';
+                    if(docsKeywordsFilterInput) docsKeywordsFilterInput.value = '';
+                    if(docsAbstractFilterInput) docsAbstractFilterInput.value = '';
+                    docsCurrentPage = 1;
+                    fetchUserDocuments(); // Fetch potentially updated list
+                 }
+
+                // Start polling for status (do this *after* initiating the fetch for the updated list)
                 docIds.forEach(docId => pollDocumentStatus(docId));
             }
 
             let finalMessage = "";
-            if (successCount === totalUploaded) finalMessage += `Uploaded ${successCount} file(s) for processing.`;
-            else if (successCount < totalUploaded) finalMessage += `Server accepted ${successCount}/${totalUploaded} uploaded file(s).`;
+            if (successCount === totalUploaded) finalMessage += `Uploaded ${successCount} file(s) for processing. `;
+            else if (successCount < totalUploaded) finalMessage += `Server accepted ${successCount}/${totalUploaded} uploaded file(s). `;
             if (data.errors && data.errors.length > 0) finalMessage += ` Server errors: ${data.errors.join(', ')}`;
 
             uploadStatusSpan.textContent = finalMessage.trim() || "Upload processed.";
-            fileInput.value = "";
+            fileInput.value = ""; // Clear file input
 
         } catch (err) {
             console.error("Upload failed:", err);
@@ -195,63 +288,95 @@ if (uploadBtn && fileInput && uploadStatusSpan) {
     });
 }
 
-// ------------- Document Functions (fetchUserDocuments, renderDocumentRow, etc.) -------------
-// Keep the existing functions fetchUserDocuments, renderDocumentRow, renderPaginationControls,
-// toggleDetails, pollDocumentStatus, onEditDocument, onExtractMetadata, deleteDocument, redirectToChat
-// ... (Paste the existing functions here, no changes needed to them based on the conversion logic) ...
-
-// --- PASTE THE FOLLOWING FUNCTIONS FROM YOUR ORIGINAL CODE HERE ---
-// fetchUserDocuments()
-// renderDocumentRow(doc)
-// renderPaginationControls(page, pageSize, totalCount)
-// window.toggleDetails = function (docId) { ... }
-// pollDocumentStatus(documentId)
-// window.onEditDocument = function(docId) { ... }
-// window.onExtractMetadata = function (docId, event) { ... }
-// window.deleteDocument = function(documentId, event) { ... } // Note: Removed 'event' param if not used
-// window.redirectToChat = function(documentId) { ... }
-// --- END PASTE ---
-
-
-// Make fetchUserDocuments globally available for workspace-init.js or other modules
-window.fetchUserDocuments = fetchUserDocuments;
-
-
-// ------------- START: PASTE YOUR EXISTING FUNCTIONS HERE -------------
+// ------------- Document Functions -------------
 
 function fetchUserDocuments() {
     if (!documentsTableBody) return; // Don't proceed if table body isn't found
-    documentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading documents...</td></tr>';
 
-    fetch(`/api/documents?page=${currentPage}&page_size=${pageSize}`)
+    // Show loading state
+    documentsTableBody.innerHTML = `
+        <tr class="table-loading-row">
+            <td colspan="4">
+                <div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>
+                Loading documents...
+            </td>
+        </tr>`;
+    if (docsPaginationContainer) docsPaginationContainer.innerHTML = ''; // Clear pagination
+
+    // Build query parameters - Include all active filters
+    const params = new URLSearchParams({
+        page: docsCurrentPage,
+        page_size: docsPageSize,
+    });
+    if (docsSearchTerm) {
+        params.append('search', docsSearchTerm); // File Name / Title search
+    }
+    if (docsClassificationFilter) {
+        params.append('classification', docsClassificationFilter);
+    }
+    // Add new metadata filters if they have values
+    if (docsAuthorFilter) {
+        params.append('author', docsAuthorFilter); // Assumes backend uses 'author'
+    }
+    if (docsKeywordsFilter) {
+        params.append('keywords', docsKeywordsFilter); // Assumes backend uses 'keywords'
+    }
+    if (docsAbstractFilter) {
+        params.append('abstract', docsAbstractFilter); // Assumes backend uses 'abstract'
+    }
+
+    console.log("Fetching documents with params:", params.toString()); // Debugging: Check params
+
+    fetch(`/api/documents?${params.toString()}`)
         .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
         .then(data => {
             documentsTableBody.innerHTML = ""; // Clear loading/existing rows
             if (!data.documents || data.documents.length === 0) {
-                documentsTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">No documents found. Upload a document to get started.</td></tr>';
+                // Check if any filters are active
+                const filtersActive = docsSearchTerm || docsClassificationFilter || docsAuthorFilter || docsKeywordsFilter || docsAbstractFilter;
+                documentsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center p-4 text-muted">
+                            ${ filtersActive
+                                ? 'No documents found matching the current filters.'
+                                : 'No documents found. Upload a document to get started.'
+                            }
+                            ${ filtersActive
+                                ? '<br><button class="btn btn-link btn-sm p-0" id="docs-reset-filter-msg-btn">Clear filters</button> to see all documents.'
+                                : ''
+                            }
+                        </td>
+                    </tr>`;
+                 // Add event listener for the reset button within the message
+                 const resetButton = document.getElementById('docs-reset-filter-msg-btn');
+                 if (resetButton && docsClearFiltersBtn) { // Ensure clear button exists
+                     resetButton.addEventListener('click', () => {
+                         docsClearFiltersBtn.click(); // Simulate clicking the main clear button
+                     });
+                 }
             } else {
                 data.documents.forEach(doc => renderDocumentRow(doc));
             }
-            renderPaginationControls(data.page, data.page_size, data.total_count);
+            renderDocsPaginationControls(data.page, data.page_size, data.total_count);
         })
         .catch(error => {
             console.error("Error fetching documents:", error);
-            documentsTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger p-4">Error loading documents: ${error.error || error.message || 'Unknown error'}</td></tr>`;
-            renderPaginationControls(1, pageSize, 0); // Show empty pagination
+            documentsTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger p-4">Error loading documents: ${escapeHtml(error.error || error.message || 'Unknown error')}</td></tr>`;
+            renderDocsPaginationControls(1, docsPageSize, 0); // Show empty pagination on error
         });
 }
+
 
 function renderDocumentRow(doc) {
     if (!documentsTableBody) return;
     const docId = doc.id;
-    // Robust check for percentage complete
+    // Ensure percentage_complete is treated as a number, default to 0 if invalid/null
     const pctString = String(doc.percentage_complete);
     const pct = /^\d+(\.\d+)?$/.test(pctString) ? parseFloat(pctString) : 0;
     const docStatus = doc.status || "";
-    const isComplete = pct >= 100 || docStatus.toLowerCase().includes("complete") || docStatus.toLowerCase().includes("error"); // Treat error as complete for UI purposes
+    const isComplete = pct >= 100 || docStatus.toLowerCase().includes("complete") || docStatus.toLowerCase().includes("error");
     const hasError = docStatus.toLowerCase().includes("error");
 
-    // Main document row
     const docRow = document.createElement("tr");
     docRow.id = `doc-row-${docId}`;
     docRow.innerHTML = `
@@ -261,7 +386,7 @@ function renderDocumentRow(doc) {
                     <span id="arrow-icon-${docId}" class="bi bi-chevron-right"></span>
                     </button>` :
                     (hasError ? `<span class="text-danger" title="Processing Error: ${escapeHtml(docStatus)}"><i class="bi bi-exclamation-triangle-fill"></i></span>`
-                             : `<span class="text-muted" title="Processing: ${escapeHtml(docStatus)}"><i class="bi bi-hourglass-split"></i></span>`)
+                             : `<span class="text-muted" title="Processing: ${escapeHtml(docStatus)} (${pct.toFixed(0)}%)"><i class="bi bi-hourglass-split"></i></span>`)
             }
         </td>
         <td class="align-middle" title="${escapeHtml(doc.file_name || "")}">${escapeHtml(doc.file_name || "")}</td>
@@ -280,34 +405,32 @@ function renderDocumentRow(doc) {
     `;
     documentsTableBody.appendChild(docRow);
 
-    // Details row (collapsible) - only if complete and no error
+    // Only add details row if complete and no error
     if (isComplete && !hasError) {
         const detailsRow = document.createElement("tr");
         detailsRow.id = `details-row-${docId}`;
         detailsRow.style.display = "none"; // Initially hidden
 
         let classificationDisplayHTML = '';
-        // Check using boolean comparison now that we use tojson
-        if (window.enable_document_classification === 'true') {
-                classificationDisplayHTML += `<p class="mb-1"><strong>Classification:</strong> `; // Start the paragraph
-                const currentLabel = doc.document_classification || null;
-                const categories = window.classification_categories || []; // Ensure it's an array
+        // Check window flag before rendering classification
+        if (window.enable_document_classification === true) {
+                classificationDisplayHTML += `<p class="mb-1"><strong>Classification:</strong> `;
+                const currentLabel = doc.document_classification || null; // Treat empty string or null as no classification
+                const categories = window.classification_categories || [];
                 const category = categories.find(cat => cat.label === currentLabel);
 
                 if (category) {
-                    const bgColor = category.color || '#6c757d'; // Default to secondary color if missing
+                    const bgColor = category.color || '#6c757d'; // Default to secondary color
                     const useDarkText = isColorLight(bgColor);
                     const textColorClass = useDarkText ? 'text-dark' : '';
                     classificationDisplayHTML += `<span class="classification-badge ${textColorClass}" style="background-color: ${escapeHtml(bgColor)};">${escapeHtml(category.label)}</span>`;
-                } else if (currentLabel) {
-                    // If label exists but no matching category (config mismatch?)
+                } else if (currentLabel) { // Has a label, but no matching category found
                     classificationDisplayHTML += `<span class="badge bg-warning text-dark" title="Category config not found">${escapeHtml(currentLabel)} (?)</span>`;
-                } else {
-                    classificationDisplayHTML += `<span class="badge bg-secondary">None</span>`;
+                } else { // No classification label (null or empty string)
+                     classificationDisplayHTML += `<span class="badge bg-secondary">None</span>`;
                 }
-                classificationDisplayHTML += `</p>`; // End the paragraph
+                classificationDisplayHTML += `</p>`;
             }
-            // No 'else' needed, classification is just omitted if not enabled
 
         let detailsHtml = `
             <td colspan="4">
@@ -327,8 +450,8 @@ function renderDocumentRow(doc) {
                          </button>
         `;
 
-        // Check using boolean comparison
-        if (window.enable_extract_meta_data === 'true') {
+        // Check window flag before rendering extract button
+        if (window.enable_extract_meta_data === true) {
             detailsHtml += `
                 <button class="btn btn-sm btn-warning" onclick="window.onExtractMetadata('${docId}', event)" title="Re-run Metadata Extraction">
                     <i class="bi bi-magic"></i> Extract Metadata
@@ -336,16 +459,15 @@ function renderDocumentRow(doc) {
             `;
         }
 
-        detailsHtml += `</div></div></td>`; // Close flex wrapper, main div, td
+        detailsHtml += `</div></div></td>`;
         detailsRow.innerHTML = detailsHtml;
         documentsTableBody.appendChild(detailsRow);
     }
 
-    // Progress/status row if incomplete or has error
+    // Add status row if not complete OR if there's an error
     if (!isComplete || hasError) {
         const statusRow = document.createElement("tr");
         statusRow.id = `status-row-${docId}`;
-        // Display error prominently if it occurred
         if (hasError) {
              statusRow.innerHTML = `
                 <td colspan="4">
@@ -353,7 +475,7 @@ function renderDocumentRow(doc) {
                         <i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${escapeHtml(docStatus)}
                     </div>
                 </td>`;
-        } else if (pct < 100) { // Only show progress if not complete and no error
+        } else if (pct < 100) { // Still processing
              statusRow.innerHTML = `
                 <td colspan="4">
                     <div class="progress" style="height: 10px;" title="Status: ${escapeHtml(docStatus)} (${pct.toFixed(0)}%)">
@@ -361,8 +483,7 @@ function renderDocumentRow(doc) {
                     </div>
                     <div class="text-muted text-end small" id="status-text-${docId}">${escapeHtml(docStatus)} (${pct.toFixed(0)}%)</div>
                 </td>`;
-        } else {
-             // Should generally not reach here if logic is correct, but as a fallback:
+        } else { // Should technically be complete now, but edge case?
              statusRow.innerHTML = `
                 <td colspan="4">
                     <small class="text-muted">Status: Finalizing...</small>
@@ -371,7 +492,7 @@ function renderDocumentRow(doc) {
 
         documentsTableBody.appendChild(statusRow);
 
-        // Start polling only if processing is actually ongoing (not complete, not error)
+        // Start polling only if it's still processing (not if it's already errored)
         if (!isComplete && !hasError) {
             pollDocumentStatus(docId);
         }
@@ -379,9 +500,9 @@ function renderDocumentRow(doc) {
 }
 
 
-function renderPaginationControls(page, pageSize, totalCount) {
-    if (!paginationContainer) return;
-    paginationContainer.innerHTML = ""; // clear old
+function renderDocsPaginationControls(page, pageSize, totalCount) {
+    if (!docsPaginationContainer) return;
+    docsPaginationContainer.innerHTML = ""; // clear old
     const totalPages = Math.ceil(totalCount / pageSize);
 
     if (totalPages <= 1) return; // Don't show pagination if only one page
@@ -393,12 +514,12 @@ function renderPaginationControls(page, pageSize, totalCount) {
     const prevA = document.createElement('a');
     prevA.classList.add('page-link');
     prevA.href = '#';
-    prevA.innerHTML = '«'; // Previous arrow
+    prevA.innerHTML = '«';
     prevA.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentPage > 1) {
-            currentPage -= 1;
-            fetchUserDocuments();
+        if (docsCurrentPage > 1) {
+            docsCurrentPage -= 1;
+            fetchUserDocuments(); // Call the correct fetch function
         }
     });
     prevLi.appendChild(prevA);
@@ -410,115 +531,73 @@ function renderPaginationControls(page, pageSize, totalCount) {
     const nextA = document.createElement('a');
     nextA.classList.add('page-link');
     nextA.href = '#';
-    nextA.innerHTML = '»'; // Next arrow
+    nextA.innerHTML = '»';
     nextA.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentPage < totalPages) {
-            currentPage += 1;
-            fetchUserDocuments();
+        if (docsCurrentPage < totalPages) {
+            docsCurrentPage += 1;
+            fetchUserDocuments(); // Call the correct fetch function
         }
     });
     nextLi.appendChild(nextA);
 
-
     // Determine page numbers to display
-    const maxPagesToShow = 5; // Max number of page links shown (excluding prev/next)
+    const maxPagesToShow = 5; // Max number of page links shown (e.g., 1 ... 4 5 6 ... 10)
     let startPage = 1;
     let endPage = totalPages;
-
     if (totalPages > maxPagesToShow) {
         let maxPagesBeforeCurrent = Math.floor(maxPagesToShow / 2);
         let maxPagesAfterCurrent = Math.ceil(maxPagesToShow / 2) - 1;
-
-        if (page <= maxPagesBeforeCurrent) {
-            // Near the beginning
-            startPage = 1;
-            endPage = maxPagesToShow;
-        } else if (page + maxPagesAfterCurrent >= totalPages) {
-            // Near the end
-            startPage = totalPages - maxPagesToShow + 1;
-            endPage = totalPages;
-        } else {
-            // In the middle
-            startPage = page - maxPagesBeforeCurrent;
-            endPage = page + maxPagesAfterCurrent;
-        }
+        if (page <= maxPagesBeforeCurrent) { startPage = 1; endPage = maxPagesToShow; }
+        else if (page + maxPagesAfterCurrent >= totalPages) { startPage = totalPages - maxPagesToShow + 1; endPage = totalPages; }
+        else { startPage = page - maxPagesBeforeCurrent; endPage = page + maxPagesAfterCurrent; }
     }
 
-    // Create pagination UL element
     const ul = document.createElement('ul');
-    ul.classList.add('pagination', 'pagination-sm', 'mb-0'); // mb-0 to remove bottom margin if needed
-
-    // Add Previous button
+    ul.classList.add('pagination', 'pagination-sm', 'mb-0');
     ul.appendChild(prevLi);
 
     // Add first page and ellipsis if needed
     if (startPage > 1) {
-        const firstLi = document.createElement('li');
-        firstLi.classList.add('page-item');
-        const firstA = document.createElement('a');
-        firstA.classList.add('page-link');
-        firstA.href = '#';
-        firstA.textContent = '1';
-        firstA.addEventListener('click', (e) => { e.preventDefault(); currentPage = 1; fetchUserDocuments(); });
-        firstLi.appendChild(firstA);
-        ul.appendChild(firstLi);
+        const firstLi = document.createElement('li'); firstLi.classList.add('page-item');
+        const firstA = document.createElement('a'); firstA.classList.add('page-link'); firstA.href = '#'; firstA.textContent = '1';
+        firstA.addEventListener('click', (e) => { e.preventDefault(); docsCurrentPage = 1; fetchUserDocuments(); });
+        firstLi.appendChild(firstA); ul.appendChild(firstLi);
         if (startPage > 2) {
-             const ellipsisLi = document.createElement('li');
-             ellipsisLi.classList.add('page-item', 'disabled');
-             ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
-             ul.appendChild(ellipsisLi);
+             const ellipsisLi = document.createElement('li'); ellipsisLi.classList.add('page-item', 'disabled');
+             ellipsisLi.innerHTML = `<span class="page-link">...</span>`; ul.appendChild(ellipsisLi);
         }
     }
 
     // Add page number links
     for (let p = startPage; p <= endPage; p++) {
-        const li = document.createElement('li');
-        li.classList.add('page-item');
-        if (p === page) {
-            li.classList.add('active');
-            li.setAttribute('aria-current', 'page');
-        }
-        const a = document.createElement('a');
-        a.classList.add('page-link');
-        a.href = '#';
-        a.textContent = p;
+        const li = document.createElement('li'); li.classList.add('page-item');
+        if (p === page) { li.classList.add('active'); li.setAttribute('aria-current', 'page'); }
+        const a = document.createElement('a'); a.classList.add('page-link'); a.href = '#'; a.textContent = p;
         a.addEventListener('click', (e) => {
             e.preventDefault();
-            if (currentPage !== p) {
-                currentPage = p;
-                fetchUserDocuments();
+            if (docsCurrentPage !== p) {
+                docsCurrentPage = p;
+                fetchUserDocuments(); // Call the correct fetch function
             }
         });
-        li.appendChild(a);
-        ul.appendChild(li);
+        li.appendChild(a); ul.appendChild(li);
     }
 
     // Add last page and ellipsis if needed
     if (endPage < totalPages) {
          if (endPage < totalPages - 1) {
-             const ellipsisLi = document.createElement('li');
-             ellipsisLi.classList.add('page-item', 'disabled');
-             ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
-             ul.appendChild(ellipsisLi);
+             const ellipsisLi = document.createElement('li'); ellipsisLi.classList.add('page-item', 'disabled');
+             ellipsisLi.innerHTML = `<span class="page-link">...</span>`; ul.appendChild(ellipsisLi);
          }
-        const lastLi = document.createElement('li');
-        lastLi.classList.add('page-item');
-        const lastA = document.createElement('a');
-        lastA.classList.add('page-link');
-        lastA.href = '#';
-        lastA.textContent = totalPages;
-        lastA.addEventListener('click', (e) => { e.preventDefault(); currentPage = totalPages; fetchUserDocuments(); });
-        lastLi.appendChild(lastA);
-        ul.appendChild(lastLi);
+        const lastLi = document.createElement('li'); lastLi.classList.add('page-item');
+        const lastA = document.createElement('a'); lastA.classList.add('page-link'); lastA.href = '#'; lastA.textContent = totalPages;
+        lastA.addEventListener('click', (e) => { e.preventDefault(); docsCurrentPage = totalPages; fetchUserDocuments(); });
+        lastLi.appendChild(lastA); ul.appendChild(lastLi);
     }
 
-
-    // Add Next button
     ul.appendChild(nextLi);
-
-    // Append the UL to the container
-    paginationContainer.appendChild(ul);
+    docsPaginationContainer.appendChild(ul); // Append to the correct container
 }
 
 
@@ -538,99 +617,85 @@ window.toggleDetails = function (docId) {
     }
 };
 
+
 function pollDocumentStatus(documentId) {
-    if (activePolls.has(documentId)) return; // Already polling
+    if (activePolls.has(documentId)) {
+        // console.log(`Polling already active for ${documentId}`);
+        return; // Already polling this document
+    }
     activePolls.add(documentId);
-    // console.log(`Starting polling for ${documentId}`);
+    // console.log(`Started polling for ${documentId}`);
 
     const intervalId = setInterval(() => {
-        // Check if the document row still exists (it might be removed by deletion or page change)
+        // Check if the document elements still exist in the DOM
         const docRow = document.getElementById(`doc-row-${documentId}`);
         const statusRow = document.getElementById(`status-row-${documentId}`);
-        if (!docRow && !statusRow) { // If neither row exists, stop polling
-            // console.log(`Stopping poll for ${documentId}: Rows not found.`);
+        if (!docRow && !statusRow) { // Row likely removed (e.g., deleted, or page changed)
+            // console.log(`Stopping polling for ${documentId} - elements not found.`);
             clearInterval(intervalId);
             activePolls.delete(documentId);
             return;
         }
 
-
         fetch(`/api/documents/${documentId}`)
             .then(r => {
-                if (r.status === 404) { // Handle case where doc was deleted during polling
-                    return Promise.reject(new Error('Document not found (likely deleted).'));
-                }
+                if (r.status === 404) { return Promise.reject(new Error('Document not found (likely deleted).')); }
                 return r.ok ? r.json() : r.json().then(err => Promise.reject(err));
              })
             .then(doc => {
-                // Robust check for percentage complete
+                 // Recalculate completion status based on latest data
                  const pctString = String(doc.percentage_complete);
                  const pct = /^\d+(\.\d+)?$/.test(pctString) ? parseFloat(pctString) : 0;
                  const docStatus = doc.status || "";
                  const isComplete = pct >= 100 || docStatus.toLowerCase().includes("complete") || docStatus.toLowerCase().includes("error");
                  const hasError = docStatus.toLowerCase().includes("error");
 
-                // --- Update Progress/Status if NOT complete ---
                 if (!isComplete && statusRow) {
+                     // Update progress bar and status text if still processing
                      const progressBar = statusRow.querySelector(`#progress-bar-${documentId}`);
                      const statusText = statusRow.querySelector(`#status-text-${documentId}`);
-
                      if (progressBar) {
                         progressBar.style.width = pct + "%";
                         progressBar.setAttribute("aria-valuenow", pct);
-                        progressBar.parentNode.setAttribute('title', `Status: ${escapeHtml(docStatus)} (${pct.toFixed(0)}%)`); // Update progress bar title
+                        progressBar.parentNode.setAttribute('title', `Status: ${escapeHtml(docStatus)} (${pct.toFixed(0)}%)`);
                      }
-                     if (statusText) {
-                        statusText.textContent = `${escapeHtml(docStatus)} (${pct.toFixed(0)}%)`;
-                     }
+                     if (statusText) { statusText.textContent = `${escapeHtml(docStatus)} (${pct.toFixed(0)}%)`; }
+                     // console.log(`Polling ${documentId}: Status ${docStatus}, ${pct}%`);
                 }
-                // --- Handle Completion ---
-                else {
-                    // console.log(`Polling detected completion/error for ${documentId}. Status: ${docStatus}`);
+                else { // Processing is complete (or errored)
+                    // console.log(`Polling ${documentId}: Completed/Errored. Status: ${docStatus}, ${pct}%`);
                     clearInterval(intervalId);
                     activePolls.delete(documentId);
+                    if (statusRow) { statusRow.remove(); } // Remove the progress/status row
 
-                    // Remove the status/progress row as it's no longer needed.
-                    if (statusRow) {
-                        statusRow.remove();
-                    }
-
-                    // Re-render the specific document row to update icons and buttons
-                    // This is safer than a full table refresh if many docs are polling
-                     if (docRow) {
+                     if (docRow) { // Found the main row, let's replace it with the final version
                         const parent = docRow.parentNode;
-                        const detailsRow = document.getElementById(`details-row-${documentId}`);
-                        // Remove existing rows for this doc before re-rendering
-                        docRow.remove();
-                        if (detailsRow) detailsRow.remove();
-                        // Re-render using the latest doc data
+                        const detailsRow = document.getElementById(`details-row-${documentId}`); // Check if details row exists from a previous render
+                        docRow.remove(); // Remove old main row
+                        if (detailsRow) detailsRow.remove(); // Remove old details row if it existed
+
+                        // Re-render using the latest doc data which now indicates completion/error
                         renderDocumentRow(doc);
                      } else {
-                         // If original row somehow gone, just refresh whole table
+                         // Should not happen often, but if the row vanished unexpectedly, refresh list
                          console.warn(`Doc row ${documentId} not found after completion, refreshing full list.`);
                          fetchUserDocuments();
                      }
-
-                    // Optional: Add a visual cue for completion/error?
-                    // const mainRow = document.getElementById(`doc-row-${documentId}`);
-                    // if (mainRow) mainRow.classList.add(hasError ? 'table-danger' : 'table-success'); // Add temporary highlight
-
                 }
             })
             .catch(err => {
                 console.error(`Error polling document ${documentId}:`, err);
                 clearInterval(intervalId);
                 activePolls.delete(documentId);
-
-                // Update UI to show polling failed if the status row still exists
+                // Update UI to show polling failed
                 if (statusRow) {
                     statusRow.innerHTML = `<td colspan="4"><div class="alert alert-warning alert-sm py-1 px-2 mb-0 small" role="alert"><i class="bi bi-exclamation-triangle-fill me-1"></i>Could not retrieve status: ${escapeHtml(err.message || 'Polling failed')}</div></td>`;
                 }
-                // Update main row icon to show warning if it exists
+                 // Maybe update the icon in the main row too if status row isn't visible
                  if (docRow && docRow.cells[0]) {
-                    // Avoid overwriting if it's already showing a processing error from the server
-                     const currentIcon = docRow.cells[0].querySelector('span.text-danger i.bi-exclamation-triangle-fill');
-                     if (!currentIcon) {
+                    const currentIcon = docRow.cells[0].querySelector('span i'); // Find any icon
+                     // Only change if it's not already an error icon
+                     if (currentIcon && !currentIcon.classList.contains('bi-exclamation-triangle-fill')) {
                          docRow.cells[0].innerHTML = '<span class="text-warning" title="Status Unavailable"><i class="bi bi-question-circle-fill"></i></span>';
                      }
                  }
@@ -643,18 +708,16 @@ window.onEditDocument = function(docId) {
         console.error("Metadata modal element not found.");
         return;
     }
-    // Show loading state in modal?
     fetch(`/api/documents/${docId}`)
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(doc => {
-            // Populate form fields, checking if elements exist
             const docIdInput = document.getElementById("doc-id");
             const docTitleInput = document.getElementById("doc-title");
             const docAbstractInput = document.getElementById("doc-abstract");
             const docKeywordsInput = document.getElementById("doc-keywords");
             const docPubDateInput = document.getElementById("doc-publication-date");
             const docAuthorsInput = document.getElementById("doc-authors");
-            const classificationSelect = document.getElementById("doc-classification");
+            const classificationSelect = document.getElementById("doc-classification"); // Use the correct ID
 
             if (docIdInput) docIdInput.value = doc.id;
             if (docTitleInput) docTitleInput.value = doc.title || "";
@@ -663,16 +726,20 @@ window.onEditDocument = function(docId) {
             if (docPubDateInput) docPubDateInput.value = doc.publication_date || "";
             if (docAuthorsInput) docAuthorsInput.value = Array.isArray(doc.authors) ? doc.authors.join(", ") : (doc.authors || "");
 
-            // Check boolean correctly for classification
-            if (window.enable_document_classification === 'true' && classificationSelect) {
-                classificationSelect.value = doc.document_classification || "";
-                // If the saved value is not in the options, reset to default "-- Select --"
-                if (classificationSelect.selectedIndex === -1 && classificationSelect.options.length > 0) {
-                    classificationSelect.value = "";
-                }
-                classificationSelect.closest('.mb-3').style.display = ''; // Ensure visible
+            // Handle classification dropdown visibility and value based on the window flag
+            if (window.enable_document_classification === true && classificationSelect) {
+                 // Set value to 'none' if classification is null/empty/undefined, otherwise set to the label
+                 const currentClassification = doc.document_classification || 'none';
+                 classificationSelect.value = currentClassification;
+                 // Double-check if the value actually exists in the options, otherwise default to "" (All) or 'none'
+                 if (![...classificationSelect.options].some(option => option.value === classificationSelect.value)) {
+                      console.warn(`Classification value "${currentClassification}" not found in dropdown, defaulting.`);
+                      classificationSelect.value = "none"; // Default to 'none' if value is invalid
+                 }
+                classificationSelect.closest('.mb-3').style.display = ''; // Ensure container is visible
             } else if (classificationSelect) {
-                 classificationSelect.closest('.mb-3').style.display = 'none'; // Hide if not enabled
+                 // Hide classification if the feature flag is false
+                 classificationSelect.closest('.mb-3').style.display = 'none';
             }
 
             docMetadataModalEl.show();
@@ -683,43 +750,32 @@ window.onEditDocument = function(docId) {
         });
 }
 
-window.onExtractMetadata = function (docId, event) {
-    // Check boolean correctly
-    if (window.enable_extract_meta_data !== 'true') {
-        alert("Metadata extraction is not enabled.");
-        return;
-    }
 
-    if (!confirm("Run metadata extraction for this document? This may overwrite existing metadata.")) {
-        return;
+window.onExtractMetadata = function (docId, event) {
+    // Check window flag
+    if (window.enable_extract_meta_data !== true) {
+        alert("Metadata extraction is not enabled."); return;
     }
+    if (!confirm("Run metadata extraction for this document? This may overwrite existing metadata.")) return;
+
     const extractBtn = event ? event.target.closest('button') : null;
     if (extractBtn) {
         extractBtn.disabled = true;
         extractBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Extracting...`;
     }
 
-    fetch(`/api/documents/${docId}/extract_metadata`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-        // Add CSRF token header if needed
-    })
+    fetch(`/api/documents/${docId}/extract_metadata`, { method: "POST", headers: { "Content-Type": "application/json" } })
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(data => {
             console.log("Metadata extraction started/completed:", data);
-            // Refresh the document list to show potentially updated metadata after a short delay
-            // This assumes the backend updates the doc record synchronously or starts a background task
-            // that will eventually be picked up by fetchUserDocuments or polling
-            setTimeout(fetchUserDocuments, 1000); // Refresh after 1 second
+            // Refresh the list after a short delay to allow backend processing
+            setTimeout(fetchUserDocuments, 1500);
             alert(data.message || "Metadata extraction process initiated.");
-
-            // Hide details view as it might be outdated now
+            // Optionally close the details view if open
             const detailsRow = document.getElementById(`details-row-${docId}`);
-            const arrowIcon = document.getElementById(`arrow-icon-${docId}`);
             if (detailsRow && detailsRow.style.display !== "none") {
-                if (arrowIcon) window.toggleDetails(docId); // Use toggle to collapse it
+                 window.toggleDetails(docId); // Close details to show updated summary row first
             }
-
         })
         .catch(err => {
             console.error("Error calling extract metadata:", err);
@@ -727,45 +783,43 @@ window.onExtractMetadata = function (docId, event) {
         })
         .finally(() => {
             if (extractBtn) {
-                extractBtn.disabled = false;
-                extractBtn.innerHTML = '<i class="bi bi-magic"></i> Extract Metadata';
+                 // Check if button still exists before re-enabling
+                 if (document.body.contains(extractBtn)) {
+                    extractBtn.disabled = false;
+                    extractBtn.innerHTML = '<i class="bi bi-magic"></i> Extract Metadata';
+                 }
             }
         });
 };
 
-window.deleteDocument = function(documentId, event) { // Keep event param for button handling
+
+window.deleteDocument = function(documentId, event) {
     if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) return;
 
     const deleteBtn = event ? event.target.closest('button') : null;
     if (deleteBtn) {
         deleteBtn.disabled = true;
-        // Make spinner smaller and match text color potentially
         deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
     }
 
-    // Stop polling for this document if it's active
+    // Stop polling if active for this document
     if (activePolls.has(documentId)) {
-        // Need to find the interval ID if stored, otherwise just remove from Set
-         activePolls.delete(documentId); // Prevent new updates during deletion
-         // Finding the actual interval ID to clear it here is complex without storing it globally.
-         // Rely on the 404 check in the poll function to eventually stop it.
+        // Find the interval ID associated with this poll to clear it (more robust approach needed if storing interval IDs)
+        // For now, just remove from the active set; the poll will eventually fail or stop when elements disappear
+        activePolls.delete(documentId);
+        // Ideally, you'd store intervalId with the docId in a map to clear it here.
     }
 
 
     fetch(`/api/documents/${documentId}`, { method: "DELETE" })
         .then(response => {
             if (!response.ok) {
-                // Try to parse error from JSON response
-                return response.json().then(data => Promise.reject(data)).catch(() => {
-                     // If JSON parsing fails, create a generic error
-                     return Promise.reject({ error: `Server responded with status ${response.status}` });
-                });
+                return response.json().then(data => Promise.reject(data)).catch(() => Promise.reject({ error: `Server responded with status ${response.status}` }));
             }
-            return response.json(); // Or response.text() if it returns simple confirmation
+            return response.json();
         })
         .then(data => {
             console.log("Document deleted successfully:", data);
-            // Remove the rows directly for faster UI update
             const docRow = document.getElementById(`doc-row-${documentId}`);
             const detailsRow = document.getElementById(`details-row-${documentId}`);
             const statusRow = document.getElementById(`status-row-${documentId}`);
@@ -773,31 +827,31 @@ window.deleteDocument = function(documentId, event) { // Keep event param for bu
             if (detailsRow) detailsRow.remove();
             if (statusRow) statusRow.remove();
 
-            // Optional: Refresh the whole list if pagination counts might change significantly
-            // fetchUserDocuments();
-             // Check if table body is now empty
+             // Refresh if the table body becomes empty OR to update pagination total count
              if (documentsTableBody && documentsTableBody.childElementCount === 0) {
-                 fetchUserDocuments(); // Refresh to show "No documents" message
+                 fetchUserDocuments(); // Refresh to show 'No documents' message and correct pagination
+             } else {
+                  // Maybe just decrement total count locally and re-render pagination?
+                  // For simplicity, a full refresh might be acceptable unless dealing with huge lists/slow API
+                  fetchUserDocuments(); // Refresh to update pagination potentially
              }
 
         })
         .catch(error => {
             console.error("Error deleting document:", error);
             alert("Error deleting document: " + (error.error || error.message || "Unknown error"));
-            if (deleteBtn) { // Re-enable button on error ONLY if it still exists
-                 const btnExists = document.body.contains(deleteBtn);
-                 if (btnExists) {
-                     deleteBtn.disabled = false;
-                     deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i>'; // Restore icon
-                 }
+            // Re-enable button only if it still exists
+            if (deleteBtn && document.body.contains(deleteBtn)) {
+                 deleteBtn.disabled = false;
+                 deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i>';
             }
         });
 }
 
+
 window.redirectToChat = function(documentId) {
-    // Redirect to the chat page, passing the document ID as a query parameter
-    // The chat page JS will need to read this parameter and potentially pre-select the document.
     window.location.href = `/chats?search_documents=true&doc_scope=personal&document_id=${documentId}`;
 }
 
-// ------------- END: PASTE YOUR EXISTING FUNCTIONS HERE -------------
+// Make fetchUserDocuments globally available for workspace-init.js
+window.fetchUserDocuments = fetchUserDocuments;

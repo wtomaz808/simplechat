@@ -5,18 +5,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css" />
   <style>
     /* Force fixed layout so columns don't expand when content changes */
-    #documents-table {
+    #documents-table, #prompts-table { /* Apply to both tables */
       table-layout: fixed;
       width: 100%;
     }
 
+    /* --- Documents Table Styles --- */
     /* Example: Keep the expand-arrow column narrow */
     #documents-table th:nth-child(1),
     #documents-table td:nth-child(1) {
       width: 50px;
       text-align: Left;
     }
-
     /* File Name column */
     #documents-table th:nth-child(2),
     #documents-table td:nth-child(2) {
@@ -24,9 +24,8 @@
       max-width: 150px;
       overflow: hidden;
       white-space: nowrap;
-      text-overflow: ellipsis; /* if you want "..." on overflow */
+      text-overflow: ellipsis;
     }
-
     /* Title column */
     #documents-table th:nth-child(3),
     #documents-table td:nth-child(3) {
@@ -36,11 +35,23 @@
       white-space: nowrap;
       text-overflow: ellipsis;
     }
-
     /* Actions column */
     #documents-table th:nth-child(4),
     #documents-table td:nth-child(4) {
       width: 200px; /* or whatever fits your buttons */
+    }
+
+    /* --- Prompts Table Styles --- */
+    #prompts-table th:nth-child(1), /* Prompt Name */
+    #prompts-table td:nth-child(1) {
+        width: 70%; /* Give name more space */
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    #prompts-table th:nth-child(2), /* Actions */
+    #prompts-table td:nth-child(2) {
+        width: 150px; /* Adjust as needed for buttons */
     }
 
     /* Style for the classification badge */
@@ -55,11 +66,38 @@
         white-space: nowrap;
         vertical-align: baseline;
         border-radius: 0.375rem; /* Bootstrap's default badge radius */
-        /* Text color adjustment based on background lightness might be needed */
     }
-    /* Helper function (or manual calculation) needed to determine if text should be dark */
     .classification-badge.text-dark {
         color: #212529 !important; /* Bootstrap dark text color */
+    }
+
+    /* Align table cells vertically */
+    #documents-table td, #prompts-table td {
+        vertical-align: middle;
+    }
+
+     /* Style for loading state in tables */
+    .table-loading-row td {
+        text-align: center;
+        padding: 1.5rem;
+        color: #6c757d; /* text-muted */
+    }
+
+     /* Ensure filter inputs don't overlap buttons on small screens */
+    .filter-controls-row > div {
+        margin-bottom: 0.5rem; /* Add some spacing below each filter group */
+    }
+    @media (min-width: 768px) { /* md breakpoint */
+       .filter-controls-row > div {
+           margin-bottom: 0;
+       }
+       .filter-buttons-col {
+          text-align: end;
+       }
+    }
+    /* Add spacing between filter rows */
+    .filter-controls-row + .filter-controls-row {
+        margin-top: 0.75rem; /* Add space above the second filter row */
     }
 
   </style>
@@ -112,14 +150,14 @@
       >
         <div class="card p-3 my-3">
           <h5>Your Documents</h5>
-          <p class="text-muted">Only you can see documents you upload. Allowed extensions
-            'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg',
-            'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
-            {% if enable_video_file_support %}
-                , 'mp4', 'mov', 'avi', 'wmv', 'mkv', 'webm'
+          <p class="text-muted small">Only you can see documents you upload. Allowed extensions:
+            txt, pdf, docx, xlsx, xls, csv, pptx, html, jpg, jpeg,
+            png, bmp, tiff, tif, heif, md, json
+            {% if enable_video_file_support in [True, 'True', 'true'] %}
+                , mp4, mov, avi, wmv, mkv, webm
             {% endif %}
-            {% if enable_audio_file_support %}
-                , 'mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'
+            {% if enable_audio_file_support in [True, 'True', 'true'] %}
+                , mp3, wav, ogg, aac, flac, m4a
             {% endif %}
           </p>
 
@@ -131,12 +169,77 @@
             </button>
             <span id="upload-status" class="ms-2 text-muted small"></span>
           </div>
+          <hr>
+
+          <!-- Document Filters -->
+           <!-- Filter Row 1: Main Search & Classification -->
+           <div class="row mb-3 align-items-end filter-controls-row">
+                {% if enable_document_classification in [True, 'True', 'true'] %}
+                    <div class="col-md-4">
+                        <label for="docs-search-input" class="form-label mb-1 small">Search File Name/Title:</label>
+                        <input type="search" id="docs-search-input" class="form-control form-control-sm" placeholder="Enter search term...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="docs-classification-filter" class="form-label mb-1 small">Filter by Classification:</label>
+                        <select id="docs-classification-filter" class="form-select form-select-sm">
+                             <option value="">(All Classifications)</option>
+                             <option value="none">(No Classification)</option>
+                             {% for cat in settings.document_classification_categories %}
+                                <option value="{{ cat.label }}">{{ cat.label }}</option>
+                             {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-5 filter-buttons-col mt-2 mt-md-0">
+                        <!-- Buttons moved to second row if metadata filters enabled -->
+                        {% if enable_extract_meta_data not in [True, 'True', 'true'] %}
+                            <button id="docs-apply-filters-btn" class="btn btn-primary btn-sm">Apply Filters</button>
+                            <button id="docs-clear-filters-btn" class="btn btn-secondary btn-sm ms-1">Clear Filters</button>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <!-- Layout when classification is disabled -->
+                    <div class="col-md-7">
+                        <label for="docs-search-input" class="form-label mb-1 small">Search File Name/Title:</label>
+                        <input type="search" id="docs-search-input" class="form-control form-control-sm" placeholder="Enter search term...">
+                    </div>
+                    <div class="col-md-5 filter-buttons-col mt-2 mt-md-0">
+                         <!-- Buttons moved to second row if metadata filters enabled -->
+                         {% if enable_extract_meta_data not in [True, 'True', 'true'] %}
+                            <button id="docs-apply-filters-btn" class="btn btn-primary btn-sm">Apply Filters</button>
+                            <button id="docs-clear-filters-btn" class="btn btn-secondary btn-sm ms-1">Clear Filters</button>
+                         {% endif %}
+                     </div>
+                {% endif %}
+           </div>
+
+           <!-- Filter Row 2: Metadata Filters (Conditional) & Buttons -->
+           {% if enable_extract_meta_data in [True, 'True', 'true'] %}
+           <div class="row mb-3 align-items-end filter-controls-row">
+                <div class="col-md-3">
+                    <label for="docs-author-filter" class="form-label mb-1 small">Search Authors:</label>
+                    <input type="search" id="docs-author-filter" class="form-control form-control-sm" placeholder="Author name...">
+                </div>
+                <div class="col-md-3">
+                    <label for="docs-keywords-filter" class="form-label mb-1 small">Search Keywords:</label>
+                    <input type="search" id="docs-keywords-filter" class="form-control form-control-sm" placeholder="Keyword...">
+                </div>
+                 <div class="col-md-3">
+                    <label for="docs-abstract-filter" class="form-label mb-1 small">Search Abstract:</label>
+                    <input type="search" id="docs-abstract-filter" class="form-control form-control-sm" placeholder="Abstract content...">
+                </div>
+                <div class="col-md-3 filter-buttons-col mt-2 mt-md-0">
+                    <button id="docs-apply-filters-btn" class="btn btn-primary btn-sm">Apply Filters</button>
+                    <button id="docs-clear-filters-btn" class="btn btn-secondary btn-sm ms-1">Clear Filters</button>
+                </div>
+           </div>
+           {% endif %}
+           <!-- End Metadata Filters -->
 
           <!-- Documents List -->
           <table class="table table-striped" id="documents-table">
             <thead>
               <tr>
-                <th></th>
+                <th></th> <!-- Expand/Collapse -->
                 <th>File Name</th>
                 <th>Title</th>
                 <th>Actions</th>
@@ -144,14 +247,21 @@
             </thead>
             <tbody>
               <!-- Populated by JavaScript -->
+              <tr class="table-loading-row">
+                <td colspan="4">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>
+                    Loading documents...
+                </td>
+              </tr>
             </tbody>
           </table>
 
-          <div class="d-flex align-items-center gap-3 mb-3">
+          <!-- Documents Pagination & Page Size -->
+          <div class="d-flex align-items-center gap-3 mb-3 mt-3">
             <!-- Page Size Section -->
             <div>
-              <label for="page-size-select" class="visually-hidden">Items per page:</label>
-              <select id="page-size-select" class="form-select form-select-sm d-inline-block" style="width:auto;">
+              <label for="docs-page-size-select" class="visually-hidden">Items per page:</label>
+              <select id="docs-page-size-select" class="form-select form-select-sm d-inline-block" style="width:auto;">
                 <option value="10" selected>10</option>
                 <option value="20">20</option>
                 <option value="50">50</option>
@@ -160,10 +270,12 @@
             </div>
 
             <!-- Pagination Controls -->
-            <div id="pagination-container" class="d-flex gap-1 ms-auto"></div>
+            <div id="docs-pagination-container" class="d-flex gap-1 ms-auto">
+                 <!-- Populated by JavaScript -->
+            </div>
           </div>
 
-        </div>
+        </div> <!-- End Card -->
       </div>
       <!-- End DOCUMENTS TAB -->
 
@@ -182,7 +294,21 @@
               New Prompt
             </button>
           </div>
+          <hr>
 
+          <!-- Prompts Filters -->
+           <div class="row mb-3 align-items-end filter-controls-row">
+                <div class="col-md-6">
+                    <label for="prompts-search-input" class="form-label mb-1 small">Search Prompt Name:</label>
+                    <input type="search" id="prompts-search-input" class="form-control form-control-sm" placeholder="Enter search term...">
+                </div>
+                <div class="col-md-6 filter-buttons-col mt-2 mt-md-0">
+                    <button id="prompts-apply-filters-btn" class="btn btn-primary btn-sm">Apply Filters</button>
+                    <button id="prompts-clear-filters-btn" class="btn btn-secondary btn-sm ms-1">Clear Filters</button>
+                 </div>
+           </div>
+
+          <!-- Prompts List -->
           <table class="table table-striped" id="prompts-table">
             <thead>
               <tr>
@@ -192,17 +318,42 @@
             </thead>
             <tbody>
               <!-- Populated by JavaScript -->
+               <tr class="table-loading-row">
+                <td colspan="2">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"><span class="visually-hidden">Loading...</span></div>
+                    Loading prompts...
+                </td>
+              </tr>
             </tbody>
           </table>
-        </div>
+
+          <!-- Prompts Pagination & Page Size -->
+           <div class="d-flex align-items-center gap-3 mb-3 mt-3">
+            <!-- Page Size Section -->
+            <div>
+              <label for="prompts-page-size-select" class="visually-hidden">Items per page:</label>
+              <select id="prompts-page-size-select" class="form-select form-select-sm d-inline-block" style="width:auto;">
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <span class="ms-1 small text-muted">items per page</span>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="prompts-pagination-container" class="d-flex gap-1 ms-auto">
+                 <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+        </div> <!-- End Card -->
       </div>
       <!-- End PROMPTS TAB -->
     </div>
     <!-- End Tab Content -->
   </div>
 
-  <!-- Modal for Creating/Editing Prompts -->
-  <!-- (Keep Existing Prompt Modal As Is) -->
+  <!-- Modal for Creating/Editing Prompts (Keep As Is) -->
   <div
     class="modal fade"
     id="promptModal"
@@ -256,7 +407,7 @@
     </div>
   </div>
 
-  <!-- Modal for Editing Document Metadata -->
+  <!-- Modal for Editing Document Metadata (Keep As Is) -->
   <div
     class="modal fade"
     id="docMetadataModal"
@@ -291,6 +442,8 @@
               >
               <select class="form-select" id="doc-classification">
                 <option value="">-- Select Classification --</option>
+                 <!-- Add 'none' option explicitly -->
+                 <option value="none">(No Classification)</option>
                 {% for cat in settings.document_classification_categories %}
                   <option value="{{ cat.label }}">{{ cat.label }}</option>
                 {% endfor %}
@@ -331,7 +484,7 @@
                 type="text"
                 class="form-control"
                 id="doc-publication-date"
-                placeholder="e.g. 08/2005"
+                placeholder="e.g. 08/2005 or YYYY-MM-DD"
               />
             </div>
 
@@ -361,12 +514,11 @@
   <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 
   <script>
-
+    // Pass settings/flags needed by JS
     window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
     if (!Array.isArray(window.classification_categories)) {
         window.classification_categories = [];
     }
-    // Pass boolean flags as strings 'True'/'False' or numbers 1/0, and check accordingly in JS
     window.enable_document_classification = "{{ enable_document_classification | tojson }}";
     window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
     window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
@@ -378,6 +530,5 @@
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-documents.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-prompts.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/workspace/workspace-init.js') }}"></script>
-
 
 {% endblock %}

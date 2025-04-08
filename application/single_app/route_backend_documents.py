@@ -161,45 +161,120 @@ def register_route_backend_documents(app):
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
 
-        # 1) Read pagination parameters from query string
+        # --- 1) Read pagination and filter parameters ---
         page = request.args.get('page', default=1, type=int)
         page_size = request.args.get('page_size', default=10, type=int)
+        search_term = request.args.get('search', default=None, type=str)
+        classification_filter = request.args.get('classification', default=None, type=str)
+        author_filter = request.args.get('author', default=None, type=str)
+        keywords_filter = request.args.get('keywords', default=None, type=str)
+        abstract_filter = request.args.get('abstract', default=None, type=str)
 
-        # 2) First query: get total count of documents for the user
-        count_query = """
-            SELECT VALUE COUNT(1)
-            FROM c
-            WHERE c.user_id = @user_id
-        """
-        count_params = [{"name": "@user_id", "value": user_id}]
-        count_items = list(documents_container.query_items(
-            query=count_query,
-            parameters=count_params,
-            enable_cross_partition_query=True
-        ))
-        total_count = count_items[0] if count_items else 0
+        # Ensure page and page_size are positive
+        if page < 1: page = 1
+        if page_size < 1: page_size = 10
+        # Limit page size to prevent abuse? (Optional)
+        # page_size = min(page_size, 100)
 
-        # 3) Second query: fetch the page of data
-        offset = (page - 1) * page_size
-        # Note: ORDER BY c._ts DESC to show newest first
-        query = f"""
-            SELECT *
-            FROM c
-            WHERE c.user_id = @user_id
-            ORDER BY c._ts DESC
-            OFFSET {offset} LIMIT {page_size}
-        """
-        docs = list(documents_container.query_items(
-            query=query,
-            parameters=count_params,
-            enable_cross_partition_query=True
-        ))
+        # --- 2) Build dynamic WHERE clause and parameters ---
+        query_conditions = ["c.user_id = @user_id"]
+        query_params = [{"name": "@user_id", "value": user_id}]
+        param_count = 0 # To generate unique parameter names
 
+        # General Search (File Name / Title)
+        if search_term:
+            param_name = f"@search_term_{param_count}"
+            # Case-insensitive search using LOWER and CONTAINS
+            query_conditions.append(f"(CONTAINS(LOWER(c.file_name ?? ''), LOWER({param_name})) OR CONTAINS(LOWER(c.title ?? ''), LOWER({param_name})))")
+            query_params.append({"name": param_name, "value": search_term})
+            param_count += 1
+
+        # Classification Filter
+        if classification_filter:
+            param_name = f"@classification_{param_count}"
+            if classification_filter.lower() == 'none':
+                # Filter for documents where classification is null, undefined, or empty string
+                query_conditions.append(f"(NOT IS_DEFINED(c.document_classification) OR c.document_classification = null OR c.document_classification = '')")
+                # No parameter needed for this specific condition
+            else:
+                query_conditions.append(f"c.document_classification = {param_name}")
+                query_params.append({"name": param_name, "value": classification_filter})
+                param_count += 1
+
+        # Author Filter (Assuming 'authors' is an array of strings)
+        if author_filter:
+            param_name = f"@author_{param_count}"
+            # Use ARRAY_CONTAINS for searching within the authors array (case-insensitive)
+            # Note: This checks if the array *contains* the exact author string.
+            # For partial matches *within* author names, CONTAINS(ToString(c.authors)...) might be needed, but less precise.
+            query_conditions.append(f"ARRAY_CONTAINS(c.authors, {param_name}, true)") # true enables case-insensitivity
+            query_params.append({"name": param_name, "value": author_filter})
+            param_count += 1
+
+        # Keywords Filter (Assuming 'keywords' is an array of strings)
+        if keywords_filter:
+            param_name = f"@keywords_{param_count}"
+            # Use ARRAY_CONTAINS for searching within the keywords array (case-insensitive)
+            query_conditions.append(f"ARRAY_CONTAINS(c.keywords, {param_name}, true)") # true enables case-insensitivity
+            query_params.append({"name": param_name, "value": keywords_filter})
+            param_count += 1
+
+        # Abstract Filter
+        if abstract_filter:
+            param_name = f"@abstract_{param_count}"
+            # Case-insensitive search using LOWER and CONTAINS
+            query_conditions.append(f"CONTAINS(LOWER(c.abstract ?? ''), LOWER({param_name}))")
+            query_params.append({"name": param_name, "value": abstract_filter})
+            param_count += 1
+
+        # Combine conditions into the WHERE clause
+        where_clause = " AND ".join(query_conditions)
+
+        # --- 3) First query: get total count based on filters ---
+        try:
+            count_query_str = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
+            # print(f"DEBUG Count Query: {count_query_str}") # Optional Debugging
+            # print(f"DEBUG Count Params: {query_params}")    # Optional Debugging
+            count_items = list(documents_container.query_items(
+                query=count_query_str,
+                parameters=query_params,
+                enable_cross_partition_query=True # May be needed if user_id is not partition key
+            ))
+            total_count = count_items[0] if count_items else 0
+
+        except Exception as e:
+            print(f"Error executing count query: {e}") # Log the error
+            return jsonify({"error": f"Error counting documents: {str(e)}"}), 500
+
+
+        # --- 4) Second query: fetch the page of data based on filters ---
+        try:
+            offset = (page - 1) * page_size
+            # Note: ORDER BY c._ts DESC to show newest first
+            data_query_str = f"""
+                SELECT *
+                FROM c
+                WHERE {where_clause}
+                ORDER BY c._ts DESC
+                OFFSET {offset} LIMIT {page_size}
+            """
+            # print(f"DEBUG Data Query: {data_query_str}") # Optional Debugging
+            # print(f"DEBUG Data Params: {query_params}")    # Optional Debugging
+            docs = list(documents_container.query_items(
+                query=data_query_str,
+                parameters=query_params,
+                enable_cross_partition_query=True # May be needed if user_id is not partition key
+            ))
+        except Exception as e:
+            print(f"Error executing data query: {e}") # Log the error
+            return jsonify({"error": f"Error fetching documents: {str(e)}"}), 500
+
+        # --- 5) Return results ---
         return jsonify({
             "documents": docs,
             "page": page,
             "page_size": page_size,
-            "total_count": total_count
+            "total_count": total_count # This now reflects the filtered count
         }), 200
 
 

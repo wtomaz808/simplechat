@@ -59,30 +59,67 @@ def register_route_backend_groups(app):
     @user_required
     @enabled_required("enable_group_workspaces")
     def api_list_groups():
+        """
+        Returns the user's groups with server-side pagination and search.
+        Query Parameters:
+            page (int): Page number (default: 1).
+            page_size (int): Items per page (default: 10).
+            search (str): Search term for group name/description.
+        """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-                
-        user_settings_data = get_user_settings(user_id)
-        db_active_group_id = user_settings_data["settings"].get("activeGroupOid", "")
 
-        search_query = request.args.get("search", "")
-        if search_query:
-            results = search_groups(search_query, user_id)
-        else:
-            results = get_user_groups(user_id)
+        try:
+            # --- Pagination Parameters ---
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 10))
+            if page < 1: page = 1
+            if page_size < 1: page_size = 10
+            offset = (page - 1) * page_size
 
-        mapped = []
-        for g in results:
-            role = get_user_role_in_group(g, user_id)
-            mapped.append({
-                "id": g["id"],
-                "name": g["name"],
-                "description": g.get("description", ""),
-                "userRole": role,
-                "isActive": (g["id"] == db_active_group_id)
-            })
+            # --- Search Parameter ---
+            search_query = request.args.get("search", "").strip()
 
-        return jsonify(mapped), 200
+            # --- Fetch ALL relevant groups first ---
+            # The existing functions get all groups for the user or filtered by search
+            # We'll do pagination *after* getting the full relevant list.
+            if search_query:
+                # Assuming search_groups returns all groups for the user matching the query
+                all_matching_groups = search_groups(search_query, user_id)
+            else:
+                # Assuming get_user_groups returns all groups for the user
+                all_matching_groups = get_user_groups(user_id)
+
+            # --- Calculate total count and apply pagination ---
+            total_count = len(all_matching_groups)
+            paginated_groups = all_matching_groups[offset : offset + page_size]
+
+            # --- Get active group ID ---
+            user_settings_data = get_user_settings(user_id)
+            db_active_group_id = user_settings_data["settings"].get("activeGroupOid", "")
+
+            # --- Map results ---
+            mapped_results = []
+            for g in paginated_groups:
+                role = get_user_role_in_group(g, user_id)
+                mapped_results.append({
+                    "id": g["id"],
+                    "name": g.get("name", "Untitled Group"), # Provide default name
+                    "description": g.get("description", ""),
+                    "userRole": role,
+                    "isActive": (g["id"] == db_active_group_id)
+                })
+
+            return jsonify({
+                "groups": mapped_results,
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count
+            }), 200
+
+        except Exception as e:
+            print(f"Error in api_list_groups: {str(e)}")
+            return jsonify({"error": f"An error occurred while fetching your groups: {str(e)}"}), 500
 
 
     @app.route("/api/groups", methods=["POST"])
