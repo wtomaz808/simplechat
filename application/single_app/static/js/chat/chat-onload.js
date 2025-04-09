@@ -11,19 +11,46 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadConversations(); // Load conversations immediately
 
-  // 1) Grab the message field
+  // Grab references to the relevant elements
   const userInput = document.getElementById("user-input");
-  // 2) Grab the new conversation button
   const newConversationBtn = document.getElementById("new-conversation-btn");
+  const promptsBtn = document.getElementById("search-prompts-btn");
+  const fileBtn = document.getElementById("choose-file-btn");
 
+  // 1) Message Input Focus => Create conversation if none
   if (userInput && newConversationBtn) {
-    // 3) Attach an event listener. You can use "focus" or "click".
-    userInput.addEventListener("click", () => {
-      // 4) Check if there's no current conversation
+    userInput.addEventListener("focus", () => {
       if (!currentConversationId) {
-        // 5) Programmatically click the new conversation button 
-        //    or call the same function that 'new-conversation-btn' calls.
         newConversationBtn.click();
+      }
+    });
+  }
+
+  // 2) Prompts Button Click => Create conversation if none
+  if (promptsBtn && newConversationBtn) {
+    promptsBtn.addEventListener("click", (event) => {
+      if (!currentConversationId) {
+        // Optionally prevent the default action if it does something immediately
+        // event.preventDefault(); 
+        newConversationBtn.click();
+
+        // (Optional) If you need the prompt UI to appear *after* the conversation is created,
+        // you can open the prompt UI programmatically in a small setTimeout or callback.
+        // setTimeout(() => openPromptUI(), 100);
+      }
+    });
+  }
+
+  // 3) File Upload Button Click => Create conversation if none
+  if (fileBtn && newConversationBtn) {
+    fileBtn.addEventListener("click", (event) => {
+      if (!currentConversationId) {
+        // event.preventDefault(); // If file dialog should only open once conversation is created
+        newConversationBtn.click();
+
+        // (Optional) If you want the file dialog to appear *after* the conversation is created,
+        // do it in a short setTimeout or callback:
+        // setTimeout(() => fileBtn.click(), 100);
       }
     });
   }
