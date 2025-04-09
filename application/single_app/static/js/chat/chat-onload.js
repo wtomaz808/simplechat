@@ -11,6 +11,23 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadConversations(); // Load conversations immediately
 
+  // 1) Grab the message field
+  const userInput = document.getElementById("user-input");
+  // 2) Grab the new conversation button
+  const newConversationBtn = document.getElementById("new-conversation-btn");
+
+  if (userInput && newConversationBtn) {
+    // 3) Attach an event listener. You can use "focus" or "click".
+    userInput.addEventListener("click", () => {
+      // 4) Check if there's no current conversation
+      if (!currentConversationId) {
+        // 5) Programmatically click the new conversation button 
+        //    or call the same function that 'new-conversation-btn' calls.
+        newConversationBtn.click();
+      }
+    });
+  }
+
   // Load documents and prompts
   Promise.all([
       loadAllDocs(),

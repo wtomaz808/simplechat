@@ -3,6 +3,193 @@
 from config import *
 from functions_authentication import *
 
+def get_settings():
+    default_settings = {
+        'id': 'app_settings',
+        # -- Your entire default dictionary here --
+        'app_title': 'Simple Chat',
+        'landing_page_text': 'You can add text here and it supports Markdown. '
+                             'You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
+        'show_logo': False,
+        'logo_path': 'images/logo.svg',
+
+        # GPT Settings
+        'enable_gpt_apim': False,
+        'azure_openai_gpt_endpoint': '',
+        'azure_openai_gpt_api_version': '2024-05-01-preview',
+        'azure_openai_gpt_authentication_type': 'key',
+        'azure_openai_gpt_subscription_id': '',
+        'azure_openai_gpt_resource_group': '',
+        'azure_openai_gpt_key': '',
+        'gpt_model': {
+            "selected": [],
+            "all": []
+        },
+        'azure_apim_gpt_endpoint': '',
+        'azure_apim_gpt_subscription_key': '',
+        'azure_apim_gpt_deployment': '',
+        'azure_apim_gpt_api_version': '',
+
+        # Embeddings Settings
+        'enable_embedding_apim': False,
+        'azure_openai_embedding_endpoint': '',
+        'azure_openai_embedding_api_version': '2024-05-01-preview',
+        'azure_openai_embedding_authentication_type': 'key',
+        'azure_openai_embedding_subscription_id': '',
+        'azure_openai_embedding_resource_group': '',
+        'azure_openai_embedding_key': '',
+        'embedding_model': {
+            "selected": [],
+            "all": []
+        },
+        'azure_apim_embedding_endpoint': '',
+        'azure_apim_embedding_subscription_key': '',
+        'azure_apim_embedding_deployment': '',
+        'azure_apim_embedding_api_version': '',
+
+        # Image Generation Settings
+        'enable_image_generation': False,
+        'enable_image_gen_apim': False,
+        'azure_openai_image_gen_endpoint': '',
+        'azure_openai_image_gen_api_version': '2024-05-01-preview',
+        'azure_openai_image_gen_authentication_type': 'key',
+        'azure_openai_image_gen_subscription_id': '',
+        'azure_openai_image_gen_resource_group': '',
+        'azure_openai_image_gen_key': '',
+        'image_gen_model': {
+            "selected": [],
+            "all": []
+        },
+        'azure_apim_image_gen_endpoint': '',
+        'azure_apim_image_gen_subscription_key': '',
+        'azure_apim_image_gen_deployment': '',
+        'azure_apim_image_gen_api_version': '',
+
+        # Workspaces
+        'enable_user_workspace': True,
+        'enable_group_workspaces': True,
+        'require_member_of_create_group': False,
+        'enable_public_workspaces': False,
+        'require_member_of_create_public_workspace': False,
+
+        # Multimedia
+        'enable_video_file_support': False,
+        'enable_audio_file_support': False,
+
+        # Metadata Extraction
+        'enable_extract_meta_data': False,
+        'enable_summarize_content_history_for_search': False,
+        'number_of_historical_messages_to_summarize': 10,
+        'enable_summarize_content_history_beyond_conversation_history_limit': False,
+
+        # Document Classification
+        'enable_document_classification': False,
+        'document_classification_categories': [
+            {"label": "None", "color": "#808080"},
+            {"label": "N/A", "color": "#808080"},
+            {"label": "Pending", "color": "#0000FF"}
+        ],
+
+        # Enhanced Citations
+        'enable_enhanced_citations': False,
+        'enable_enhanced_citations_mount': False,
+        'enhanced_citations_mount': '/view_documents',
+        'office_docs_storage_account_url': '',
+        'office_docs_authentication_type': 'key',
+        'office_docs_key': '',
+        'video_files_storage_account_url': '',
+        'video_files_authentication_type': 'key',
+        'video_files_key': '',
+        'audio_files_storage_account_url': '',
+        'audio_files_authentication_type': 'key',
+        'audio_files_key': '',
+
+        # Safety (Content Safety) Settings
+        'enable_content_safety': False,
+        'require_member_of_safety_violation_admin': False,
+        'content_safety_endpoint': '',
+        'content_safety_key': '',
+        'content_safety_authentication_type': 'key',
+        'enable_content_safety_apim': False,
+        'azure_apim_content_safety_endpoint': '',
+        'azure_apim_content_safety_subscription_key': '',
+
+        # User Feedback / Conversation Archiving
+        'enable_user_feedback': True,
+        'require_member_of_feedback_admin': False,
+        'enable_conversation_archiving': False,
+
+        # Search and Extract
+        'enable_web_search': False,
+        'bing_search_key': '',
+        'enable_web_search_apim': False,
+        'azure_apim_web_search_endpoint': '',
+        'azure_apim_web_search_subscription_key': '',
+
+        'azure_ai_search_endpoint': '',
+        'azure_ai_search_key': '',
+        'azure_ai_search_authentication_type': 'key',
+        'enable_ai_search_apim': False,
+        'azure_apim_ai_search_endpoint': '',
+        'azure_apim_ai_search_subscription_key': '',
+
+        'azure_document_intelligence_endpoint': '',
+        'azure_document_intelligence_key': '',
+        'azure_document_intelligence_authentication_type': 'key',
+        'enable_document_intelligence_apim': False,
+        'azure_apim_document_intelligence_endpoint': '',
+        'azure_apim_document_intelligence_subscription_key': '',
+
+        # Other
+        'max_file_size_mb': 150,
+        'conversation_history_limit': 10,
+        'default_system_prompt': '',
+        'enable_file_processing_logs': True
+    }
+
+    try:
+        # Attempt to read the existing doc
+        settings_item = settings_container.read_item(
+            item="app_settings",
+            partition_key="app_settings"
+        )
+        print("Successfully retrieved settings from Cosmos DB.")
+
+        # Merge default_settings in, to fill in any missing or nested keys
+        merged = deep_merge_dicts(default_settings, settings_item)
+
+        # If merging added anything new, upsert back to Cosmos so future reads remain up to date
+        if merged != settings_item:
+            settings_container.upsert_item(merged)
+            print("App Settings had missing keys and was updated in Cosmos DB.")
+            return merged
+        else:
+            # If merged is unchanged, no new keys needed
+            return merged
+
+    except CosmosResourceNotFoundError:
+        # If there's no doc, create it from scratch:
+        settings_container.create_item(body=default_settings)
+        print("Default settings created in Cosmos and returned.")
+        return default_settings
+
+    except Exception as e:
+        print(f"Error retrieving settings: {str(e)}")
+        return None
+
+
+def update_settings(new_settings):
+    try:
+        # always fetch the latest settings doc, which includes your merges
+        settings_item = get_settings()
+        settings_item.update(new_settings)
+        settings_container.upsert_item(settings_item)
+        print("Settings updated successfully.")
+        return True
+    except Exception as e:
+        print(f"Error updating settings: {str(e)}")
+        return False
+
 def compare_versions(v1_str, v2_str):
     """
     Manually compares two version strings (e.g., "1.0.0", "1.1").
@@ -46,8 +233,6 @@ def compare_versions(v1_str, v2_str):
 
     # If all compared parts are equal, they are the same version
     return 0
-# --- End of compare_versions function ---
-
 
 def extract_latest_version_from_html(html_content):
     """
@@ -123,243 +308,17 @@ def extract_latest_version_from_html(html_content):
     except Exception as e:
         print(f"Error parsing HTML or finding latest version: {e}")
         return None
-
-def get_settings():
-    try:
-        settings_item = settings_container.read_item(
-            item="app_settings",
-            partition_key="app_settings"
-        )
-        print("Successfully retrieved settings.")
-
-        # --- NEW: Ensure version_check exists ---
-        needs_update = False
-        if 'version_check' not in settings_item:
-            print("Existing settings document missing 'version_check'. Adding default.")
-            default_version_check = {
-                "last_checked_datetime": "None",
-                "latest_release_version": '',
-                'url': 'https://github.com/microsoft/simplechat/releases'
-            }
-            settings_item['version_check'] = default_version_check
-            needs_update = True
-        elif not isinstance(settings_item.get('version_check'), dict):
-             print("Existing 'version_check' field is not a dictionary. Resetting to default.")
-             default_version_check = {
-                "last_checked_datetime": "None",
-                "latest_release_version": '',
-                'url': 'https://github.com/microsoft/simplechat/releases'
-             }
-             settings_item['version_check'] = default_version_check
-             needs_update = True
-        # Optional: Add checks for sub-keys like 'url' if needed
-        elif 'url' not in settings_item['version_check']:
-             print("Existing 'version_check' dictionary missing 'url'. Adding default URL.")
-             settings_item['version_check']['url'] = 'https://github.com/microsoft/simplechat/releases'
-             # Add defaults for other keys if necessary
-             if 'last_checked_datetime' not in settings_item['version_check']:
-                 settings_item['version_check']['last_checked_datetime'] = "None"
-             if 'latest_release_version' not in settings_item['version_check']:
-                 settings_item['version_check']['latest_release_version'] = ""
-             needs_update = True
-
-
-        if needs_update:
-            try:
-                # Update the item in Cosmos DB to persist the change
-                settings_container.upsert_item(body=settings_item)
-                print("'version_check' field updated/added and saved to settings document.")
-            except Exception as update_err:
-                print(f"Error saving updated settings with version_check field: {update_err}")
-                # Proceed with the in-memory update for this request, but log the save error
-        # --- END NEW ---
-
-        return settings_item
-    except CosmosResourceNotFoundError:
-        default_settings = {
-            'id': 'app_settings',
-
-            # General Settings
-            'app_title': 'Simple Chat',
-            'landing_page_text': 'You can add text here and it supports Markdown. You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
-            'show_logo': False,
-            'logo_path': 'images/logo.png',
-
-            # GPT Settings
-            'enable_gpt_apim': False,
-            'azure_openai_gpt_endpoint': '',
-            'azure_openai_gpt_api_version': '2024-05-01-preview',
-            'azure_openai_gpt_authentication_type': 'key',
-            'azure_openai_gpt_subscription_id': '',
-            'azure_openai_gpt_resource_group': '',
-            'azure_openai_gpt_key': '',
-            'gpt_model': {
-                "selected": [],
-                "all": []
-            },
-            'azure_apim_gpt_endpoint': '',
-            'azure_apim_gpt_subscription_key': '',
-            'azure_apim_gpt_deployment': '',
-            'azure_apim_gpt_api_version': '',
-
-            # Embeddings Settings
-            'enable_embedding_apim': False,
-            'azure_openai_embedding_endpoint': '',
-            'azure_openai_embedding_api_version': '2024-05-01-preview',
-            'azure_openai_embedding_authentication_type': 'key',
-            'azure_openai_embedding_subscription_id': '',
-            'azure_openai_embedding_resource_group': '',
-            'azure_openai_embedding_key': '',
-            'embedding_model': {
-                "selected": [],
-                "all": []
-            },
-            'azure_apim_embedding_endpoint': '',
-            'azure_apim_embedding_subscription_key': '',
-            'azure_apim_embedding_deployment': '',
-            'azure_apim_embedding_api_version': '',
-
-            # Image Generation Settings
-            'enable_image_generation': False,
-            'enable_image_gen_apim': False,
-            'azure_openai_image_gen_endpoint': '',
-            'azure_openai_image_gen_api_version': '2024-05-01-preview',
-            'azure_openai_image_gen_authentication_type': 'key',
-            'azure_openai_image_gen_subscription_id': '',
-            'azure_openai_image_gen_resource_group': '',
-            'azure_openai_image_gen_key': '',
-            'image_gen_model': {
-                "selected": [],
-                "all": []
-            },
-            'azure_apim_image_gen_endpoint': '',
-            'azure_apim_image_gen_subscription_key': '',
-            'azure_apim_image_gen_deployment': '',
-            'azure_apim_image_gen_api_version': '',
-
-            # Workspaces
-            'enable_user_workspace': True,
-            'enable_group_workspaces': True,
-            'require_member_of_create_group': False,
-            'enable_public_workspaces': False,
-            'require_member_of_create_public_workspace': False,
-
-            # Multimedia
-            'enable_video_file_support': False,
-            'enable_audio_file_support': False,
-
-            # Metadata Extraction
-            'enable_extract_meta_data': False,
-            'enable_summarize_content_history_for_search': False,
-            'number_of_historical_messages_to_summarize': 10,
-            'enable_summarize_content_history_beyond_conversation_history_limit': False,
-            # title, authors, publication date, keywords, summary
-            'enable_document_classification': False,
-            'document_classification_categories': [
-                {
-                    "label": "None",
-                    "color": "#808080"
-                },
-                {
-                    "label": "N/A",
-                    "color": "#808080"
-                },
-                {
-                    "label": "Pending",
-                    "color": "#0000FF"
-                }
-            ],
-
-            # Enhanced Citations
-            'enable_enhanced_citations': False,
-            'enable_enhanced_citations_mount': False,
-            'enhanced_citations_mount': '/view_documents',
-            'office_docs_storage_account_url': '',
-            'office_docs_authentication_type': 'key',
-            'office_docs_key': '',
-            'video_files_storage_account_url': '',
-            'video_files_authentication_type': 'key',
-            'video_files_key': '',
-            'audio_files_storage_account_url': '',
-            'audio_files_authentication_type': 'key',
-            'audio_files_key': '',
-
-            # Safety (Content Safety) Settings
-            'enable_content_safety': False,
-            'require_member_of_safety_violation_admin': False,
-            'content_safety_endpoint': '',
-            'content_safety_key': '',
-            'content_safety_authentication_type': 'key',
-            'enable_content_safety_apim': False,
-            'azure_apim_content_safety_endpoint': '',
-            'azure_apim_content_safety_subscription_key': '',
-
-            # User Feedback / Conversation Archiving
-            'enable_user_feedback': True,
-            'require_member_of_feedback_admin': False,
-            'enable_conversation_archiving': False,
-
-            # Search and Extract
-            'enable_web_search': False,
-            'bing_search_key': '',
-            'enable_web_search_apim': False,
-            'azure_apim_web_search_endpoint': '',
-            'azure_apim_web_search_subscription_key': '',
-
-            'azure_ai_search_endpoint': '',
-            'azure_ai_search_key': '',
-            'azure_ai_search_authentication_type': 'key',
-            'enable_ai_search_apim': False,
-            'azure_apim_ai_search_endpoint': '',
-            'azure_apim_ai_search_subscription_key': '',
-
-            'azure_document_intelligence_endpoint': '',
-            'azure_document_intelligence_key': '',
-            'azure_document_intelligence_authentication_type': 'key',
-            'enable_document_intelligence_apim': False,
-            'azure_apim_document_intelligence_endpoint': '',
-            'azure_apim_document_intelligence_subscription_key': '',
-
-            # Other Settings
-            'max_file_size_mb': 150,
-            'conversation_history_limit': 10,
-            'default_system_prompt': '',
-            'enable_file_processing_logs': True,
-            'version_check': {
-                "last_checked_datetime": "None",
-                "latest_release_version": '',
-                'url': 'https://github.com/microsoft/simplechat/releases'
-            }
-        }
-
-        try:
-            settings_container.create_item(body=default_settings)
-            print("Default settings created and returned.")
-            return default_settings
-        except Exception as create_err:
-             print(f"Error creating default settings document: {create_err}")
-             # Return the defaults in memory even if creation failed, but log error
-             return default_settings
-    except Exception as e:
-        print(f"Error retrieving settings: {str(e)}")
-        return { # Return minimal structure on generic error
-            'id': 'app_settings',
-            'app_title': 'Error Loading Settings',
-            'version_check': { "url": "", "latest_release_version": "" }
-            # Add other essential keys with safe defaults if needed
-        }
-
-
-def update_settings(new_settings):
-    try:
-        settings_item = get_settings()
-        settings_item.update(new_settings)
-        settings_container.upsert_item(settings_item)
-        print("Settings updated successfully.")
-        return True
-    except Exception as e:
-        print(f"Error updating settings: {str(e)}")
-        return False
+    
+def deep_merge_dicts(default_dict, existing_dict):
+    for k, default_val in default_dict.items():
+        if k not in existing_dict:
+            existing_dict[k] = default_val
+        else:
+            existing_val = existing_dict[k]
+            if isinstance(default_val, dict) and isinstance(existing_val, dict):
+                deep_merge_dicts(default_val, existing_val)
+            # For lists or other types, we skip overwriting.
+    return existing_dict
 
 def encrypt_key(key):
     cipher_suite = Fernet(app.config['SECRET_KEY'])

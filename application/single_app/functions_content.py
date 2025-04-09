@@ -18,7 +18,7 @@ def extract_content_with_azure_di(file_path):
     and returns a list of dicts, each containing page_number and content.
     """
     try:
-        document_intelligence_client = CLIENTS['document_intelligence_client']
+        document_intelligence_client = CLIENTS['document_intelligence_client'] # Ensure CLIENTS is populated
         with open(file_path, "rb") as f:
             poller = document_intelligence_client.begin_analyze_document(
                 model_id="prebuilt-read",
@@ -33,16 +33,18 @@ def extract_content_with_azure_di(file_path):
             if status == "succeeded":
                  break
             if status in ["failed", "canceled"]:
+                # Attempt to get result even on failure for potential error details
                 try:
                      result = poller.result()
+                     # Optionally add failed result details to the exception message
                      error_details = f"Failed DI result details: {result}"
                 except Exception as res_ex:
                      error_details = f"Could not get result details after failure: {res_ex}"
-                raise Exception(f"Document analysis {status}. {error_details}")
+                raise Exception(f"Document analysis {status} for document. {error_details}")
             if time.time() - start_time > max_wait_time:
                 raise TimeoutError(f"Document analysis took too long.")
 
-            sleep_duration = 5
+            sleep_duration = 10 # Or adjust based on expected processing time
             time.sleep(sleep_duration)
 
 
@@ -53,8 +55,9 @@ def extract_content_with_azure_di(file_path):
         if result.pages:
             for page in result.pages:
                 page_number = page.page_number
-                page_text = ""
+                page_text = "" # Initialize page_text
 
+                # --- METHOD 1: Preferred - Use spans and result.content ---
                 if page.spans and result.content:
                     try:
                         page_content_parts = []
@@ -64,39 +67,59 @@ def extract_content_with_azure_di(file_path):
                             page_content_parts.append(result.content[start:end])
                         page_text = "".join(page_content_parts)
                     except Exception as span_ex:
-                         page_text = ""
+                         # Silently ignore span extraction error and try next method
+                         page_text = "" # Reset on error
 
+                # --- METHOD 2: Fallback - Use lines if spans failed or weren't available ---
                 if not page_text and page.lines:
                     try:
                         page_text = "\n".join(line.content for line in page.lines)
                     except Exception as line_ex:
-                        page_text = ""
+                        # Silently ignore line extraction error and try next method
+                        page_text = "" # Reset on error
 
 
+                # --- METHOD 3: Last Resort Fallback - Use words (less accurate formatting) ---
                 if not page_text and page.words:
                      try:
                         page_text = " ".join(word.content for word in page.words)
                      except Exception as word_ex:
-                         page_text = ""
+                         # Silently ignore word extraction error
+                         page_text = "" # Reset on error
 
+                # If page_text is still empty after all attempts, it will be added as such
 
                 pages_data.append({
                     "page_number": page_number,
                     "content": page_text.strip() # Add strip() just in case
                 })
+        # --- Fallback if NO pages were found at all, but top-level content exists ---
         elif result.content:
             pages_data.append({
                 "page_number": 1,
                 "content": result.content.strip()
             })
+        # else: # No pages and no content, pages_data remains empty
+
+
+        # Log the *processed* data using your existing logging function (optional)
+        # add_file_task_to_file_processing_log(
+        #     document_id=document_id,
+        #     user_id=user_id,
+        #     content=f"DI extraction processed data: {pages_data}"
+        # )
 
         return pages_data
 
     except HttpResponseError as e:
+        # Consider adding to your specific log here if needed, before re-raising
+        # add_file_task_to_file_processing_log(document_id, user_id, f"HTTP error during DI: {e}")
         raise e
     except TimeoutError as e:
+        # add_file_task_to_file_processing_log(document_id, user_id, f"Timeout error during DI: {e}")
         raise e
     except Exception as e:
+        # add_file_task_to_file_processing_log(document_id, user_id, f"General error during DI: {e}")
         raise e
 
 
