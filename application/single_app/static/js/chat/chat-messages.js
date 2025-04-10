@@ -54,37 +54,31 @@ function createCitationsHtml(hybridCitations = [], webCitations = [], messageId)
 }
 
 export function loadMessages(conversationId) {
-  // Assuming the API returns the full message objects including augmented data
-  fetch(`/conversation/${conversationId}/messages`)
-      .then((response) => response.ok ? response.json() : Promise.reject('Failed to load messages'))
+    fetch(`/conversation/${conversationId}/messages`)
+      .then((response) => response.json())
       .then((data) => {
-          // const chatbox = document.getElementById("chatbox"); // Already defined above
-          if (!chatbox) return;
-
-          chatbox.innerHTML = ""; // Clear previous messages
-          data.messages.forEach((msg) => {
-               // Pass the necessary fields, including the new ones
-              appendMessage(
-                  msg.role === "user" ? "You" :
-                  msg.role === "assistant" ? "AI" :
-                  msg.role === "file" ? "File" :
-                  msg.role === "image" ? "image" :
-                  msg.role === "safety" ? "safety" : "System", // Handle different roles
-                  msg.content, // Content or file object
-                  msg.model_deployment_name,
-                  msg.id, // Use msg.id as messageId
-                  msg.augmented,
-                  msg.hybrid_citations,
-                  msg.web_search_citations
-              );
-          });
-          scrollChatToBottom(); // Scroll after loading all
+        const chatbox = document.getElementById("chatbox");
+        if (!chatbox) return;
+  
+        chatbox.innerHTML = "";
+        data.messages.forEach((msg) => {
+          if (msg.role === "user") {
+            appendMessage("You", msg.content);
+          } else if (msg.role === "assistant") {
+            appendMessage("AI", msg.content, msg.model_deployment_name, msg.message_id);
+          } else if (msg.role === "file") {
+            appendMessage("File", msg);
+          } else if (msg.role === "image") {
+            appendMessage("image", msg.content, msg.model_deployment_name);
+          } else if (msg.role === "safety") {
+            appendMessage("safety", msg.content);
+          }
+        });
       })
       .catch((error) => {
-          console.error("Error loading messages:", error);
-           if (chatbox) chatbox.innerHTML = `<div class="text-center p-3 text-danger">Error loading messages.</div>`;
+        console.error("Error loading messages:", error);
       });
-}
+  }
 
 export function appendMessage(
     sender,
