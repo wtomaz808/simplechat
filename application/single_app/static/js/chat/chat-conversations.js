@@ -10,6 +10,8 @@ const currentConversationTitleEl = document.getElementById("current-conversation
 const currentConversationClassificationsEl = document.getElementById("current-conversation-classifications");
 const chatbox = document.getElementById("chatbox");
 
+let currentlyEditingId = null; // Track which item is being edited
+
 export function loadConversations() {
   if (!conversationsList) return;
   conversationsList.innerHTML = '<div class="text-center p-3 text-muted">Loading conversations...</div>'; // Loading state
