@@ -16,7 +16,7 @@ def register_route_backend_prompts(app):
         search_term = request.args.get('search', None)
 
         # Base query
-        query = f"SELECT c.id, c.name, c.updated_at FROM c WHERE c.user_id = @user_id AND c.type = 'user_prompt'"
+        query = f"SELECT * FROM c WHERE c.user_id = @user_id AND c.type = 'user_prompt'"
         parameters = [ {"name": "@user_id", "value": user_id} ]
 
         # Count query (without pagination limits but with filters)

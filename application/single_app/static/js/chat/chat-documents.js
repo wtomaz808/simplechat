@@ -2,6 +2,10 @@
 
 import { showToast } from "./chat-toast.js"; // Assuming you have this
 
+let personalDocs = [];
+let groupDocs = [];
+let activeGroupName = "";
+
 export const docScopeSelect = document.getElementById("doc-scope-select");
 const searchDocumentsBtn = document.getElementById("search-documents-btn");
 const docSelectEl = document.getElementById("document-select");
@@ -33,12 +37,6 @@ try {
     console.error("Error parsing classification categories:", e);
     classificationCategories = [];
 }
-// ----------------------------------
-
-// We'll store personalDocs/groupDocs in memory once loaded:
-let personalDocs = [];
-let groupDocs = [];
-let activeGroupName = "";
 
 /* ---------------------------------------------------------------------------
    Populate the Document Dropdown Based on the Scope

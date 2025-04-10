@@ -9,6 +9,8 @@ import { createNewConversation, selectConversation, addConversationToList  } fro
 import { isColorLight, toBoolean, escapeHtml } from "./chat-utils.js";
 import { showToast } from "./chat-toast.js"; 
 
+let currentConversationId = null; // Global variable to hold the current conversation ID
+
 export const userInput = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const promptSelectionContainer = document.getElementById("prompt-selection-container");
@@ -85,6 +87,13 @@ export function loadMessages(conversationId) {
            if (chatbox) chatbox.innerHTML = `<div class="text-center p-3 text-danger">Error loading messages.</div>`;
       });
 }
+
+function scrollChatToBottom() {
+    const chatbox = document.getElementById("chatbox");
+    if (chatbox) {
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+  }
 
 export function appendMessage(
     sender,
