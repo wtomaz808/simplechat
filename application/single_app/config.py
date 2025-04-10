@@ -43,14 +43,14 @@ from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
 from flask_executor import Executor
-from io import BytesIO
 from bs4 import BeautifulSoup
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     MarkdownHeaderTextSplitter,
     RecursiveJsonSplitter
 )
-
+from PIL import Image
+from io import BytesIO
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -76,7 +76,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.501'
+app.config['VERSION'] = '0.207.509'
 Session(app)
 
 CLIENTS = {}
@@ -213,6 +213,26 @@ file_processing_container = database.create_container_if_not_exists(
     id=file_processing_container_name,
     partition_key=PartitionKey(path="/document_id")
 )
+
+def ensure_custom_logo_file_exists(app, settings):
+    """
+    If custom_logo_base64 is present in settings, ensure static/images/custom_logo.png
+    is created. If file is missing, create it from base64.
+    """
+    custom_logo_b64 = settings.get('custom_logo_base64', '')
+    if not custom_logo_b64:
+        # No custom logo in DB; nothing to generate
+        return
+    
+    logo_path = os.path.join(app.root_path, 'static', 'images', 'custom_logo.png')
+    if not os.path.exists(logo_path):
+        try:
+            decoded = base64.b64decode(custom_logo_b64)
+            with open(logo_path, 'wb') as f:
+                f.write(decoded)
+            print("Created static/images/custom_logo.png from stored base64.")
+        except Exception as ex:
+            print(f"Failed to create custom_logo.png: {ex}")
 
 def initialize_clients(settings):
     """

@@ -4,6 +4,7 @@ from config import *
 from functions_documents import *
 from functions_authentication import *
 from functions_settings import *
+from functions_logging import *
 
 def allowed_file(filename, allowed_extensions):
     return '.' in filename and \
@@ -150,34 +151,12 @@ def register_route_frontend_admin_settings(app):
                 flash('Error parsing Image Gen model data. Changes may not be saved.', 'warning')
                 image_gen_model_obj = settings.get('image_gen_model', {'selected': [], 'all': []}) # Fallback
 
-
-            # Logo Handling (Your existing logic is fine)
-            logo_path_relative = settings.get('logo_path', 'images/logo.svg')
-            logo_file = request.files.get('logo_file')
-            if logo_file and allowed_file(logo_file.filename, ALLOWED_EXTENSIONS_IMG):
-                # Your logo saving logic...
-                filename = secure_filename(logo_file.filename)
-                # Use a consistent name or timestamped name to avoid conflicts
-                custom_logo_filename = f"custom_logo{os.path.splitext(filename)[1]}"
-                logo_path = os.path.join(app.root_path, 'static', 'images', custom_logo_filename)
-                os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-                try:
-                    logo_file.save(logo_path)
-                    logo_path_relative = f'images/{custom_logo_filename}'
-                    print(f"Saved new logo to: {logo_path_relative}")
-                except Exception as e:
-                    print(f"Error saving logo file: {e}")
-                    flash(f"Error saving logo file: {e}", "danger")
-                    # Keep existing logo path if save fails
-                    logo_path_relative = settings.get('logo_path', 'images/logo.svg')
-
-
             # --- Construct new_settings Dictionary ---
             new_settings = {
                 # General
                 'app_title': app_title,
                 'show_logo': form_data.get('show_logo') == 'on',
-                'logo_path': logo_path_relative,
+                'custom_logo_base64': settings.get('custom_logo_base64', ''),
                 'landing_page_text': form_data.get('landing_page_text', ''),
 
                 # GPT (Direct & APIM)
@@ -297,18 +276,119 @@ def register_route_frontend_admin_settings(app):
                 'max_file_size_mb': max_file_size_mb,
                 'conversation_history_limit': conversation_history_limit,
                 'default_system_prompt': form_data.get('default_system_prompt', '').strip(),
-             }
+            }
+            
+            logo_file = request.files.get('logo_file')
+            if logo_file and allowed_file(logo_file.filename, ALLOWED_EXTENSIONS_IMG):
+                try:
+                    # 1) Read file fully into memory:
+                    file_bytes = logo_file.read()
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Logo file uploaded: {logo_file.filename}"
+                    )
 
-            # Update settings in DB
+                    # 3) Load into Pillow from the original bytes for processing
+                    in_memory_for_process = BytesIO(file_bytes) # Use original bytes
+                    img = Image.open(in_memory_for_process)
+                    
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Loaded image for processing: {logo_file.filename}"
+                    )
+
+                    # Ensure image mode is compatible (e.g., convert palette modes)
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    elif img.mode != 'RGB' and img.mode != 'RGBA':
+                         img = img.convert('RGB')
+
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Converted image mode for processing: {logo_file.filename} (mode: {img.mode})"
+                    )
+
+                    # 4) Resize to height=100
+                    w, h = img.size
+                    if h > 100:
+                        aspect = w / h
+                        new_height = 100
+                        new_width = int(aspect * new_height)
+                        # Use LANCZOS (previously ANTIALIAS) for resizing
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Resized image for processing: {logo_file.filename} (new size: {img.size})"
+                    )
+
+                    # 5) Convert to PNG in-memory
+                    img_bytes_io = BytesIO()
+                    img.save(img_bytes_io, format='PNG')
+                    png_data = img_bytes_io.getvalue()
+
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Converted image to PNG for processing: {logo_file.filename}"
+                    )
+
+                    # 6) Turn to base64
+                    base64_str = base64.b64encode(png_data).decode('utf-8')
+
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Converted image to base64 for processing: {base64_str}"
+                    )
+
+                    # ****** CHANGE HERE: Update only on success *****
+                    new_settings['custom_logo_base64'] = base64_str
+                    test_settings = get_settings()
+                    base64_str_test = test_settings.get('custom_logo_base64')
+
+                    print("Successfully processed new logo and updated base64 string.")
+
+                    add_file_task_to_file_processing_log(
+                        document_id=None, # Placeholder if needed
+                        user_id='test',
+                        content=f"Updated logo base64 in settings: {base64_str_test}"
+                    )
+
+                    # ****** END CHANGE *****
+
+                    # 7) (Optional) update logo_path_relative if you still use it elsewhere
+                    # logo_path_relative = f'images/{custom_logo_filename}'
+                    # new_settings['logo_path_relative'] = logo_path_relative # Example if needed
+
+                except Exception as e:
+                    print(f"Error processing logo file: {e}") # Log the error for debugging
+                    flash(f"Error processing logo file: {e}. Existing logo preserved.", "danger")
+                    # On error, new_settings['custom_logo_base64'] keeps its initial value (the old logo)
+
+            # --- Update settings in DB ---
+            # new_settings now contains either the new logo base64 or the original one
             if update_settings(new_settings):
                 flash("Admin settings updated successfully.", "success")
-                # Update local settings variable if needed by other functions called after this
+                # Update local settings variable ONLY after successful DB update
+                # This ensures the 'settings' variable used in GET requests reflects the saved state
+                # Note: get_settings() called at the start of the *next* request will fetch the true latest state anyway.
+                # So, this immediate update is mainly for consistency within this *single* request/response cycle if needed.
                 settings.update(new_settings)
-                # Re-initialize clients or services that depend on settings
-                # initialize_clients(settings) # Ensure this function exists and handles potential errors
+                # Re-initialize clients or services if critical settings changed
+                # initialize_clients(settings) # Uncomment if needed and defined
+                # Ensure the static file is updated/created from the new base64
+                ensure_custom_logo_file_exists(app, new_settings) # Call after successful update
             else:
                 flash("Failed to update admin settings.", "danger")
 
 
             # Redirect back to settings page
             return redirect(url_for('admin_settings'))
+
+        # Fallback if not GET or POST (shouldn't happen with standard routing)
+        return redirect(url_for('admin_settings'))

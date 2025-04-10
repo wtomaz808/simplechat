@@ -11,7 +11,7 @@ def get_settings():
         'landing_page_text': 'You can add text here and it supports Markdown. '
                              'You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
         'show_logo': False,
-        'logo_path': 'images/logo.svg',
+        'custom_logo_base64': '',
 
         # GPT Settings
         'enable_gpt_apim': False,

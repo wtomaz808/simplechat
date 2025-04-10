@@ -37,6 +37,7 @@ from route_backend_group_prompts import *
 def before_first_request():
     settings = get_settings()
     initialize_clients(settings)
+    ensure_custom_logo_file_exists(app, settings)
 
 @app.context_processor
 def inject_settings():

@@ -114,13 +114,19 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
     <div class="container-fluid">
       {% if app_settings.show_logo %}
-      <a class="navbar-brand" href="{{ url_for('index') }}">
-        <img src="{{ url_for('static', filename=app_settings.logo_path) }}" alt="Logo" height="30" />
-      </a>
+        {% if app_settings.custom_logo_base64 %}
+          <a class="navbar-brand" href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='images/custom_logo.png') }}" alt="Logo" height="30" />
+          </a>
+        {% else %}
+          <a class="navbar-brand" href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="30" />
+          </a>
+        {% endif %}
       {% else %}
-      <a class="navbar-brand" href="{{ url_for('index') }}">
-        {{ app_settings.app_title }}
-      </a>
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+          {{ app_settings.app_title }}
+        </a>
       {% endif %}
   
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"

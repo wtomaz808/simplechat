@@ -8,10 +8,17 @@
 
 <div class="text-center mt-5">
     {% if app_settings.show_logo %}
-        <img src="{{ url_for('static', filename=app_settings.logo_path) }}"
-             alt="Logo"
-             height="100"
-             class="mb-4">
+        {% if app_settings.custom_logo_base64 %}
+            <img src="{{ url_for('static', filename='images/custom_logo.png') }}"
+                alt="Logo"
+                height="100"
+                class="mb-4">
+        {% else %}
+            <img src="{{ url_for('static', filename='images/logo.png') }}"
+                alt="Logo"
+                height="100"
+                class="mb-4">
+        {% endif %}
     {% endif %}
 
     {% if session.get('user') and session['user'].get('roles')
