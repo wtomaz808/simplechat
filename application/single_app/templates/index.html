@@ -9,7 +9,7 @@
 <div class="text-center mt-5">
     {% if app_settings.show_logo %}
         {% if app_settings.custom_logo_base64 %}
-            <img src="{{ url_for('static', filename='images/custom_logo.png') }}"
+            <img src="{{ url_for('static', filename='images/custom_logo.png') }}?v={{ app_settings.logo_version | default(1) }}"
                 alt="Logo"
                 height="100"
                 class="mb-4">

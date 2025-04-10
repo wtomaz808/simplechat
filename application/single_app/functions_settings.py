@@ -12,6 +12,7 @@ def get_settings():
                              'You agree to our [acceptable user policy](acceptable_use_policy.html) by using this service.',
         'show_logo': False,
         'custom_logo_base64': '',
+        'logo_version': 1,
 
         # GPT Settings
         'enable_gpt_apim': False,

@@ -157,6 +157,7 @@ def register_route_frontend_admin_settings(app):
                 'app_title': app_title,
                 'show_logo': form_data.get('show_logo') == 'on',
                 'custom_logo_base64': settings.get('custom_logo_base64', ''),
+                'logo_version': settings.get('logo_version', 1),
                 'landing_page_text': form_data.get('landing_page_text', ''),
 
                 # GPT (Direct & APIM)
@@ -284,8 +285,8 @@ def register_route_frontend_admin_settings(app):
                     # 1) Read file fully into memory:
                     file_bytes = logo_file.read()
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Logo file uploaded: {logo_file.filename}"
                     )
 
@@ -294,8 +295,8 @@ def register_route_frontend_admin_settings(app):
                     img = Image.open(in_memory_for_process)
                     
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Loaded image for processing: {logo_file.filename}"
                     )
 
@@ -306,8 +307,8 @@ def register_route_frontend_admin_settings(app):
                          img = img.convert('RGB')
 
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Converted image mode for processing: {logo_file.filename} (mode: {img.mode})"
                     )
 
@@ -321,8 +322,8 @@ def register_route_frontend_admin_settings(app):
                         img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Resized image for processing: {logo_file.filename} (new size: {img.size})"
                     )
 
@@ -332,8 +333,8 @@ def register_route_frontend_admin_settings(app):
                     png_data = img_bytes_io.getvalue()
 
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Converted image to PNG for processing: {logo_file.filename}"
                     )
 
@@ -341,29 +342,18 @@ def register_route_frontend_admin_settings(app):
                     base64_str = base64.b64encode(png_data).decode('utf-8')
 
                     add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
+                        document_id='Image_Upload', # Placeholder if needed
+                        user_id='New_image',
                         content=f"Converted image to base64 for processing: {base64_str}"
                     )
 
                     # ****** CHANGE HERE: Update only on success *****
                     new_settings['custom_logo_base64'] = base64_str
-                    test_settings = get_settings()
-                    base64_str_test = test_settings.get('custom_logo_base64')
 
-                    print("Successfully processed new logo and updated base64 string.")
+                    current_version = settings.get('logo_version', 1) # Get version from settings loaded at start
+                    new_settings['logo_version'] = current_version + 1 # Increment
+                    new_logo_processed = True
 
-                    add_file_task_to_file_processing_log(
-                        document_id=None, # Placeholder if needed
-                        user_id='test',
-                        content=f"Updated logo base64 in settings: {base64_str_test}"
-                    )
-
-                    # ****** END CHANGE *****
-
-                    # 7) (Optional) update logo_path_relative if you still use it elsewhere
-                    # logo_path_relative = f'images/{custom_logo_filename}'
-                    # new_settings['logo_path_relative'] = logo_path_relative # Example if needed
 
                 except Exception as e:
                     print(f"Error processing logo file: {e}") # Log the error for debugging
@@ -374,15 +364,14 @@ def register_route_frontend_admin_settings(app):
             # new_settings now contains either the new logo base64 or the original one
             if update_settings(new_settings):
                 flash("Admin settings updated successfully.", "success")
-                # Update local settings variable ONLY after successful DB update
-                # This ensures the 'settings' variable used in GET requests reflects the saved state
-                # Note: get_settings() called at the start of the *next* request will fetch the true latest state anyway.
-                # So, this immediate update is mainly for consistency within this *single* request/response cycle if needed.
-                settings.update(new_settings)
-                # Re-initialize clients or services if critical settings changed
-                # initialize_clients(settings) # Uncomment if needed and defined
-                # Ensure the static file is updated/created from the new base64
-                ensure_custom_logo_file_exists(app, new_settings) # Call after successful update
+                # Ensure static file is created/updated *after* successful DB save
+                # Pass the *just saved* data (or fetch fresh) to ensure consistency
+                updated_settings_for_file = get_settings() # Fetch fresh to be safe
+                if updated_settings_for_file:
+                    ensure_custom_logo_file_exists(app, updated_settings_for_file)
+                else:
+                    print("ERROR: Could not fetch settings after update to ensure logo file.")
+
             else:
                 flash("Failed to update admin settings.", "danger")
 
