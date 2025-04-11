@@ -102,54 +102,99 @@ def register_route_backend_documents(app):
             return jsonify({'error': 'User not authenticated'}), 401
 
         if 'file' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
-        
-        file = request.files['file']
-        if not file.filename:
-            return jsonify({'error': 'No selected file'}), 400
+            return jsonify({'error': 'No file part in the request'}), 400 # Changed error message slightly
 
-        # 1) Save the file temporarily
-        filename = secure_filename(file.filename)
-        file_ext = os.path.splitext(filename)[1].lower()
+        files = request.files.getlist('file') # Handle multiple files potentially
+        if not files or all(not f.filename for f in files):
+             return jsonify({'error': 'No file selected or files have no name'}), 400
 
-        parent_document_id = str(uuid.uuid4())
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-            file.save(tmp_file.name)
-            temp_file_path = tmp_file.name
+        processed_docs = []
+        upload_errors = []
 
-        # 2) Create the Cosmos metadata with status=“queued”
-        create_document(
-            file_name=filename,
-            user_id=user_id,
-            document_id=parent_document_id,
-            num_file_chunks=0,
-            status="Queued for processing"  # or "Starting..."
-        )
+        for file in files:
+            if not file.filename:
+                upload_errors.append(f"Skipped a file with no name.")
+                continue
 
-        # (Optional) set initial percentage
-        update_document(
-            document_id=parent_document_id,
-            user_id=user_id,
-            percentage_complete=0
-        )
+            # --- CHANGE: Use original filename directly ---
+            original_filename = file.filename
+            # Keep secure_filename ONLY for creating the temporary file path suffix
+            # to avoid issues with OS path characters, BUT DO NOT use its output elsewhere.
+            safe_suffix_filename = secure_filename(original_filename)
+            file_ext = os.path.splitext(safe_suffix_filename)[1].lower() # Get extension from safely-suffixed name for temp file
 
-        # 3) Now run heavy-lifting in a background thread
-        # Pass in user_id, doc_id, and the path to the saved file
-        future = executor.submit(
-            process_document_upload_background,
-            parent_document_id,
-            user_id,
-            temp_file_path,
-            filename
-        )
-        # If you want to store the future in memory by name, you can do:
-        executor.submit_stored(parent_document_id, process_document_upload_background, ...)
+            # --- CHANGE: Validate using the original filename ---
+            if not allowed_file(original_filename):
+                upload_errors.append(f"File type not allowed for: {original_filename}")
+                continue
 
-        # 4) Return immediately to the user with doc ID
+            # --- Check extension existence from original filename ---
+            if not os.path.splitext(original_filename)[1]:
+                 upload_errors.append(f"Could not determine file extension for: {original_filename}")
+                 continue
+
+            # 1) Save the file temporarily
+            parent_document_id = str(uuid.uuid4())
+            temp_file_path = None # Initialize
+            try:
+                # Use NamedTemporaryFile for automatic cleanup, generate safe suffix
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                    file.save(tmp_file.name)
+                    temp_file_path = tmp_file.name
+            except Exception as e:
+                 upload_errors.append(f"Failed to save temporary file for {original_filename}: {e}")
+                 if temp_file_path and os.path.exists(temp_file_path):
+                     os.remove(temp_file_path) # Clean up if partially created
+                 continue # Skip this file
+
+            try:
+                # 2) Create the Cosmos metadata with status="Queued"
+                # --- CHANGE: Use original_filename for file_name ---
+                create_document(
+                    file_name=original_filename,
+                    user_id=user_id,
+                    document_id=parent_document_id,
+                    num_file_chunks=0, # This likely gets updated later
+                    status="Queued for processing"
+                )
+
+                # (Optional) set initial percentage
+                update_document(
+                    document_id=parent_document_id,
+                    user_id=user_id,
+                    percentage_complete=0
+                )
+
+                # 3) Now run heavy-lifting in a background thread
+                # --- CHANGE: Pass original_filename ---
+                future = executor.submit(
+                    process_document_upload_background,
+                    parent_document_id,
+                    user_id,
+                    temp_file_path, # Pass the actual path of the saved temp file
+                    original_filename
+                )
+                # If you want to store the future in memory by name, you can do:
+                executor.submit_stored(parent_document_id, process_document_upload_background, parent_document_id, user_id, temp_file_path, original_filename)
+
+                processed_docs.append({'document_id': parent_document_id, 'filename': original_filename})
+
+            except Exception as e:
+                upload_errors.append(f"Failed to queue processing for {original_filename}: {e}")
+                # Clean up temp file if queuing failed after saving
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+
+        # 4) Return immediately to the user with doc IDs and any errors
+        response_status = 200 if processed_docs and not upload_errors else 207 # Multi-Status if partial success/errors
+        if not processed_docs and upload_errors: response_status = 400 # Bad Request if all failed
+
         return jsonify({
-            'message': 'File accepted for processing. Check status periodically.',
-            'document_id': parent_document_id
-        }), 200
+            'message': f'Processed {len(processed_docs)} file(s). Check status periodically.',
+            'document_ids': [doc['document_id'] for doc in processed_docs],
+            'processed_filenames': [doc['filename'] for doc in processed_docs],
+            'errors': upload_errors
+        }), response_status
 
 
     @app.route('/api/documents', methods=['GET'])

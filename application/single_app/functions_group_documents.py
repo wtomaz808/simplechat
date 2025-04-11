@@ -138,7 +138,7 @@ def process_group_document_upload(file, group_id, user_id):
     """
     settings = get_settings()
 
-    filename = secure_filename(file.filename)
+    filename = secure_filename(file.filename, allow_unicode=True)
     file_ext = os.path.splitext(filename)[1].lower()
     if file_ext.replace('.', '') not in ALLOWED_EXTENSIONS:
         raise Exception("Unsupported file extension")

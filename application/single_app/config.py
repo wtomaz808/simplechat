@@ -35,7 +35,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
 from functools import wraps
-from msal import ConfidentialClientApplication
+from msal import ConfidentialClientApplication, SerializableTokenCache
 from flask_session import Session
 from uuid import uuid4
 from threading import Thread
@@ -76,7 +76,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.526'
+app.config['VERSION'] = '0.207.535'
 Session(app)
 
 CLIENTS = {}
@@ -94,7 +94,7 @@ APP_URI = f"api://{CLIENT_ID}"
 CLIENT_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
-SCOPE = ["User.Read"]  # Adjust scope according to your needs
+SCOPE = ["User.Read", "User.ReadBasic.All", "People.Read.All", "Group.Read.All"] # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
 AZURE_ENVIRONMENT = os.getenv("AZURE_ENVIRONMENT", "public") # public, usgovernment
 
