@@ -1,0 +1,29 @@
+{
+    "id": "<unique-document-id>",
+    "num_chunks": 0,
+    "file_name": "<file-name>",
+    "user_id": "<unique-user-id>",
+    "upload_date": "<ISO-8601-upload-timestamp>",
+    "version": 1,
+    "author": [
+        {
+            "name": "<author-name>"
+        },
+        {
+            "name": "<author-name>"
+        }
+    ],
+    "title": "<document-title>",
+    "summary": "<document-summary>",
+    "keywords": [
+        "<keyword-1>",
+        "<keyword-2>",
+        "<keyword-3>"
+    ],
+    "status": "<document-status>",
+    "percentage_complete": 50,
+    "number_of_pages": 100,
+    "file_creation_date": "<ISO-8601-creation-timestamp>",
+    "file_last_modification_date": "<ISO-8601-modification-timestamp>",
+    "type": "document_metadata"
+}

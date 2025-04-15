@@ -1,0 +1,3109 @@
+openapi: 3.0.0
+info:
+  title: Simple Chat
+  version: 0.207.585
+  description: API for managing chats, documents, groups, user settings, admin settings, feedback, and safety logs.
+servers:
+  - url: /api
+    description: api server
+  - url: /
+    description: web server
+
+tags:
+  - name: Chats
+    description: Chat interaction and message management
+  - name: Conversations
+    description: Managing conversation metadata
+  - name: Documents
+    description: User document upload, management, and retrieval
+  - name: Group Documents
+    description: Group document upload, management, and retrieval
+  - name: Groups
+    description: Group creation, membership, and management
+  - name: Group Prompts
+    description: Managing shared prompts within groups
+  - name: User Prompts
+    description: Managing personal user prompts
+  - name: Feedback
+    description: Submitting and reviewing user feedback
+  - name: Safety
+    description: Managing and viewing content safety logs
+  - name: Models
+    description: Retrieving available AI model deployments
+  - name: Users
+    description: User search and settings management
+  - name: Admin
+    description: Administrative settings and connection testing
+
+paths:
+  /api/chat:
+    post:
+      tags: [Chats]
+      summary: Send a message and get a reply
+      operationId: chatApi
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Successful reply or safety block message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/get_messages:
+    get:
+      tags: [Chats]
+      summary: Get all messages for a specific conversation
+      operationId: apiGetMessages
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: conversation_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the conversation to fetch messages for.
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound' # Conversation not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/get_conversations:
+    get:
+      tags: [Conversations]
+      summary: Get all conversations for the current user
+      operationId: getConversations
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of user's conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/create_conversation:
+    post:
+      tags: [Conversations]
+      summary: Create a new empty conversation
+      operationId: createConversation
+      security:
+        - cookieAuth: []
+      responses:
+        '200': # Often returns 201 Created, but code shows 200
+          description: New conversation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation_id:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                    example: New Conversation
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/conversations/{conversation_id}:
+    put:
+      tags: [Conversations]
+      summary: Update conversation title
+      operationId: updateConversationTitle
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  description: The new title for the conversation.
+                  example: "Project Alpha Planning"
+      responses:
+        '200':
+          description: Conversation title updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Conversation updated
+                  title:
+                    type: string
+                  classification:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Conversations]
+      summary: Delete a conversation and its messages
+      operationId: deleteConversation
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Conversation deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/get_file_content:
+    post:
+      tags: [Documents]
+      summary: Get the extracted content of a file previously added to a conversation
+      operationId: getFileContent
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversation_id, file_id]
+              properties:
+                conversation_id:
+                  type: string
+                  format: uuid
+                file_id:
+                  type: string
+                  description: The ID of the file message within the conversation.
+      responses:
+        '200':
+          description: File content retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_content:
+                    type: string
+                  filename:
+                    type: string
+                  is_table:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound' # Conversation or File not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/upload:
+    post:
+      tags: [Documents]
+      summary: Upload one or more documents to the user's workspace
+      operationId: apiUserUploadDocument
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: # Assuming the input name is 'file' and it can handle multiple
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The document file(s) to upload.
+      responses:
+        '200':
+          description: File(s) accepted and queued for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '207':
+          description: Multi-Status - Some files processed, some errors occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse' # Same schema, but check 'errors'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No file, invalid type, size exceeded, all failed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents:
+    get:
+      tags: [Documents]
+      summary: Get a paginated list of the user's documents with filtering
+      operationId: apiGetUserDocuments
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: classification
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by document classification label (or 'none').
+        - name: author
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by author name.
+        - name: keywords
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by keyword.
+        - name: abstract
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by text within the abstract.
+      responses:
+        '200':
+          description: Paginated list of documents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      documents:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DocumentMeta'
+        '400':
+           $ref: '#/components/responses/BadRequest' # Invalid pagination params
+        '401':
+           $ref: '#/components/responses/Unauthorized'
+        '500':
+           $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{document_id}:
+    get:
+      tags: [Documents]
+      summary: Get metadata for a specific user document
+      operationId: apiGetUserDocument
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document metadata found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentMeta' # Assuming GET returns full metadata
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # If user doesn't own doc
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Documents]
+      summary: Update metadata for a specific user document
+      operationId: apiPatchUserDocument
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                abstract:
+                  type: string
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                publication_date:
+                  type: string
+                  format: date # or date-time if applicable
+                document_classification:
+                  type: string
+                authors:
+                  type: array
+                  items:
+                    type: string
+              example:
+                title: "Updated Report Title"
+                keywords: ["finance", "q3", "update"]
+      responses:
+        '200':
+          description: Document metadata updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+           $ref: '#/components/responses/Forbidden' # If user doesn't own doc
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Documents]
+      summary: Delete a user document and its associated chunks
+      operationId: apiDeleteUserDocument
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+           $ref: '#/components/responses/Forbidden' # If user doesn't own doc
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{document_id}/extract_metadata:
+    post:
+      tags: [Documents]
+      summary: Queue a background job to extract metadata for a user document
+      operationId: apiExtractUserMetadata
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200': # Code uses 200, could be 202 Accepted
+          description: Metadata extraction job queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  document_id:
+                    type: string
+                    format: uuid
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or user doesn't own doc
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/get_citation:
+    post:
+      tags: [Chats] # Related to chat citations
+      summary: Get the text content of a specific citation ID
+      operationId: getCitation
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [citation_id]
+              properties:
+                citation_id:
+                  type: string
+                  description: The ID of the chunk/citation to retrieve.
+      responses:
+        '200':
+          description: Citation text retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cited_text:
+                    type: string
+                  file_name:
+                    type: string
+                  page_number:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Trying to access citation not owned/shared
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/discover:
+    get:
+      tags: [Groups]
+      summary: Discover groups (optionally filtering out user's groups)
+      operationId: discoverGroups
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: showAll
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: If true, shows all groups including those the user is already in.
+      responses:
+        '200':
+          description: List of discoverable groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupDiscoveryInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups:
+    get:
+      tags: [Groups]
+      summary: List the user's groups with pagination and search
+      operationId: apiListGroups
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+      responses:
+        '200':
+          description: Paginated list of user's groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      groups:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GroupListItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Groups]
+      summary: Create a new group
+      operationId: apiCreateGroup
+      security:
+        - cookieAuth: []
+      description: Requires create group role if configured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  default: "Untitled Group"
+                description:
+                  type: string
+                  default: ""
+              example:
+                name: "Marketing Team"
+                description: "Collaboration space for marketing projects"
+      responses:
+        '201':
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}:
+    get:
+      tags: [Groups]
+      summary: Get full details for a specific group
+      operationId: apiGetGroupDetails
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Group details found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group' # Assuming full details
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Groups]
+      summary: Delete a group (owner only)
+      operationId: apiDeleteGroup
+      security:
+        - cookieAuth: []
+      description: Requires create group role and ownership.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Group deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled, insufficient role, or not owner
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch: # Combined PATCH/PUT as they modify the same resource
+      tags: [Groups]
+      summary: Update group name and description (owner only)
+      operationId: apiUpdateGroupPatch
+      security:
+        - cookieAuth: []
+      description: Requires create group role and ownership.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+              example:
+                name: "Updated Marketing Team Name"
+                description: "New description"
+      responses:
+        '200':
+          description: Group updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Group updated
+                  id:
+                    type: string
+                    format: uuid
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled, insufficient role, or not owner
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put: # Define PUT separately if its behavior or required fields differ significantly
+      tags: [Groups]
+      summary: Replace group name and description (owner only)
+      operationId: apiUpdateGroupPut
+      security:
+        - cookieAuth: []
+      description: Requires create group role and ownership. Typically requires all fields.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description] # Usually PUT requires all fields
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+              example:
+                name: "Updated Marketing Team Name"
+                description: "New description"
+      responses:
+        '200':
+          description: Group updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Group updated
+                  id:
+                    type: string
+                    format: uuid
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled, insufficient role, or not owner
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/setActive:
+    patch:
+      tags: [Groups]
+      summary: Set the user's active group
+      operationId: apiSetActiveGroup
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groupId]
+              properties:
+                groupId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Active group set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or user not in group
+        '404':
+          $ref: '#/components/responses/NotFound' # Group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/requests:
+    post:
+      tags: [Groups]
+      summary: Request to join a group
+      operationId: requestToJoin
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '201':
+          description: Membership request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Already member or already requested
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags: [Groups]
+      summary: View pending membership requests (Owner/Admin only)
+      operationId: viewPendingRequests
+      security:
+        - cookieAuth: []
+      description: Requires Owner or Admin role in the group.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: List of pending user requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/requests/{request_id}:
+    patch:
+      tags: [Groups]
+      summary: Approve or reject a membership request (Owner/Admin only)
+      operationId: approveRejectRequest
+      security:
+        - cookieAuth: []
+      description: Requires Owner or Admin role in the group. `request_id` is the user ID of the requester.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject]
+      responses:
+        '200':
+          description: Request action processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid action
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Group or request not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/members:
+    post:
+      tags: [Groups]
+      summary: Add a member directly to the group (Owner/Admin only)
+      operationId: addMemberDirectly
+      security:
+        - cookieAuth: []
+      description: Requires Owner or Admin role in the group.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                displayName:
+                  type: string
+              example:
+                userId: "user-guid-123"
+                email: "member@example.com"
+                displayName: "New Member"
+      responses:
+        '200':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Missing userId or user already member
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags: [Groups]
+      summary: View members of a group with filtering
+      operationId: viewGroupMembers
+      security:
+        - cookieAuth: []
+      description: Requires membership in the group.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Owner, Admin, DocumentManager, User]
+          description: Filter members by their role in the group.
+      responses:
+        '200':
+          description: List of group members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or not a member
+        '404':
+          $ref: '#/components/responses/NotFound' # Group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/members/{member_id}:
+    delete:
+      tags: [Groups]
+      summary: Remove a member from the group
+      operationId: removeMember
+      security:
+        - cookieAuth: []
+      description: User can remove themselves (if not owner). Owner/Admin can remove others (except owner).
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/MemberId'
+      responses:
+        '200':
+          description: Member removed successfully (or user left)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled, insufficient role, trying to remove owner, owner trying to leave
+        '404':
+          $ref: '#/components/responses/NotFound' # Group or member not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Groups]
+      summary: Update a member's role in the group (Owner/Admin only)
+      operationId: updateMemberRole
+      security:
+        - cookieAuth: []
+      description: Requires Owner or Admin role in the group. Cannot change Owner role here.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - $ref: '#/components/parameters/MemberId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [Admin, DocumentManager, User]
+      responses:
+        '200':
+          description: Member role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage' # Or return updated member info
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid role
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Group or member not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/transferOwnership:
+    patch:
+      tags: [Groups]
+      summary: Transfer ownership of the group (Owner only)
+      operationId: transferOwnership
+      security:
+        - cookieAuth: []
+      description: Requires ownership of the group. New owner must be a member.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newOwnerId]
+              properties:
+                newOwnerId:
+                  type: string
+                  description: The user ID of the member to become the new owner.
+      responses:
+        '200':
+          description: Ownership transferred successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Missing newOwnerId or new owner not a member
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or not the owner
+        '404':
+          $ref: '#/components/responses/NotFound' # Group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/groups/{group_id}/fileCount:
+    get:
+      tags: [Groups]
+      summary: Get the count of files associated with the group (Owner only)
+      operationId: getGroupFileCount
+      security:
+        - cookieAuth: []
+      description: Requires ownership of the group.
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: File count retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or not the owner
+        '404':
+          $ref: '#/components/responses/NotFound' # Group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/group_prompts:
+    get:
+      tags: [Group Prompts]
+      summary: Get prompts for the user's active group
+      operationId: getGroupPrompts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of prompts for the active group
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prompts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GroupPrompt'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or user not in group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Group Prompts]
+      summary: Create a new prompt for the active group
+      operationId: createGroupPrompt
+      security:
+        - cookieAuth: []
+      description: Role check might apply based on policy (e.g., Owner/Admin/DocManager).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+              example:
+                name: "Summarize Meeting Notes"
+                content: "Please summarize the key action items and decisions from the following text:\n{text}"
+      responses:
+        '200': # Code uses 200, could be 201
+          description: Group prompt created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupPrompt'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Missing fields or no active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/group_prompts/{prompt_id}:
+    get:
+      tags: [Group Prompts]
+      summary: Get a specific prompt from the active group
+      operationId: getGroupPrompt
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      responses:
+        '200':
+          description: Group prompt details found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupPrompt'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or user not in group
+        '404':
+          $ref: '#/components/responses/NotFound' # Prompt not found in group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Group Prompts]
+      summary: Update a specific prompt in the active group
+      operationId: updateGroupPrompt
+      security:
+        - cookieAuth: []
+      description: Role check might apply based on policy.
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+              example:
+                name: "Updated Summarize Notes"
+      responses:
+        '200':
+          description: Group prompt updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupPrompt'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No active group or invalid data
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Prompt not found in group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Group Prompts]
+      summary: Delete a specific prompt from the active group
+      operationId: deleteGroupPrompt
+      security:
+        - cookieAuth: []
+      description: Role check might apply based on policy.
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      responses:
+        '200':
+          description: Group prompt deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Prompt not found in group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/group_documents/upload:
+    post:
+      tags: [Group Documents]
+      summary: Upload one or more documents to the user's active group
+      operationId: apiUploadGroupDocument
+      security:
+        - cookieAuth: []
+      description: Requires Owner, Admin, or DocumentManager role in the active group.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The document file(s) to upload.
+      responses:
+        '200':
+          description: File(s) accepted and queued for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '207':
+          description: Multi-Status - Some files processed, some errors occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No file, invalid type, size exceeded, no active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Active group not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/group_documents:
+    get:
+      tags: [Group Documents]
+      summary: Get a paginated list of documents for the user's active group
+      operationId: apiGetGroupDocuments
+      security:
+        - cookieAuth: []
+      description: Requires membership in the active group.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: classification
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by document classification label (or 'none').
+        - name: author
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by author name.
+        - name: keywords
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by keyword.
+        - name: abstract
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by text within the abstract.
+      responses:
+        '200':
+          description: Paginated list of group documents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      documents:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DocumentMeta' # Same schema as user docs
+        '400':
+           $ref: '#/components/responses/BadRequest' # Invalid pagination or no active group
+        '401':
+           $ref: '#/components/responses/Unauthorized'
+        '403':
+           $ref: '#/components/responses/Forbidden' # Feature disabled or not member of group
+        '404':
+           $ref: '#/components/responses/NotFound' # Active group not found
+        '500':
+           $ref: '#/components/responses/InternalServerError'
+
+  /api/group_documents/{document_id}:
+    get:
+      tags: [Group Documents]
+      summary: Get metadata for a specific group document
+      operationId: apiGetGroupDocument
+      security:
+        - cookieAuth: []
+      description: Requires membership in the active group.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId' # Re-using doc id param
+      responses:
+        '200':
+          description: Group document metadata found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or not member
+        '404':
+          $ref: '#/components/responses/NotFound' # Active group or document not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Group Documents]
+      summary: Update metadata for a specific group document
+      operationId: apiPatchGroupDocument
+      security:
+        - cookieAuth: []
+      description: Requires Owner, Admin, or DocumentManager role in the active group.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # Same properties as user document patch
+                title:
+                  type: string
+                abstract:
+                  type: string
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                publication_date:
+                  type: string
+                  format: date
+                document_classification:
+                  type: string
+                authors:
+                  type: array
+                  items:
+                    type: string
+              example:
+                title: "Group Report Update"
+                document_classification: "Confidential"
+      responses:
+        '200':
+          description: Group document metadata updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid data or no active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+           $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Active group or document not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Group Documents]
+      summary: Delete a group document and its associated chunks
+      operationId: apiDeleteGroupDocument
+      security:
+        - cookieAuth: []
+      description: Requires Owner, Admin, or DocumentManager role in the active group.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Group document deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+           $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+           $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Active group or document not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/group_documents/{document_id}/extract_metadata:
+    post:
+      tags: [Group Documents]
+      summary: Queue extraction of metadata for a group document
+      operationId: apiExtractGroupMetadata
+      security:
+        - cookieAuth: []
+      description: Requires Owner, Admin, or DocumentManager role in the active group.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200': # Code uses 200, could be 202
+          description: Group metadata extraction job queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  document_id:
+                    type: string
+                    format: uuid
+        '400':
+           $ref: '#/components/responses/BadRequest' # No active group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound' # Active group or document not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /feedback/submit:
+    post:
+      tags: [Feedback]
+      summary: Submit feedback on an AI message
+      operationId: feedbackSubmit
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageId, conversationId, feedbackType]
+              properties:
+                messageId:
+                  type: string
+                  description: ID of the AI message being reviewed.
+                conversationId:
+                  type: string
+                  format: uuid
+                feedbackType:
+                  type: string
+                  enum: [Positive, Negative, Neutral] # Assuming these types
+                reason:
+                  type: string
+                  description: Optional user reason for the feedback.
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  feedbackId:
+                    type: string
+                    format: uuid
+        '400':
+          $ref: '#/components/responses/BadRequest' # Missing fields
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError' # DB error or error fetching context
+
+  /feedback/review:
+    get:
+      tags: [Feedback]
+      summary: Get feedback items for admin review (Admin only)
+      operationId: feedbackReviewGet
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially feedback admin role.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSizeReview'
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Positive, Negative, Neutral]
+          description: Filter by feedback type.
+        - name: ack
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: Filter by acknowledgment status (as string 'true' or 'false').
+      responses:
+        '200':
+          description: Paginated list of feedback items for review
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfoReview'
+                  - type: object
+                    properties:
+                      feedback:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FeedbackItem'
+                      total_pages:
+                         type: integer
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /feedback/review/{feedbackId}:
+    get:
+      tags: [Feedback]
+      summary: Get a single feedback item by ID (Admin only)
+      operationId: feedbackReviewGetSingle
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially feedback admin role.
+      parameters:
+        - $ref: '#/components/parameters/FeedbackId'
+      responses:
+        '200':
+          description: Feedback item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Feedback]
+      summary: Update admin review fields for a feedback item (Admin only)
+      operationId: feedbackReviewUpdate
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially feedback admin role.
+      parameters:
+        - $ref: '#/components/parameters/FeedbackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledged:
+                  type: boolean
+                analysisNotes:
+                  type: string
+                responseToUser:
+                  type: string
+                actionTaken:
+                  type: string
+              example:
+                acknowledged: true
+                analysisNotes: "Reviewed accuracy, seems correct."
+      responses:
+        '200':
+          description: Feedback item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /feedback/retest/{feedbackId}:
+    post:
+      tags: [Feedback]
+      summary: Retest the prompt from a feedback item (Admin only)
+      operationId: feedbackRetest
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially feedback admin role.
+      parameters:
+        - $ref: '#/components/parameters/FeedbackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  description: The original user prompt to retest.
+      responses:
+        '200':
+          description: Retest response generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  retestResponse:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest' # Missing prompt
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '500':
+          $ref: '#/components/responses/InternalServerError' # Error running prompt
+
+  /feedback/my:
+    get:
+      tags: [Feedback]
+      summary: Get the current user's submitted feedback items
+      operationId: feedbackMy
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [Positive, Negative, Neutral]
+          description: Filter by feedback type.
+        - name: ack
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: Filter by admin acknowledgment status ('true' or 'false').
+      responses:
+        '200':
+          description: Paginated list of the user's feedback
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      feedback:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FeedbackItem' # Can reuse admin view schema
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/prompts:
+    get:
+      tags: [User Prompts]
+      summary: Get the user's saved prompts with pagination and search
+      operationId: getPrompts
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTermPromptName'
+      responses:
+        '200':
+          description: Paginated list of user prompts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      prompts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserPrompt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [User Prompts]
+      summary: Create a new user prompt
+      operationId: createPrompt
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+              example:
+                name: "My Email Template"
+                content: "Draft an email about {topic} to {recipient}..."
+      responses:
+        '201':
+          description: User prompt created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPromptShort' # Return minimal info
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid/missing fields
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/prompts/{prompt_id}:
+    get:
+      tags: [User Prompts]
+      summary: Get a specific user prompt by ID
+      operationId: getPrompt
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      responses:
+        '200':
+          description: User prompt details found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPrompt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or prompt not owned by user
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [User Prompts]
+      summary: Update a specific user prompt
+      operationId: updatePrompt
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+              example:
+                name: "Updated Email Template"
+      responses:
+        '200':
+          description: User prompt updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPromptShort' # Return minimal info
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid/missing fields
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or prompt not owned by user
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [User Prompts]
+      summary: Delete a specific user prompt
+      operationId: deletePrompt
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PromptId'
+      responses:
+        '200': # Code uses 200, could be 204 No Content
+          description: User prompt deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or prompt not owned by user
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/models/gpt:
+    get:
+      tags: [Models]
+      summary: Get available GPT model deployments
+      operationId: getGptModels
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of available GPT models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Config missing
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError' # Azure API error
+
+  /api/models/embedding:
+    get:
+      tags: [Models]
+      summary: Get available Embedding model deployments
+      operationId: getEmbeddingModels
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of available Embedding models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelInfo'
+        '400':
+           $ref: '#/components/responses/BadRequest' # Config missing
+        '401':
+           $ref: '#/components/responses/Unauthorized'
+        '500':
+           $ref: '#/components/responses/InternalServerError' # Azure API error
+
+  /api/models/image:
+    get:
+      tags: [Models]
+      summary: Get available Image Generation model deployments
+      operationId: getImageModels
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of available Image Generation models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelInfo'
+        '400':
+           $ref: '#/components/responses/BadRequest' # Config missing
+        '401':
+           $ref: '#/components/responses/Unauthorized'
+        '500':
+           $ref: '#/components/responses/InternalServerError' # Azure API error
+
+  /api/safety/logs:
+    get:
+      tags: [Safety]
+      summary: Get content safety logs for admin review (Admin only)
+      operationId: getSafetyLogs
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially safety admin role.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter logs by status (e.g., 'Blocked', 'Reviewed').
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter logs by action taken (e.g., 'Warned', 'NoAction').
+      responses:
+        '200':
+          description: Paginated list of safety logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      logs:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SafetyLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/safety/logs/{log_id}:
+    patch:
+      tags: [Safety]
+      summary: Update admin fields for a safety log (Admin only)
+      operationId: updateSafetyLog
+      security:
+        - cookieAuth: []
+      description: Requires admin role and potentially safety admin role.
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                action:
+                  type: string
+                notes:
+                  type: string
+                  description: Admin notes regarding the log entry.
+              example:
+                status: "Reviewed"
+                action: "NoAction"
+                notes: "False positive detection."
+      responses:
+        '200':
+          description: Safety log updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or insufficient role
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/safety/logs/my:
+    get:
+      tags: [Safety]
+      summary: Get the current user's safety logs
+      operationId: getMySafetyLogs
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter logs by status.
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter logs by action.
+      responses:
+        '200':
+          description: Paginated list of the user's safety logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginationInfo'
+                  - type: object
+                    properties:
+                      logs:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SafetyLog' # Reuse admin schema
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/safety/logs/my/{log_id}:
+    patch:
+      tags: [Safety]
+      summary: Update user notes for their own safety log
+      operationId: updateMySafetyLog
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_notes:
+                  type: string
+                  description: Notes added by the user regarding this log entry.
+              example:
+                user_notes: "I didn't intend for this message to be harmful."
+      responses:
+        '200':
+          description: Safety log user notes updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Feature disabled or trying to update someone else's log
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/userSearch:
+    get:
+      tags: [Users]
+      summary: Search for users in Azure AD via Microsoft Graph
+      operationId: apiUserSearch
+      security:
+        - cookieAuth: [] # Requires logged-in user's token implicitly
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search term for user's displayName, mail, or userPrincipalName.
+      responses:
+        '200':
+          description: List of matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSearchResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized' # Missing or invalid token
+        '500':
+          $ref: '#/components/responses/InternalServerError' # Graph API error
+
+  /api/user/settings:
+    get:
+      tags: [Users]
+      summary: Get the current user's settings document
+      operationId: getUserSettings
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User settings document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsDocument'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+           description: User settings document not found (might return empty object instead)
+           content:
+             application/json:
+               schema:
+                 type: object
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Users]
+      summary: Update the current user's settings
+      operationId: updateUserSettings
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  $ref: '#/components/schemas/UserSettings'
+              example:
+                settings:
+                  layoutPreference: "horizontal"
+                  activeGroupOid: "group-guid-456"
+      responses:
+        '200':
+          description: User settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Invalid JSON or structure
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/admin/settings/test_connection:
+    post:
+      tags: [Admin]
+      summary: Test connection to external services using provided credentials (Admin only)
+      operationId: testConnection
+      security:
+        - cookieAuth: []
+      description: Requires admin role. Accepts temporary connection details to test before saving.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [test_type]
+              properties:
+                test_type:
+                  type: string
+                  enum: [gpt, embedding, image, safety, web_search, azure_ai_search, azure_doc_intelligence, chunking_api]
+                # Other properties depend on test_type (e.g., endpoint, key, deployment, auth_type)
+                # Example structure (actual payload varies)
+                enable_apim:
+                  type: boolean
+                apim:
+                  type: object
+                  properties:
+                     endpoint: string
+                     subscription_key: string
+                     deployment: string # For AI models
+                     api_version: string # For AI models
+                direct:
+                  type: object
+                  properties:
+                     endpoint: string
+                     key: string
+                     auth_type: string
+                     api_version: string # For AI models
+                selected_model:
+                  type: object
+                  properties:
+                     deploymentName: string
+                enabled: # For toggleable services like Safety/WebSearch
+                  type: boolean
+              example:
+                test_type: "gpt"
+                enable_apim: false
+                direct:
+                  endpoint: "https://YOUR_AOAI.openai.azure.com/"
+                  key: "YOUR_KEY"
+                  auth_type: "key"
+                  api_version: "2023-05-15"
+                selected_model:
+                  deploymentName: "gpt-35-turbo"
+
+      responses:
+        '200':
+          description: Connection test successful (or skipped if service disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest' # Unknown test_type or missing data
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' # Not an admin
+        '500':
+          description: Connection test failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' # Error contains details
+
+components:
+  schemas:
+    # --- Request Schemas ---
+    ChatRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The user's message.
+        conversation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the existing conversation, or null/absent for a new one.
+        hybrid_search:
+          type: boolean
+          default: false
+        selected_document_id:
+          type: string
+          format: uuid
+          nullable: true
+        bing_search:
+          type: boolean
+          default: false
+        image_generation:
+          type: boolean
+          default: false
+        doc_scope:
+          type: string
+          enum: [user, group, user_and_group] # Assuming possible values
+          nullable: true
+        active_group_id:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - message
+
+    # --- Response Schemas ---
+    ChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+          description: The AI's response or a safety block message.
+        image_url:
+          type: string
+          format: url
+          nullable: true
+          description: URL of the generated image, if requested.
+        conversation_id:
+          type: string
+          format: uuid
+        conversation_title:
+          type: string
+        message_id:
+          type: string
+          description: ID of the assistant's or safety message.
+        blocked:
+          type: boolean
+          description: True if the user's message was blocked by Content Safety.
+        triggered_categories:
+          type: array
+          items:
+            type: object
+            properties:
+              category: string
+              severity: integer
+          nullable: true
+        blocklist_matches:
+          type: array
+          items:
+            type: object
+            properties:
+              blocklistName: string
+              blocklistItemId: string
+              blocklistItemText: string
+          nullable: true
+        classification:
+           type: array
+           items:
+             type: string
+           nullable: true
+        model_deployment_name:
+           type: string
+           nullable: true
+        augmented:
+           type: boolean
+        hybrid_citations:
+           type: array
+           items:
+             $ref: '#/components/schemas/HybridCitation'
+           nullable: true
+        web_search_citations:
+           type: array
+           items:
+             $ref: '#/components/schemas/WebSearchCitation'
+           nullable: true
+
+    UploadResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        document_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        processed_filenames:
+           type: array
+           items:
+             type: string
+        errors:
+          type: array
+          items:
+            type: string
+
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      example:
+        message: Operation successful
+
+    SuccessStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        details: # Optional details field
+          type: object
+          additionalProperties: true
+          description: Additional error details, structure may vary.
+      example:
+        error: Resource not found
+
+    # --- Data Schemas ---
+    ConversationMeta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        last_updated:
+          type: string
+          format: date-time
+        title:
+          type: string
+        classification:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        conversation_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system, safety, file, image] # Add other roles as needed
+        content:
+          type: string # Could be URL for image, text for others
+        timestamp:
+          type: string
+          format: date-time
+        model_deployment_name:
+          type: string
+          nullable: true
+        # File role specific:
+        filename:
+           type: string
+           nullable: true
+        is_table:
+           type: boolean
+           nullable: true
+        # Assistant role specific:
+        augmented:
+           type: boolean
+           nullable: true
+        hybrid_citations:
+           type: array
+           items:
+             $ref: '#/components/schemas/HybridCitation'
+           nullable: true
+        web_search_citations:
+           type: array
+           items:
+             $ref: '#/components/schemas/WebSearchCitation'
+           nullable: true
+        hybridsearch_query:
+           type: string
+           nullable: true
+        user_message: # Context for assistant message
+           type: string
+           nullable: true
+        # Image role specific:
+        prompt:
+           type: string
+           nullable: true
+
+    HybridCitation:
+       type: object
+       properties:
+          file_name: string
+          citation_id: string
+          page_number: integer
+          chunk_id: string
+          chunk_sequence: integer
+          score: number
+          format: float
+          group_id: string
+          nullable: true
+          version: string
+          nullable: true
+          classification: string
+          nullable: true
+
+    WebSearchCitation:
+      type: object
+      properties:
+         title: string
+         url: string
+         format: url
+         snippet: string
+
+    DocumentMeta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          nullable: true # Present for user docs
+        group_id:
+          type: string
+          format: uuid
+          nullable: true # Present for group docs
+        file_name:
+          type: string
+        title:
+          type: string
+          nullable: true
+        abstract:
+          type: string
+          nullable: true
+        keywords:
+          type: array
+          items:
+            type: string
+          nullable: true
+        authors:
+          type: array
+          items:
+            type: string
+          nullable: true
+        publication_date:
+          type: string
+          format: date # Or string if format varies
+          nullable: true
+        document_classification:
+          type: string
+          nullable: true
+        num_file_chunks:
+           type: integer
+        status:
+           type: string
+        percentage_complete:
+           type: number
+           format: float
+           nullable: true
+        uploaded_at:
+           type: string
+           format: date-time
+        _ts: # Cosmos DB timestamp
+           type: integer
+
+    GroupDiscoveryInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+
+    GroupListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        userRole:
+          type: string
+          enum: [Owner, Admin, DocumentManager, User]
+        isActive:
+          type: boolean
+
+    GroupMember:
+      type: object
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [Owner, Admin, DocumentManager, User]
+
+    PendingUser:
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+
+    Group: # Represents the full group document structure
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          $ref: '#/components/schemas/GroupMemberIdentifier'
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMemberIdentifier'
+        admins:
+          type: array
+          items:
+            type: string # User IDs
+        documentManagers:
+          type: array
+          items:
+            type: string # User IDs
+        pendingUsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingUser'
+        createdDate:
+          type: string
+          format: date-time
+        modifiedDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          example: group
+
+    GroupMemberIdentifier: # Simplified representation for owner/users array
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+
+    GroupPrompt:
+      type: object
+      properties:
+         id: string
+         group_id: string
+         uploaded_by_user_id: string
+         name: string
+         content: string
+         type: string
+         example: group_prompt
+         created_at: string
+         format: date-time
+         updated_at: string
+         format: date-time
+
+    UserPrompt:
+      type: object
+      properties:
+         id: string
+         user_id: string
+         name: string
+         content: string
+         type: string
+         example: user_prompt
+         created_at: string
+         format: date-time
+         updated_at: string
+         format: date-time
+
+    UserPromptShort: # For create/update responses
+      type: object
+      properties:
+        id: string
+        name: string
+        updated_at: string
+        format: date-time
+
+    FeedbackAdminReview:
+      type: object
+      properties:
+        acknowledged:
+          type: boolean
+          default: false
+        analyzedBy:
+          type: string
+          nullable: true
+        analysisNotes:
+          type: string
+          nullable: true
+        responseToUser:
+          type: string
+          nullable: true
+        actionTaken:
+          type: string
+          nullable: true
+        reviewTimestamp:
+          type: string
+          format: date-time
+          nullable: true
+
+    FeedbackItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          nullable: true
+        conversationId:
+          type: string
+          format: uuid
+        messageId:
+          type: string
+        prompt:
+          type: string
+        aiResponse:
+          type: string
+        feedbackType:
+          type: string
+          enum: [Positive, Negative, Neutral]
+        reason:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        adminReview:
+          $ref: '#/components/schemas/FeedbackAdminReview'
+
+    SafetyLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          nullable: true
+        conversation_id:
+          type: string
+          format: uuid
+        message:
+          type: string
+          description: The user message that triggered the safety check.
+        triggered_categories:
+          type: array
+          items:
+            type: object # Structure as in ChatResponse
+        blocklist_matches:
+          type: array
+          items:
+            type: object # Structure as in ChatResponse
+        timestamp: # When the safety event occurred
+          type: string
+          format: date-time
+        reason: # Why it was blocked/logged
+          type: string
+        status: # Admin review status
+          type: string
+          nullable: true
+        action: # Admin action taken
+          type: string
+          nullable: true
+        notes: # Admin notes
+          type: string
+          nullable: true
+        user_notes: # User's notes
+          type: string
+          nullable: true
+        created_at: # When the log record was created
+          type: string
+          format: date-time
+        last_updated: # When the log record was last updated
+          type: string
+          format: date-time
+
+    ModelInfo:
+      type: object
+      properties:
+        deploymentName:
+          type: string
+        modelName:
+          type: string
+
+    UserSearchResult:
+       type: object
+       properties:
+         id: string
+         displayName: string
+         email: string
+         format: email
+
+    UserSettings: # The 'settings' object within the document
+       type: object
+       properties:
+          activeGroupOid:
+            type: string
+            format: uuid
+            nullable: true
+          layoutPreference:
+            type: string
+            enum: [horizontal, vertical] # Assuming possible values
+          splitSizesPreference:
+             type: array
+             items:
+               type: number
+               format: float
+          dockedSidebarHidden:
+             type: boolean
+       additionalProperties: true # Allow other settings not explicitly listed
+
+    UserSettingsDocument: # The full document stored in Cosmos DB
+      type: object
+      properties:
+        id:
+          type: string # Usually the user_id
+        user_id:
+          type: string
+        settings:
+          $ref: '#/components/schemas/UserSettings'
+        last_updated:
+          type: string
+          format: date-time
+
+    PaginationInfo: # Common pagination fields for user/group documents, prompts, feedback etc.
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 10
+        total_count:
+          type: integer
+          example: 53
+
+    PaginationInfoReview: # Specific pagination for feedback/safety review
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          enum: [10, 20, 50]
+          example: 10
+        total_count:
+          type: integer
+          example: 53
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      description: Page number for pagination.
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+      description: Number of items per page.
+    PageSizeReview:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        enum: [10, 20, 50]
+        default: 10
+      description: Number of items per page for review screens.
+    SearchTerm:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Search term for filtering (e.g., group name, document name).
+    SearchTermPromptName:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Search term for filtering prompt names.
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The ID of the conversation.
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid # Assuming document IDs are UUIDs
+      description: The ID of the document.
+    GroupId:
+      name: group_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid # Assuming group IDs are UUIDs
+      description: The ID of the group.
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema:
+        type: string # This is actually the user ID of the requester
+      description: The user ID associated with the join request.
+    MemberId:
+      name: member_id
+      in: path
+      required: true
+      schema:
+        type: string # User ID
+      description: The user ID of the group member.
+    PromptId:
+      name: prompt_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid # Assuming prompt IDs are UUIDs
+      description: The ID of the prompt.
+    FeedbackId:
+      name: feedbackId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid # Assuming feedback IDs are UUIDs
+      description: The ID of the feedback item.
+    LogId:
+      name: log_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid # Assuming safety log IDs are UUIDs
+      description: The ID of the safety log entry.
+
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input, missing parameters, etc.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized - Authentication required or session invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden - User does not have permission for this action (role, ownership, feature disabled).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not Found - The requested resource (conversation, document, group, etc.) does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalServerError:
+      description: Internal Server Error - An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session # Adjust if your session cookie has a different name
+      description: Session cookie obtained after successful login via Azure AD.
+
+security:
+  - cookieAuth: [] # Apply session cookie requirement globally to all paths unless overridden

@@ -37,7 +37,7 @@ def create_group(name, description):
         "createdDate": now_str,
         "modifiedDate": now_str
     }
-    groups_container.create_item(group_doc)
+    cosmos_groups_container.create_item(group_doc)
     return group_doc
 
 def search_groups(search_query, user_id):
@@ -63,7 +63,7 @@ def search_groups(search_query, user_id):
         query += " AND CONTAINS(c.name, @search) "
         params.append({"name": "@search", "value": search_query})
 
-    results = list(groups_container.query_items(
+    results = list(cosmos_groups_container.query_items(
         query=query,
         parameters=params,
         enable_cross_partition_query=True
@@ -85,7 +85,7 @@ def get_user_groups(user_id):
     """
 
     params = [{ "name": "@user_id", "value": user_id }]
-    results = list(groups_container.query_items(
+    results = list(cosmos_groups_container.query_items(
         query=query,
         parameters=params,
         enable_cross_partition_query=True
@@ -95,7 +95,7 @@ def get_user_groups(user_id):
 def find_group_by_id(group_id):
     """Retrieve a single group doc by its ID."""
     try:
-        group_doc = groups_container.read_item(
+        group_doc = cosmos_groups_container.read_item(
             item=group_id,
             partition_key=group_id
         )
@@ -103,12 +103,10 @@ def find_group_by_id(group_id):
     except exceptions.CosmosResourceNotFoundError:
         return None
 
-def update_active_group_for_user(user_id, group_id):
+def update_active_group_for_user(group_id):
+    user_id = get_current_user_id()
     new_settings = {
-        "settings": {
-            "activeGroupOid": group_id
-        },
-        "lastUpdated": datetime.utcnow().isoformat()
+        "activeGroupOid": group_id
     }
     update_user_settings(user_id, new_settings)
 
@@ -153,7 +151,7 @@ def delete_group(group_id):
     """
     Deletes a group from Cosmos DB. Typically only owner can do this.
     """
-    groups_container.delete_item(item=group_id, partition_key=group_id)
+    cosmos_groups_container.delete_item(item=group_id, partition_key=group_id)
 
 def is_user_in_group(group_doc, user_id):
     """

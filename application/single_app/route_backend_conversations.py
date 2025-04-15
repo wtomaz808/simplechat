@@ -17,13 +17,13 @@ def register_route_backend_conversations(app):
         if not conversation_id:
             return jsonify({'error': 'No conversation_id provided'}), 400
         try:
-            conversation_item = container.read_item(
+            conversation_item = cosmos_conversations_container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
-            # Then query the messages in messages_container
+            # Then query the messages in cosmos_messages_container
             message_query = f"SELECT * FROM c WHERE c.conversation_id = '{conversation_id}' ORDER BY c.timestamp ASC"
-            messages = list(messages_container.query_items(
+            messages = list(cosmos_messages_container.query_items(
                 query=message_query,
                 partition_key=conversation_id
             ))
@@ -40,8 +40,8 @@ def register_route_backend_conversations(app):
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        query = f"SELECT c.id, c.title, c.last_updated FROM c WHERE c.user_id = '{user_id}' ORDER BY c.last_updated DESC"
-        items = list(container.query_items(query=query, enable_cross_partition_query=True))
+        query = f"SELECT * FROM c WHERE c.user_id = '{user_id}' ORDER BY c.last_updated DESC"
+        items = list(cosmos_conversations_container.query_items(query=query, enable_cross_partition_query=True))
         return jsonify({
             'conversations': items
         }), 200
@@ -59,17 +59,60 @@ def register_route_backend_conversations(app):
         conversation_item = {
             'id': conversation_id,
             'user_id': user_id,
-            'messages': [],
             'last_updated': datetime.utcnow().isoformat(),
             'title': 'New Conversation'
         }
-        container.upsert_item(conversation_item)
+        cosmos_conversations_container.upsert_item(conversation_item)
 
         return jsonify({
             'conversation_id': conversation_id,
             'title': 'New Conversation'
         }), 200
     
+    @app.route('/api/conversations/<conversation_id>', methods=['PUT'])
+    @login_required
+    @user_required
+    def update_conversation_title(conversation_id):
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        # Parse the new title from the request body
+        data = request.get_json()
+        new_title = data.get('title', '').strip()
+        if not new_title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        try:
+            # Retrieve the conversation
+            conversation_item = cosmos_conversations_container.read_item(
+                item=conversation_id,
+                partition_key=conversation_id
+            )
+
+            # Ensure that the conversation belongs to the current user
+            if conversation_item.get('user_id') != user_id:
+                return jsonify({'error': 'Forbidden'}), 403
+
+            # Update the title
+            conversation_item['title'] = new_title
+
+            # Optionally update the last_updated time
+            from datetime import datetime
+            conversation_item['last_updated'] = datetime.utcnow().isoformat()
+
+            # Write back to Cosmos DB
+            cosmos_conversations_container.upsert_item(conversation_item)
+
+            return jsonify({
+                'message': 'Conversation updated', 
+                'title': new_title,
+                'classification': conversation_item.get('classification', []) # Send classifications if any
+            }), 200
+        except Exception as e:
+            print(e)
+            return jsonify({'error': 'Failed to update conversation'}), 500
+        
     @app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
     @login_required
     @user_required
@@ -81,7 +124,7 @@ def register_route_backend_conversations(app):
         archiving_enabled = settings.get('enable_conversation_archiving', False)
 
         try:
-            conversation_item = container.read_item(
+            conversation_item = cosmos_conversations_container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
@@ -97,10 +140,10 @@ def register_route_backend_conversations(app):
         if archiving_enabled:
             archived_item = dict(conversation_item)
             archived_item["archived_at"] = datetime.utcnow().isoformat()
-            archived_conversations_container.upsert_item(archived_item)
+            cosmos_archived_conversations_container.upsert_item(archived_item)
 
         message_query = f"SELECT * FROM c WHERE c.conversation_id = '{conversation_id}'"
-        results = list(messages_container.query_items(
+        results = list(cosmos_messages_container.query_items(
             query=message_query,
             partition_key=conversation_id
         ))
@@ -109,12 +152,12 @@ def register_route_backend_conversations(app):
             if archiving_enabled:
                 archived_doc = dict(doc)
                 archived_doc["archived_at"] = datetime.utcnow().isoformat()
-                archived_messages_container.upsert_item(archived_doc)
+                cosmos_archived_messages_container.upsert_item(archived_doc)
 
-            messages_container.delete_item(doc['id'], partition_key=conversation_id)
+            cosmos_messages_container.delete_item(doc['id'], partition_key=conversation_id)
         
         try:
-            container.delete_item(
+            cosmos_conversations_container.delete_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )

@@ -22,7 +22,7 @@ def register_route_backend_group_prompts(app):
         # ...
         # then fetch prompts
         query = f"SELECT * FROM c WHERE c.group_id = '{active_group_id}' AND c.type='group_prompt'"
-        items = list(group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
+        items = list(cosmos_group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
         return jsonify({"prompts": items}), 200
 
     @app.route('/api/group_prompts', methods=['POST'])
@@ -59,7 +59,7 @@ def register_route_backend_group_prompts(app):
             "created_at": now,
             "updated_at": now
         }
-        group_prompts_container.create_item(body=prompt_doc)
+        cosmos_group_prompts_container.create_item(body=prompt_doc)
         return jsonify(prompt_doc), 200
 
     @app.route('/api/group_prompts/<prompt_id>', methods=['GET'])
@@ -74,7 +74,7 @@ def register_route_backend_group_prompts(app):
             return jsonify({"error": "No active group selected"}), 400
 
         query = f"SELECT * FROM c WHERE c.id = '{prompt_id}' AND c.group_id = '{active_group_id}' AND c.type='group_prompt'"
-        items = list(group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
+        items = list(cosmos_group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
         if not items:
             return jsonify({"error": "Group prompt not found"}), 404
         return jsonify(items[0]), 200
@@ -98,7 +98,7 @@ def register_route_backend_group_prompts(app):
         # ...
         
         query = f"SELECT * FROM c WHERE c.id = '{prompt_id}' AND c.group_id = '{active_group_id}' AND c.type='group_prompt'"
-        items = list(group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
+        items = list(cosmos_group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
         if not items:
             return jsonify({"error": "Group prompt not found"}), 404
 
@@ -107,7 +107,7 @@ def register_route_backend_group_prompts(app):
         if content: doc["content"] = content
         doc["updated_at"] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        group_prompts_container.upsert_item(doc)
+        cosmos_group_prompts_container.upsert_item(doc)
         return jsonify(doc), 200
 
     @app.route('/api/group_prompts/<prompt_id>', methods=['DELETE'])
@@ -125,10 +125,10 @@ def register_route_backend_group_prompts(app):
         # ...
         
         query = f"SELECT * FROM c WHERE c.id = '{prompt_id}' AND c.group_id = '{active_group_id}' AND c.type='group_prompt'"
-        items = list(group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
+        items = list(cosmos_group_prompts_container.query_items(query=query, enable_cross_partition_query=True))
         if not items:
             return jsonify({"error": "Group prompt not found"}), 404
         
         doc = items[0]
-        group_prompts_container.delete_item(doc["id"], partition_key=doc["id"])
+        cosmos_group_prompts_container.delete_item(doc["id"], partition_key=doc["id"])
         return jsonify({"message": "Group prompt deleted"}), 200

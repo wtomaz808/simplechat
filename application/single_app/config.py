@@ -5,7 +5,6 @@ import requests
 import uuid
 import tempfile
 import json
-import openai
 import pandas as pd
 import time
 import threading
@@ -13,18 +12,46 @@ import random
 import base64
 import markdown2
 import re
+import docx
+import fitz # PyMuPDF
+import math
+import mimetypes
+import openpyxl
+import xlrd
+import traceback
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_from_directory, send_file, Markup
+from flask import (
+    Flask, 
+    flash, 
+    request, 
+    jsonify, 
+    render_template, 
+    redirect, 
+    url_for, 
+    session, 
+    send_from_directory, 
+    send_file, 
+    Markup
+)
 from werkzeug.utils import secure_filename
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
-from msal import ConfidentialClientApplication
+from msal import ConfidentialClientApplication, SerializableTokenCache
 from flask_session import Session
 from uuid import uuid4
 from threading import Thread
 from openai import AzureOpenAI, RateLimitError
 from cryptography.fernet import Fernet, InvalidToken
 from urllib.parse import quote
+from flask_executor import Executor
+from bs4 import BeautifulSoup
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+    RecursiveJsonSplitter
+)
+from PIL import Image
+from io import BytesIO
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -39,12 +66,18 @@ from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider, AzureAuthorityHosts
 from azure.ai.contentsafety import ContentSafetyClient
 from azure.ai.contentsafety.models import AnalyzeTextOptions, TextCategory
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
 
 app = Flask(__name__)
 
+app.config['EXECUTOR_TYPE'] = 'thread'
+app.config['EXECUTOR_MAX_WORKERS'] = 30
+executor = Executor()
+executor.init_app(app)
+
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.206.4'
+app.config['VERSION'] = '0.207.585'
 Session(app)
 
 CLIENTS = {}
@@ -53,7 +86,8 @@ CLIENTS_LOCK = threading.Lock()
 ALLOWED_EXTENSIONS = {
     'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
 }
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+ALLOWED_EXTENSIONS_IMG = {'png', 'jpg', 'jpeg'}
+MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 16 MB
 
 # Azure AD Configuration
 CLIENT_ID = os.getenv("CLIENT_ID")
@@ -61,9 +95,11 @@ APP_URI = f"api://{CLIENT_ID}"
 CLIENT_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 AUTHORITY = f"https://login.microsoftonline.us/{TENANT_ID}"
-SCOPE = ["User.Read"]  # Adjust scope according to your needs
+SCOPE = ["User.Read", "User.ReadBasic.All", "People.Read.All", "Group.Read.All"] # Adjust scope according to your needs
 MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = os.getenv("MICROSOFT_PROVIDER_AUTHENTICATION_SECRET")    
 AZURE_ENVIRONMENT = os.getenv("AZURE_ENVIRONMENT", "public") # public, usgovernment
+
+WORD_CHUNK_SIZE = 400
 
 if AZURE_ENVIRONMENT == "usgovernment":
     resource_manager = "https://management.usgovcloudapi.net"
@@ -76,6 +112,13 @@ else:
 
 bing_search_endpoint = "https://api.bing.microsoft.com/"
 
+storage_account_user_documents_container_name = "user-documents"
+storage_account_group_documents_container_name = "group-documents"
+storage_account_user_video_files_container_name = "user-video-files"
+storage_account_group_video_files_container_name = "group-video-files"
+storage_account_user_audio_files_container_name = "user-audio-files"
+storage_account_group_audio_files_container_name = "group-audio-files"
+
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
 cosmos_key = os.getenv("AZURE_COSMOS_KEY")
@@ -85,86 +128,132 @@ if cosmos_authentication_type == "managed_identity":
 else:
     cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 
-database_name = "SimpleChat"
-database = cosmos_client.create_database_if_not_exists(database_name)
+cosmos_database_name = "SimpleChat"
+cosmos_database = cosmos_client.create_database_if_not_exists(cosmos_database_name)
 
-container_name = "conversations"
-container = database.create_container_if_not_exists(
-    id=container_name,
+cosmos_conversations_container_name = "conversations"
+cosmos_conversations_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_conversations_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-messages_container_name = "messages"
-messages_container = database.create_container_if_not_exists(
-    id=messages_container_name,
+cosmos_messages_container_name = "messages"
+cosmos_messages_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_messages_container_name,
     partition_key=PartitionKey(path="/conversation_id")
 )
 
-documents_container_name = "documents"
-documents_container = database.create_container_if_not_exists(
-    id=documents_container_name,
+cosmos_user_documents_container_name = "documents"
+cosmos_user_documents_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_documents_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-settings_container_name = "settings"
-settings_container = database.create_container_if_not_exists(
-    id=settings_container_name,
+cosmos_settings_container_name = "settings"
+cosmos_settings_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_settings_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-groups_container_name = "groups"
-groups_container = database.create_container_if_not_exists(
-    id=groups_container_name,
+cosmos_groups_container_name = "groups"
+cosmos_groups_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_groups_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-group_documents_container_name = "group_documents"
-group_documents_container = database.create_container_if_not_exists(
-    id=group_documents_container_name,
+cosmos_group_documents_container_name = "group_documents"
+cosmos_group_documents_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_group_documents_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-user_settings_container_name = "user_settings"
-user_settings_container = database.create_container_if_not_exists(
-    id=user_settings_container_name,
+cosmos_user_settings_container_name = "user_settings"
+cosmos_user_settings_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_settings_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-safety_container_name = "safety"
-safety_container = database.create_container_if_not_exists(
-    id=safety_container_name,
+cosmos_safety_container_name = "safety"
+cosmos_safety_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_safety_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-feedback_container_name = "feedback"
-feedback_container = database.create_container_if_not_exists(
-    id=feedback_container_name,
+cosmos_feedback_container_name = "feedback"
+cosmos_feedback_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_feedback_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-archived_conversations_container_name = "archived_conversations"
-archived_conversations_container = database.create_container_if_not_exists(
-    id=archived_conversations_container_name,
+cosmos_archived_conversations_container_name = "archived_conversations"
+cosmos_archived_conversations_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_archived_conversations_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-archived_messages_container_name = "archived_messages"
-archived_messages_container = database.create_container_if_not_exists(
-    id=archived_messages_container_name,
+cosmos_archived_messages_container_name = "archived_messages"
+cosmos_archived_messages_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_archived_messages_container_name,
     partition_key=PartitionKey(path="/conversation_id")
 )
 
-prompts_container_name = "prompts"
-prompts_container = database.create_container_if_not_exists(
-    id=prompts_container_name,
+cosmos_user_prompts_container_name = "prompts"
+cosmos_user_prompts_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_prompts_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-group_prompts_container_name = "group_prompts"
-group_prompts_container = database.create_container_if_not_exists(
-    id=group_prompts_container_name,
+cosmos_group_prompts_container_name = "group_prompts"
+cosmos_group_prompts_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_group_prompts_container_name,
     partition_key=PartitionKey(path="/id")
 )
+
+cosmos_file_processing_container_name = "file_processing"
+cosmos_file_processing_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_file_processing_container_name,
+    partition_key=PartitionKey(path="/document_id")
+)
+
+def ensure_custom_logo_file_exists(app, settings):
+    """
+    If custom_logo_base64 is present in settings, ensure static/images/custom_logo.png
+    exists and reflects the current base64 data. Overwrites if necessary.
+    If base64 is empty/missing, removes the file.
+    """
+    custom_logo_b64 = settings.get('custom_logo_base64', '')
+    # Ensure the filename is consistent
+    logo_filename = 'custom_logo.png'
+    logo_path = os.path.join(app.root_path, 'static', 'images', logo_filename)
+    images_dir = os.path.dirname(logo_path)
+
+    # Ensure the directory exists
+    os.makedirs(images_dir, exist_ok=True)
+
+    if not custom_logo_b64:
+        # No custom logo in DB; remove the static file if it exists
+        if os.path.exists(logo_path):
+            try:
+                os.remove(logo_path)
+                print(f"Removed existing {logo_filename} as custom logo is disabled/empty.")
+            except OSError as ex: # Use OSError for file operations
+                print(f"Error removing {logo_filename}: {ex}")
+        return
+
+    # Custom logo exists in settings, write/overwrite the file
+    try:
+        # Decode the current base64 string
+        decoded = base64.b64decode(custom_logo_b64)
+
+        # Write the decoded data to the file, overwriting if it exists
+        with open(logo_path, 'wb') as f:
+            f.write(decoded)
+        print(f"Ensured {logo_filename} exists and matches current settings.")
+
+    except (base64.binascii.Error, TypeError, OSError) as ex: # Catch specific errors
+        print(f"Failed to write/overwrite {logo_filename}: {ex}")
+    except Exception as ex: # Catch any other unexpected errors
+         print(f"Unexpected error during logo file write for {logo_filename}: {ex}")
 
 def initialize_clients(settings):
     """
@@ -183,6 +272,10 @@ def initialize_clients(settings):
         enable_ai_search_apim = settings.get("enable_ai_search_apim")
         azure_apim_ai_search_endpoint = settings.get("azure_apim_ai_search_endpoint")
         azure_apim_ai_search_subscription_key = settings.get("azure_apim_ai_search_subscription_key")
+
+        enable_enhanced_citations = settings.get("enable_enhanced_citations")
+        enable_video_file_support = settings.get("enable_video_file_support")
+        enable_audio_file_support = settings.get("enable_audio_file_support")
 
         try:
             if enable_document_intelligence_apim:
@@ -279,3 +372,14 @@ def initialize_clients(settings):
         else:
             if "content_safety_client" in CLIENTS:
                 del CLIENTS["content_safety_client"]
+
+
+        try:
+            if enable_enhanced_citations:
+                CLIENTS["storage_account_office_docs_client"] = BlobServiceClient.from_connection_string(settings.get("office_docs_storage_account_url"))
+                if enable_video_file_support:
+                    CLIENTS["storage_account_video_files_client"] = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
+                if enable_audio_file_support:
+                    CLIENTS["storage_account_audio_files_client"] = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
+        except Exception as e:
+            print(f"Failed to initialize Blob Storage clients: {e}")
