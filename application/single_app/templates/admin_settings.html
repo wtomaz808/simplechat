@@ -824,7 +824,7 @@
                             <h6><strong>Office Documents</strong></h6>
                             <div class="mb-3">
                                 <label for="office_docs_storage_account_url" class="form-label">
-                                    Storage Account URL
+                                    Storage Account Connection String
                                 </label>
                                 <input
                                     type="text"
@@ -833,42 +833,6 @@
                                     name="office_docs_storage_account_url"
                                     value="{{ settings.office_docs_storage_account_url or '' }}"
                                 >
-                            </div>
-                            <div class="mb-3">
-                                <label for="office_docs_authentication_type" class="form-label">
-                                    Authentication Type
-                                </label>
-                                <select
-                                    class="form-select"
-                                    id="office_docs_authentication_type"
-                                    name="office_docs_authentication_type"
-                                >
-                                    <option value="key" {% if settings.office_docs_authentication_type=='key' %}selected{% endif %}>Key</option>
-                                    <option value="managed_identity" {% if settings.office_docs_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                                </select>
-                            </div>
-                            <div
-                                class="mb-3"
-                                id="office_docs_key_container"
-                                {% if settings.office_docs_authentication_type != 'key' %}style="display:none;"{% endif %}
-                            >
-                                <label for="office_docs_key" class="form-label">Key</label>
-                                <div class="input-group">
-                                    <input
-                                        type="password"
-                                        class="form-control"
-                                        id="office_docs_key"
-                                        name="office_docs_key"
-                                        value="{{ settings.office_docs_key or '' }}"
-                                    >
-                                    <button
-                                        type="button"
-                                        class="btn btn-outline-secondary"
-                                        id="toggle_office_docs_key"
-                                    >
-                                        Show
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
@@ -879,7 +843,7 @@
                                 <!-- If video is enabled in Workspaces -->
                                 <div class="mb-3">
                                     <label for="video_files_storage_account_url" class="form-label">
-                                        Storage Account URL
+                                        Storage Account Connection String
                                     </label>
                                     <input
                                         type="text"
@@ -888,42 +852,6 @@
                                         name="video_files_storage_account_url"
                                         value="{{ settings.video_files_storage_account_url or '' }}"
                                     >
-                                </div>
-                                <div class="mb-3">
-                                    <label for="video_files_authentication_type" class="form-label">
-                                        Authentication Type
-                                    </label>
-                                    <select
-                                        class="form-select"
-                                        id="video_files_authentication_type"
-                                        name="video_files_authentication_type"
-                                    >
-                                        <option value="key" {% if settings.video_files_authentication_type=='key' %}selected{% endif %}>Key</option>
-                                        <option value="managed_identity" {% if settings.video_files_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                                    </select>
-                                </div>
-                                <div
-                                    class="mb-3"
-                                    id="video_files_key_container"
-                                    {% if settings.video_files_authentication_type != 'key' %}style="display:none;"{% endif %}
-                                >
-                                    <label for="video_files_key" class="form-label">Key</label>
-                                    <div class="input-group">
-                                        <input
-                                            type="password"
-                                            class="form-control"
-                                            id="video_files_key"
-                                            name="video_files_key"
-                                            value="{{ settings.video_files_key or '' }}"
-                                        >
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-secondary"
-                                            id="toggle_video_files_key"
-                                        >
-                                            Show
-                                        </button>
-                                    </div>
                                 </div>
                             {% else %}
                                 <!-- If video is NOT enabled in Workspaces -->
@@ -949,7 +877,7 @@
                                 <!-- If audio is enabled in Workspaces -->
                                 <div class="mb-3">
                                     <label for="audio_files_storage_account_url" class="form-label">
-                                        Storage Account URL
+                                        Storage Account Connection String
                                     </label>
                                     <input
                                         type="text"
@@ -958,42 +886,6 @@
                                         name="audio_files_storage_account_url"
                                         value="{{ settings.audio_files_storage_account_url or '' }}"
                                     >
-                                </div>
-                                <div class="mb-3">
-                                    <label for="audio_files_authentication_type" class="form-label">
-                                        Authentication Type
-                                    </label>
-                                    <select
-                                        class="form-select"
-                                        id="audio_files_authentication_type"
-                                        name="audio_files_authentication_type"
-                                    >
-                                        <option value="key" {% if settings.audio_files_authentication_type=='key' %}selected{% endif %}>Key</option>
-                                        <option value="managed_identity" {% if settings.audio_files_authentication_type=='managed_identity' %}selected{% endif %}>Managed Identity</option>
-                                    </select>
-                                </div>
-                                <div
-                                    class="mb-3"
-                                    id="audio_files_key_container"
-                                    {% if settings.audio_files_authentication_type != 'key' %}style="display:none;"{% endif %}
-                                >
-                                    <label for="audio_files_key" class="form-label">Key</label>
-                                    <div class="input-group">
-                                        <input
-                                            type="password"
-                                            class="form-control"
-                                            id="audio_files_key"
-                                            name="audio_files_key"
-                                            value="{{ settings.audio_files_key or '' }}"
-                                        >
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-secondary"
-                                            id="toggle_audio_files_key"
-                                        >
-                                            Show
-                                        </button>
-                                    </div>
                                 </div>
                             {% else %}
                                 <!-- If audio is NOT enabled in Workspaces -->

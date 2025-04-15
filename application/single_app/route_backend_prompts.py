@@ -39,11 +39,11 @@ def register_route_backend_prompts(app):
 
         try:
             # Execute count query
-            count_results = list(prompts_container.query_items(query=count_query, parameters=parameters, enable_cross_partition_query=True))
+            count_results = list(cosmos_user_prompts_container.query_items(query=count_query, parameters=parameters, enable_cross_partition_query=True))
             total_count = count_results[0] if count_results else 0
 
             # Execute main query for the page
-            items = list(prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+            items = list(cosmos_user_prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
             return jsonify({
                 "prompts": items,
@@ -90,7 +90,7 @@ def register_route_backend_prompts(app):
                 "updated_at": now
             }
 
-            created_item = prompts_container.create_item(body=prompt_doc)
+            created_item = cosmos_user_prompts_container.create_item(body=prompt_doc)
             # Return only essential fields or the full created item
             return jsonify({
                  "id": created_item['id'],
@@ -111,7 +111,7 @@ def register_route_backend_prompts(app):
         try:
             # Attempt direct read first if partition key is id
             try:
-                item = prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
+                item = cosmos_user_prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
                 # Verify user_id and type if read was successful
                 if item.get('user_id') == user_id and item.get('type') == 'user_prompt':
                     return jsonify(item), 200
@@ -125,7 +125,7 @@ def register_route_backend_prompts(app):
                     {"name": "@prompt_id", "value": prompt_id},
                     {"name": "@user_id", "value": user_id}
                 ]
-                items = list(prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+                items = list(cosmos_user_prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
                 if not items:
                     return jsonify({"error": "Prompt not found"}), 404
                 return jsonify(items[0]), 200
@@ -164,14 +164,14 @@ def register_route_backend_prompts(app):
 
             # Fetch existing doc to ensure it belongs to the user
             try:
-                item = prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
+                item = cosmos_user_prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
                 if item.get('user_id') != user_id or item.get('type') != 'user_prompt':
                      return jsonify({"error": "Prompt not found or access denied"}), 404
             except:
                  # Query as fallback if direct read fails
                  query = "SELECT * FROM c WHERE c.id = @prompt_id AND c.user_id = @user_id AND c.type='user_prompt'"
                  parameters = [{"name": "@prompt_id", "value": prompt_id}, {"name": "@user_id", "value": user_id}]
-                 items = list(prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+                 items = list(cosmos_user_prompts_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
                  if not items:
                      return jsonify({"error": "Prompt not found"}), 404
                  item = items[0] # Get the item if found via query
@@ -182,7 +182,7 @@ def register_route_backend_prompts(app):
             item["updated_at"] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
             # Use replace_item for updates, passing the etag for optimistic concurrency
-            updated_item = prompts_container.replace_item(item=item['id'], body=item) # ETag handled automatically by SDK if present in 'item'
+            updated_item = cosmos_user_prompts_container.replace_item(item=item['id'], body=item) # ETag handled automatically by SDK if present in 'item'
 
             # Return minimal confirmation or updated fields
             return jsonify({
@@ -205,11 +205,11 @@ def register_route_backend_prompts(app):
             # Need partition key for deletion. Assuming it's the 'id' field based on other operations.
             # First, verify ownership before deleting
             try:
-                 item = prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
+                 item = cosmos_user_prompts_container.read_item(item=prompt_id, partition_key=prompt_id)
                  if item.get('user_id') != user_id or item.get('type') != 'user_prompt':
                       return jsonify({"error": "Prompt not found or access denied"}), 404
                  # If ownership verified, proceed to delete
-                 prompts_container.delete_item(item=prompt_id, partition_key=prompt_id)
+                 cosmos_user_prompts_container.delete_item(item=prompt_id, partition_key=prompt_id)
                  return jsonify({"message": "Prompt deleted successfully"}), 200 # 200 OK or 204 No Content
             except:
                  # Item doesn't exist

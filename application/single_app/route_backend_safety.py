@@ -61,7 +61,7 @@ def register_route_backend_safety(app):
 
             # --- Execute Queries ---
             # 1. Get total count of items matching filters
-            count_results = list(safety_container.query_items(
+            count_results = list(cosmos_safety_container.query_items(
                 query=count_query,
                 parameters=parameters,
                 enable_cross_partition_query=True
@@ -70,7 +70,7 @@ def register_route_backend_safety(app):
 
             # 2. Get the paginated items matching filters
             # Fetch items matching the filter, ordered
-            all_matching_items = list(safety_container.query_items(
+            all_matching_items = list(cosmos_safety_container.query_items(
                 query=query,
                 parameters=parameters,
                 enable_cross_partition_query=True
@@ -106,7 +106,7 @@ def register_route_backend_safety(app):
         notes = data.get("notes")
         
         try:
-            item = safety_container.read_item(item=log_id, partition_key=log_id)
+            item = cosmos_safety_container.read_item(item=log_id, partition_key=log_id)
 
             if not item.get("created_at"):
                 item["created_at"] = datetime.utcnow().isoformat()
@@ -121,7 +121,7 @@ def register_route_backend_safety(app):
 
             item["last_updated"] = datetime.utcnow().isoformat()
 
-            safety_container.upsert_item(item)
+            cosmos_safety_container.upsert_item(item)
 
             return jsonify({"message": "Safety log updated successfully."}), 200
         except exceptions.CosmosHttpResponseError as e:
@@ -177,7 +177,7 @@ def register_route_backend_safety(app):
 
             # --- Execute Queries ---
             # 1. Get total count of items matching filters for this user
-            count_results = list(safety_container.query_items(
+            count_results = list(cosmos_safety_container.query_items(
                 query=count_query,
                 parameters=parameters,
                 enable_cross_partition_query=True # May be needed depending on partition key
@@ -186,7 +186,7 @@ def register_route_backend_safety(app):
 
             # 2. Get the paginated items matching filters for this user
             # Fetch all matching items first, then slice (suitable for moderate user data volume)
-            all_matching_items = list(safety_container.query_items(
+            all_matching_items = list(cosmos_safety_container.query_items(
                 query=query,
                 parameters=parameters,
                 enable_cross_partition_query=True
@@ -225,7 +225,7 @@ def register_route_backend_safety(app):
             return jsonify({"error": "No user ID found in session"}), 403
 
         try:
-            item = safety_container.read_item(item=log_id, partition_key=log_id)
+            item = cosmos_safety_container.read_item(item=log_id, partition_key=log_id)
 
             if item.get("user_id") != user_id:
                 return jsonify({"error": "You do not have permission to update this record."}), 403
@@ -237,7 +237,7 @@ def register_route_backend_safety(app):
                 item["user_notes"] = user_notes
 
             item["last_updated"] = datetime.utcnow().isoformat()
-            safety_container.upsert_item(item)
+            cosmos_safety_container.upsert_item(item)
 
             return jsonify({"message": "Safety log updated successfully."}), 200
         except exceptions.CosmosHttpResponseError as e:

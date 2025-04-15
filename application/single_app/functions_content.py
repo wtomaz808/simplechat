@@ -205,7 +205,7 @@ def chunk_text(text, chunk_size=2000, overlap=200):
         print(f"Error in chunk_text: {e}")
         raise e  # Re-raise the exception to propagate it
     
-def chunk_word_file_into_pages(document_id, user_id, di_pages):
+def chunk_word_file_into_pages(di_pages):
     """
     Chunks the content extracted from a Word document by Azure DI into smaller
     chunks based on a target word count.

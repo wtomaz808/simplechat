@@ -12,78 +12,148 @@ def allowed_file(filename, allowed_extensions=None):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in allowed_extensions
     
-def create_document(file_name, user_id, document_id, num_file_chunks, status):
-    current_time = datetime.now(timezone.utc)
-    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+def create_document(file_name, user_id, document_id, num_file_chunks, status, group_id=None):
+    current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    is_group = group_id is not None
 
-    existing_document_query = """
-        SELECT c.version 
-        FROM c 
-        WHERE c.file_name = @file_name AND c.user_id = @user_id
-    """
-    parameters = [{"name": "@file_name", "value": file_name}, {"name": "@user_id", "value": user_id}]
-    
-    try:
-        existing_document = list(documents_container.query_items(query=existing_document_query, parameters=parameters, enable_cross_partition_query=True))
-    except Exception as e:
-        print(f"Error querying existing document: {e}")
-        raise
+    # Choose the correct cosmos_container and query parameters
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
 
-    if existing_document:
-        version = existing_document[0]['version'] + 1
+    if is_group:
+        query = """
+            SELECT * 
+            FROM c
+            WHERE c.file_name = @file_name 
+                AND c.group_id = @group_id
+        """
+        parameters = [
+            {"name": "@file_name", "value": file_name},
+            {"name": "@group_id", "value": group_id}
+        ]
     else:
-        version = 1
+        query = """
+            SELECT * 
+            FROM c
+            WHERE c.file_name = @file_name 
+                AND c.user_id = @user_id
+        """
+        parameters = [
+            {"name": "@file_name", "value": file_name},
+            {"name": "@user_id", "value": user_id}
+        ]
 
     try:
-        document_metadata = {
-            "id": document_id,
-            "file_name": file_name,
-            "user_id": user_id,
-            "num_chunks": 0,
-            "number_of_pages": 0,
-            "current_file_chunk": 0,
-            "num_file_chunks": num_file_chunks,
-            "upload_date": formatted_time,
-            "last_updated": formatted_time,
-            "version": version,
-            "status": status,
-            "percentage_complete": 0,
-            "document_classification": "Pending",
-            "type": "document_metadata"
-        }
-        documents_container.upsert_item(document_metadata)
+        existing_document = list(
+            cosmos_container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+        )
+        version = existing_document[0]['version'] + 1 if existing_document else 1
+        
+        if is_group:
+            document_metadata = {
+                "id": document_id,
+                "file_name": file_name,
+                "num_chunks": 0,
+                "number_of_pages": 0,
+                "current_file_chunk": 0,
+                "num_file_chunks": num_file_chunks,
+                "upload_date": current_time,
+                "last_updated": current_time,
+                "version": version,
+                "status": status,
+                "percentage_complete": 0,
+                "document_classification": "Pending",
+                "type": "document_metadata",
+                "group_id": group_id
+            }
+        else:
+            document_metadata = {
+                "id": document_id,
+                "file_name": file_name,
+                "num_chunks": 0,
+                "number_of_pages": 0,
+                "current_file_chunk": 0,
+                "num_file_chunks": num_file_chunks,
+                "upload_date": current_time,
+                "last_updated": current_time,
+                "version": version,
+                "status": status,
+                "percentage_complete": 0,
+                "document_classification": "Pending",
+                "type": "document_metadata",
+                "user_id": user_id
+            }
+
+        cosmos_container.upsert_item(document_metadata)
 
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
+            document_id,
+            user_id,
             f"Document {file_name} created."
         )
 
     except Exception as e:
-        print(f"Error upserting document metadata: {e}")
+        print(f"Error creating document: {e}")
         raise
 
-def get_document_metadata(document_id, user_id):
-    try:
+
+def get_document_metadata(document_id, user_id, group_id=None):
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
         query = """
-            SELECT *
+            SELECT * 
             FROM c
-            WHERE c.user_id = @user_id AND c.id = @document_id
+            WHERE c.id = @document_id 
+                AND c.group_id = @group_id
+            ORDER BY c.version DESC
         """
         parameters = [
-            {"name": "@user_id", "value": user_id},
-            {"name": "@document_id", "value": document_id}
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
         ]
-        
-        document_items = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
-        
-        if not document_items:
-            return None
-        
-        return document_items[0]
+    else:
+        query = """
+            SELECT * 
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@user_id", "value": user_id}
+        ]
+
+    add_file_task_to_file_processing_log(
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id,
+        content=f"Query is {query}, parameters are {parameters}."
+    )
+    try:
+        document_items = list(
+            cosmos_container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+        )
+        add_file_task_to_file_processing_log(
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Document metadata retrieved: {document_items}."
+        )
+        return document_items[0] if document_items else None
+
     except Exception as e:
-        print(f"Error retrieving document metadata: {e}")
+        print(f"Error retrieving document metadata: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
         return None
+
+
 
 def calculate_processing_percentage(doc_metadata):
     """
@@ -170,43 +240,93 @@ def calculate_processing_percentage(doc_metadata):
 def update_document(**kwargs):
     document_id = kwargs.get('document_id')
     user_id = kwargs.get('user_id')
+    group_id = kwargs.get('group_id')
     num_chunks_increment = kwargs.pop('num_chunks_increment', 0)
 
-    if not document_id or not user_id:
+    if (not document_id or not user_id) or (not document_id and not group_id):
         # Cannot proceed without these identifiers
-        print("Error: document_id and user_id are required for update_document")
+        print("Error: document_id and user_id or document_id and group_id are required for update_document")
         # Depending on context, you might raise an error or return failure
-        raise ValueError("document_id and user_id are required")
+        raise ValueError("document_id and user_id or document_id and group_id are required")
 
-    current_time = datetime.now(timezone.utc)
-    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    is_group = group_id is not None
 
-    try:
+    # if is_group:
+    #     log_msg = f"Group document update requested for {document_id} by group {group_id}."
+    # else:
+    #     log_msg = f"User document update requested for {document_id} by user {user_id}."
+
+    # add_file_task_to_file_processing_log(
+    #     document_id=document_id, 
+    #     user_id=group_id if group_id else user_id, 
+    #     content=log_msg
+    # )
+
+    # Choose the correct cosmos_container and query parameters
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
         query = """
-            SELECT *
+            SELECT * 
             FROM c
-            WHERE c.user_id = @user_id AND c.id = @document_id
+            WHERE c.id = @document_id 
+                AND c.group_id = @group_id
         """
         parameters = [
-            {"name": "@user_id", "value": user_id},
-            {"name": "@document_id", "value": document_id}
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
         ]
-        existing_documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+    else:
+        query = """
+            SELECT * 
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@user_id", "value": user_id}
+        ]
+    
+    add_file_task_to_file_processing_log(
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id, 
+        content=f"Query is {query}, parameters are {parameters}."
+    )
+
+    try:
+        existing_documents = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         status = kwargs.get('status', '')
 
-        add_file_task_to_file_processing_log(
-            document_id=document_id,
-            user_id=user_id,
-            content=f"Status: {status}"
-        )
+        if status:
+            add_file_task_to_file_processing_log(
+                document_id=document_id,
+                user_id=group_id if is_group else user_id,
+                content=f"Status: {status}"
+            )
 
         if not existing_documents:
             # Log specific error before raising
             log_msg = f"Document {document_id} not found for user {user_id} during update."
             print(log_msg)
-            add_file_task_to_file_processing_log(document_id, user_id, log_msg)
-            raise CosmosResourceNotFoundError(f"Document {document_id} not found")
+            add_file_task_to_file_processing_log(
+                document_id=document_id, 
+                user_id=group_id if is_group else user_id, 
+                content=log_msg
+            )
+            raise CosmosResourceNotFoundError(
+                message=f"Document {document_id} not found",
+                status=404
+            )
+
 
         existing_document = existing_documents[0]
         original_percentage = existing_document.get('percentage_complete', 0) # Store for comparison
@@ -219,7 +339,11 @@ def update_document(**kwargs):
             current_num_chunks = existing_document.get('num_chunks', 0)
             existing_document['num_chunks'] = current_num_chunks + num_chunks_increment
             update_occurred = True # Incrementing counts as an update
-            add_file_task_to_file_processing_log(document_id, user_id, f"Incrementing num_chunks by {num_chunks_increment} to {existing_document['num_chunks']}")
+            add_file_task_to_file_processing_log(
+                document_id=document_id, 
+                user_id=group_id if is_group else user_id,  
+                content=f"Incrementing num_chunks by {num_chunks_increment} to {existing_document['num_chunks']}"
+            )
 
         for key, value in kwargs.items():
             if value is not None and existing_document.get(key) != value:
@@ -233,7 +357,7 @@ def update_document(**kwargs):
 
         # 3. If any update happened, handle timestamps and percentage
         if update_occurred:
-            existing_document['last_updated'] = formatted_time
+            existing_document['last_updated'] = current_time
 
             # Calculate new percentage based on the *updated* existing_document state
             # This now includes the potentially incremented num_chunks
@@ -283,28 +407,37 @@ def update_document(**kwargs):
                     if chunk_updates: # Only call update if there's something to change
                          update_chunk_metadata(chunk['id'], user_id, document_id, **chunk_updates)
                 add_file_task_to_file_processing_log(
-                    document_id, user_id,
-                    f"Propagated updates for fields {updated_fields_requiring_chunk_sync} to search chunks."
+                    document_id=document_id, 
+                    user_id=group_id if is_group else user_id,
+                    content=f"Propagated updates for fields {updated_fields_requiring_chunk_sync} to search chunks."
                 )
             except Exception as chunk_sync_error:
-                 # Log error but don't necessarily fail the whole document update
-                 error_msg = f"Warning: Failed to sync metadata updates to search chunks for doc {document_id}: {chunk_sync_error}"
-                 print(error_msg)
-                 add_file_task_to_file_processing_log(document_id, user_id, error_msg)
+                # Log error but don't necessarily fail the whole document update
+                error_msg = f"Warning: Failed to sync metadata updates to search chunks for doc {document_id}: {chunk_sync_error}"
+                print(error_msg)
+                add_file_task_to_file_processing_log(
+                    document_id=document_id, 
+                    user_id=group_id if is_group else user_id, 
+                    content=error_msg
+                )
 
 
         # 5. Upsert the document if changes were made
         if update_occurred:
-            documents_container.upsert_item(existing_document)
+            cosmos_container.upsert_item(existing_document)
 
     except CosmosResourceNotFoundError as e:
         # Error already logged where it was first detected
         print(f"Document {document_id} not found or access denied: {e}")
         raise # Re-raise for the caller to handle
     except Exception as e:
-        error_msg = f"Error during update_document for {document_id}: {e}"
+        error_msg = f"Error during update_document for {document_id}: {repr(e)}\nTraceback:\n{traceback.format_exc()}"
         print(error_msg)
-        add_file_task_to_file_processing_log(document_id, user_id, error_msg)
+        add_file_task_to_file_processing_log(
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=error_msg
+        )
         # Optionally update status to failure here if the exception is critical
         # try:
         #    existing_document['status'] = f"Update failed: {str(e)[:100]}" # Truncate error
@@ -314,28 +447,52 @@ def update_document(**kwargs):
         #    print(f"Failed to update status to error state for {document_id}: {inner_e}")
         raise # Re-raise the original exception
 
-def save_chunks(page_text_content, page_number, file_name, user_id, document_id):
+def save_chunks(page_text_content, page_number, file_name, user_id, document_id, group_id=None):
     """
     Save a single chunk (one page) at a time:
       - Generate embedding
       - Build chunk metadata
       - Upload to Search index
     """
-    settings = get_settings()
+    current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    is_group = group_id is not None
 
-    current_time = datetime.now(timezone.utc)
-    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Choose the correct cosmos_container and query parameters
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
 
     try:
         # Update document status
         #num_chunks = 1  # because we only have one chunk (page) here
         #status = f"Processing 1 chunk (page {page_number})"
         #update_document(document_id=document_id, user_id=user_id, status=status)
+        
+        add_file_task_to_file_processing_log(
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id, 
+            content=f"Saving chunk, cosmos_container:{cosmos_container}, page_text_content:{page_text_content}, page_number:{page_number}, file_name:{file_name}, user_id:{user_id}, document_id:{document_id}, group_id:{group_id}"
+        )
 
-        version = get_document_metadata(document_id, user_id)['version']
+        if is_group:
+            metadata = get_document_metadata(
+                document_id=document_id, 
+                user_id=user_id, 
+                group_id=group_id
+            )
+        else:
+            metadata = get_document_metadata(
+                document_id=document_id, 
+                user_id=user_id
+            )
+
+        if not metadata:
+            raise ValueError(f"No metadata found for document {document_id} (group: {is_group})")
+
+        version = metadata.get("version") if metadata.get("version") else 1 
+        if version is None:
+            raise ValueError(f"Metadata for document {document_id} missing 'version' field")
         
     except Exception as e:
-        print(f"Error updating document status or retrieving metadata for document {document_id}: {e}")
+        print(f"Error updating document status or retrieving metadata for document {document_id}: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
         raise
 
     # Generate embedding
@@ -355,24 +512,44 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
         author = []
         title = ""
 
-        chunk_document = {
-            "id": chunk_id,
-            "document_id": document_id,
-            "chunk_id": str(page_number),
-            "chunk_text": page_text_content,
-            "embedding": embedding,
-            "file_name": file_name,
-            "user_id": user_id,
-            "chunk_keywords": chunk_keywords,
-            "chunk_summary": chunk_summary,
-            "page_number": page_number,
-            "author": author,
-            "title": title,
-            "document_classification": "Pending",
-            "chunk_sequence": page_number,  # or you can keep an incremental idx
-            "upload_date": formatted_time,
-            "version": version
-        }
+        if is_group:
+            chunk_document = {
+                "id": chunk_id,
+                "document_id": document_id,
+                "chunk_id": str(page_number),
+                "chunk_text": page_text_content,
+                "embedding": embedding,
+                "file_name": file_name,
+                "chunk_keywords": chunk_keywords,
+                "chunk_summary": chunk_summary,
+                "page_number": page_number,
+                "author": author,
+                "title": title,
+                "document_classification": "Pending",
+                "chunk_sequence": page_number,  # or you can keep an incremental idx
+                "upload_date": current_time,
+                "version": version,
+                "group_id": group_id
+            }
+        else:
+            chunk_document = {
+                "id": chunk_id,
+                "document_id": document_id,
+                "chunk_id": str(page_number),
+                "chunk_text": page_text_content,
+                "embedding": embedding,
+                "file_name": file_name,
+                "chunk_keywords": chunk_keywords,
+                "chunk_summary": chunk_summary,
+                "page_number": page_number,
+                "author": author,
+                "title": title,
+                "document_classification": "Pending",
+                "chunk_sequence": page_number,  # or you can keep an incremental idx
+                "upload_date": current_time,
+                "version": version,
+                "user_id": user_id
+            }
     except Exception as e:
         print(f"Error creating chunk document for page {page_number} of document {document_id}: {e}")
         raise
@@ -382,56 +559,77 @@ def save_chunks(page_text_content, page_number, file_name, user_id, document_id)
         #status = f"Uploading page {page_number} of document {document_id} to index."
         #update_document(document_id=document_id, user_id=user_id, status=status)
 
-        search_client_user = CLIENTS["search_client_user"]
+        search_client = CLIENTS["search_client_group"] if is_group else CLIENTS["search_client_user"]
         # Upload as a single-document list
-        search_client_user.upload_documents(documents=[chunk_document])
+        search_client.upload_documents(documents=[chunk_document])
+
     except Exception as e:
         print(f"Error uploading chunk document for document {document_id}: {e}")
         raise
 
-def get_all_chunks(document_id, user_id):
+def get_all_chunks(document_id, user_id, group_id=None):
+    is_group = group_id is not None
+
+    search_client = CLIENTS["search_client_group"] if is_group else CLIENTS["search_client_user"]
+    filter_expr = (
+        f"document_id eq '{document_id}' and group_id eq '{group_id}'"
+        if is_group else
+        f"document_id eq '{document_id}' and user_id eq '{user_id}'"
+    )
+
+    select_fields = [
+        "id", 
+        "chunk_text", 
+        "chunk_id", 
+        "file_name",
+        "group_id" if is_group else "user_id",
+        "version", 
+        "chunk_sequence", 
+        "upload_date"
+    ]
+
     try:
-        search_client_user = CLIENTS["search_client_user"]
-        results = search_client_user.search(
+        results = search_client.search(
             search_text="*",
-            filter=f"document_id eq '{document_id}' and user_id eq '{user_id}'",
-            select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+            filter=filter_expr,
+            select=",".join(select_fields)
         )
         return results
+
     except Exception as e:
         print(f"Error retrieving chunks for document {document_id}: {e}")
         raise
 
-def update_chunk_metadata(chunk_id, user_id, document_id, **kwargs):
+def update_chunk_metadata(chunk_id, user_id, group_id, document_id, **kwargs):
+    is_group = group_id is not None
+
     try:
-        search_client_user = CLIENTS["search_client_user"]
-        chunk_item = search_client_user.get_document(chunk_id)
+        search_client = CLIENTS["search_client_group"] if is_group else CLIENTS["search_client_user"]
+        chunk_item = search_client.get_document(key=chunk_id)
 
         if not chunk_item:
             raise Exception("Chunk not found")
-        
-        if chunk_item['user_id'] != user_id:
+
+        if chunk_item.get('user_id') != user_id or (is_group and chunk_item.get('group_id') != group_id):
             raise Exception("Unauthorized access to chunk")
-        
-        if chunk_item['document_id'] != document_id:
+
+        if chunk_item.get('document_id') != document_id:
             raise Exception("Chunk does not belong to document")
-        
-        if 'chunk_keywords' in kwargs:
-            chunk_item['chunk_keywords'] = kwargs['chunk_keywords']
 
-        if 'chunk_summary' in kwargs:
-            chunk_item['chunk_summary'] = kwargs['chunk_summary']
+        # Update only supported fields
+        updatable_fields = [
+            'chunk_keywords',
+            'chunk_summary',
+            'author',
+            'title',
+            'document_classification'
+        ]
+        for field in updatable_fields:
+            if field in kwargs:
+                chunk_item[field] = kwargs[field]
 
-        if 'author' in kwargs:
-            chunk_item['author'] = kwargs['author']
+        search_client.upload_documents(documents=[chunk_item])
 
-        if 'title' in kwargs:
-            chunk_item['title'] = kwargs['title']
-
-        if 'document_classification' in kwargs:
-            chunk_item['document_classification'] = kwargs['document_classification']
-
-        search_client_user.upload_documents(documents=[chunk_item])
     except Exception as e:
         print(f"Error updating chunk metadata for chunk {chunk_id}: {e}")
         raise
@@ -485,16 +683,39 @@ def chunk_pdf(input_pdf_path: str, max_pages: int = 500) -> list:
 
     return chunks
 
-def get_user_documents(user_id):
-    try:
+def get_documents(user_id, group_id=None):
+    is_group = group_id is not None
+
+    # Choose the correct cosmos_container and query parameters
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
         query = """
-            SELECT *
+            SELECT * 
+            FROM c
+            WHERE c.group_id = @group_id
+        """
+        parameters = [
+            {"name": "@group_id", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT * 
             FROM c
             WHERE c.user_id = @user_id
         """
-        parameters = [{"name": "@user_id", "value": user_id}]
-        
-        documents = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+        parameters = [
+            {"name": "@user_id", "value": user_id}
+        ]
+    
+    try:       
+        documents = list(
+            cosmos_container.query_items(
+                query=query,
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         latest_documents = {}
 
@@ -507,13 +728,30 @@ def get_user_documents(user_id):
     except Exception as e:
         return jsonify({'error': f'Error retrieving documents: {str(e)}'}), 500
 
-def get_user_document(user_id, document_id):
+def get_document(user_id, document_id, group_id=None):
+    is_group = group_id is not None
 
-    try:
-        latest_version_query = """
-            SELECT TOP 1 *
-            FROM c 
-            WHERE c.id = @document_id AND c.user_id = @user_id
+    # Choose the correct cosmos_container and query parameters
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
+        query = """
+            SELECT TOP 1 * 
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.group_id = @group_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT TOP 1 * 
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
             ORDER BY c.version DESC
         """
         parameters = [
@@ -521,11 +759,14 @@ def get_user_document(user_id, document_id):
             {"name": "@user_id", "value": user_id}
         ]
 
-        document_results = list(documents_container.query_items(
-            query=latest_version_query, 
-            parameters=parameters, 
-            enable_cross_partition_query=True
-        ))
+    try:
+        document_results = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         if not document_results:
             return jsonify({'error': 'Document not found or access denied'}), 404
@@ -535,44 +776,93 @@ def get_user_document(user_id, document_id):
     except Exception as e:
         return jsonify({'error': f'Error retrieving document: {str(e)}'}), 500
 
-def get_latest_version(document_id, user_id):
+def get_latest_version(document_id, user_id, group_id=None):
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
 
-    query = """
-        SELECT c.version
-        FROM c 
-        WHERE c.id = @document_id AND c.user_id = @user_id
-    """
-    parameters = [
-        {"name": "@document_id", "value": document_id},
-        {"name": "@user_id", "value": user_id}
-    ]
+    if is_group:
+        query = """
+            SELECT c.version 
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.group_id = @group_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT c.version
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@user_id", "value": user_id}
+        ]
 
     try:
-        results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+        results = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         if results:
-            max_version = max(item['version'] for item in results)
-            return max_version
+            return results[0]['version']
         else:
             return None
 
     except Exception as e:
         return None
     
-def get_user_document_version(user_id, document_id, version):
-    try:
+def get_document_version(user_id, document_id, version, group_id=None):
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
         query = """
-            SELECT *
-            FROM c 
-            WHERE c.id = @document_id AND c.user_id = @user_id AND c.version = @version
+            SELECT * 
+            FROM c
+            WHERE c.id = @document_id
+                AND c.version = @version
+                AND c.group_id = @group_id
+            ORDER BY c.version DESC
         """
         parameters = [
             {"name": "@document_id", "value": document_id},
-            {"name": "@user_id", "value": user_id},
-            {"name": "@version", "value": version}
+            {"name": "@version", "value": version},
+            {"name": "@group_id", "value": group_id}
         ]
-        
-        document_results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+    else:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.version = @version
+                AND c.user_id = @user_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@version", "value": version},
+            {"name": "@user_id", "value": user_id}
+        ]
+
+    try:
+        document_results = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         if not document_results:
             return jsonify({'error': 'Document version not found'}), 404
@@ -582,31 +872,38 @@ def get_user_document_version(user_id, document_id, version):
     except Exception as e:
         return jsonify({'error': f'Error retrieving document version: {str(e)}'}), 500
 
-def delete_user_document(user_id, document_id):
-    """Delete a document from the user's documents in Cosmos DB."""
-    try:
-        document_item = documents_container.read_item(
-            item=document_id,
-            partition_key=document_id
-        )
+# def delete_document(user_id, document_id, group_id=None):
+#     """Delete a document from the user's documents in Cosmos DB."""
+#     is_group = group_id is not None
+#     cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
 
-        if document_item.get('user_id') != user_id:
-            raise Exception("Unauthorized access to document")
+#     try:
+#         document_item = cosmos_container.read_item(
+#             item=document_id,
+#             partition_key=document_id
+#         )
 
-        documents_container.delete_item(
-            item=document_id,
-            partition_key=document_id
-        )
-    except CosmosResourceNotFoundError:
-        raise Exception("Document not found")
-    except Exception as e:
-        raise
+#         if (document_item.get('user_id') != user_id) or (is_group and document_item.get('group_id') != group_id):
+#             raise Exception("Unauthorized access to document")
 
-def delete_user_document_chunks(document_id):
+#         cosmos_container.delete_item(
+#             item=document_id,
+#             partition_key=document_id
+#         )
+
+#     except CosmosResourceNotFoundError:
+#         raise Exception("Document not found")
+#     except Exception as e:
+#         raise
+
+def delete_document_chunks(document_id, group_id=None):
     """Delete document chunks from Azure Cognitive Search index."""
+
+    is_group = group_id is not None
+
     try:
-        search_client_user = CLIENTS["search_client_user"]
-        results = search_client_user.search(
+        search_client = CLIENTS["search_client_group"] if is_group else CLIENTS["search_client_user"]
+        results = search_client.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
             select=["id"]
@@ -620,39 +917,47 @@ def delete_user_document_chunks(document_id):
         documents_to_delete = [{"id": doc_id} for doc_id in ids_to_delete]
         batch = IndexDocumentsBatch()
         batch.add_delete_actions(documents_to_delete)
-        result = search_client_user.index_documents(batch)
+        result = search_client.index_documents(batch)
     except Exception as e:
         raise
 
-def delete_user_document(user_id, document_id):
+def delete_document(user_id, document_id, group_id=None):
     """
     Delete a document from the user's documents in Cosmos DB
     and remove any associated blobs in storage whose metadata
     matches the user_id and document_id.
     """
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+    storage_account_container_name = (
+        storage_account_group_documents_container_name
+        if is_group else
+        storage_account_user_documents_container_name
+    )
+
     try:
         # 1. Verify the document is owned by this user
-        document_item = documents_container.read_item(
+        document_item = cosmos_container.read_item(
             item=document_id,
             partition_key=document_id
         )
-        if document_item.get('user_id') != user_id:
+        if (document_item.get('user_id') != user_id) or (is_group and document_item.get('group_id') != group_id):
             raise Exception("Unauthorized access to document")
 
         # 2. Delete from Cosmos DB
-        documents_container.delete_item(
+        cosmos_container.delete_item(
             item=document_id,
             partition_key=document_id
         )
 
         # 3. Delete matching blobs from Azure Storage
-        blob_service_client = CLIENTS.get("office_docs_client")
+        blob_service_client = CLIENTS.get("storage_account_office_docs_client")
         container_client = blob_service_client.get_container_client(
-            user_documents_container_name
+            storage_account_container_name
         )
 
         # List only blobs in "user_id/" prefix:
-        prefix = f"{user_id}/"
+        prefix = f"{group_id}/" if is_group else f"{user_id}/"
         blob_list = container_client.list_blobs(name_starts_with=prefix)
 
         for blob_item in blob_list:
@@ -662,12 +967,21 @@ def delete_user_document(user_id, document_id):
             blob_metadata = properties.metadata or {}
 
             # Compare metadata for user_id and document_id
-            if (
-                blob_metadata.get('user_id') == str(user_id)
-                and blob_metadata.get('document_id') == str(document_id)
-            ):
-                # This blob belongs to the same doc & user => Delete
-                container_client.delete_blob(blob_item.name)
+            if not is_group:
+                # User document - match only user_id and document_id
+                if (
+                    blob_metadata.get('user_id') == str(user_id) and
+                    blob_metadata.get('document_id') == str(document_id)
+                ):
+                    container_client.delete_blob(blob_item.name)
+
+            elif is_group:
+                # Group document - match only group_id and document_id
+                if (
+                    blob_metadata.get('group_id') == str(group_id) and
+                    blob_metadata.get('document_id') == str(document_id)
+                ):
+                    container_client.delete_blob(blob_item.name)
 
         return {"message": "Document and associated blobs deleted successfully."}
 
@@ -679,12 +993,15 @@ def delete_user_document(user_id, document_id):
 
 
 
-def delete_user_document_version_chunks(document_id, version):
-    search_client_user = CLIENTS["search_client_user"]
-    search_client_user.delete_documents(
+def delete_document_version_chunks(document_id, version, group_id=None):
+    """Delete document chunks from Azure Cognitive Search index for a specific version."""
+    is_group = group_id is not None
+    search_client = CLIENTS["search_client_group"] if is_group else CLIENTS["search_client_user"]
+
+    search_client.delete_documents(
         actions=[
             {"@search.action": "delete", "id": chunk['id']} for chunk in 
-            search_client_user.search(
+            search_client.search(
                 search_text="*",
                 filter=f"document_id eq '{document_id}' and version eq {version}",
                 select="id"
@@ -692,12 +1009,29 @@ def delete_user_document_version_chunks(document_id, version):
         ]
     )
 
-def get_document_versions(user_id, document_id):
-    try:
+def get_document_versions(user_id, document_id, group_id=None):
+    """ Get all versions of a document for a user."""
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+
+    if is_group:
         query = """
             SELECT c.id, c.file_name, c.version, c.upload_date
-            FROM c 
-            WHERE c.id = @document_id AND c.user_id = @user_id
+            FROM c
+            WHERE c.id = @document_id
+                AND c.group_id = @group_id
+            ORDER BY c.version DESC
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT c.id, c.file_name, c.version, c.upload_date
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
             ORDER BY c.version DESC
         """
         parameters = [
@@ -705,7 +1039,14 @@ def get_document_versions(user_id, document_id):
             {"name": "@user_id", "value": user_id}
         ]
 
-        versions_results = list(documents_container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+    try:
+        versions_results = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
+        )
 
         if not versions_results:
             return []
@@ -723,7 +1064,10 @@ def detect_doc_type(document_id, user_id=None):
     """
 
     try:
-        doc_item = documents_container.read_item(document_id, partition_key=document_id)
+        doc_item = cosmos_user_documents_container.read_item(
+            document_id, 
+            partition_key=document_id
+        )
         if user_id and doc_item.get('user_id') != user_id:
             pass
         else:
@@ -732,78 +1076,129 @@ def detect_doc_type(document_id, user_id=None):
         pass
 
     try:
-        group_doc_item = group_documents_container.read_item(document_id, partition_key=document_id)
+        group_doc_item = cosmos_group_documents_container.read_item(
+            document_id, 
+            partition_key=document_id
+        )
         return "group", group_doc_item['group_id']
     except:
         pass
 
     return None
 
-def process_metadata_extraction_background(document_id, user_id):
+def process_metadata_extraction_background(document_id, user_id, group_id=None):
     """
     Background function that calls extract_document_metadata(...)
     and updates Cosmos DB accordingly.
     """
+    is_group = group_id is not None
+
     try:
         # Log status: starting
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            percentage_complete=5,
-            status="Metadata extraction started..."
-        )
+        args = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "percentage_complete": 5,
+            "status": "Metadata extraction started..."
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        update_document(**args)
 
         # Call your existing extraction function
-        metadata = extract_document_metadata(document_id, user_id)
+        args = {
+            "document_id": document_id,
+            "user_id": user_id
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        metadata = extract_document_metadata(**args)
+
 
         if not metadata:
             # If it fails or returns nothing, log an error status and quit
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                status="Metadata extraction returned empty or failed"
-            )
+            args = {
+                "document_id": document_id,
+                "user_id": user_id,
+                "status": "Metadata extraction returned empty or failed"
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            update_document(**args)
+
             return
 
         # Persist the returned metadata fields back into Cosmos
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            title=metadata.get('title'),
-            authors=metadata.get('authors'),
-            abstract=metadata.get('abstract'),
-            keywords=metadata.get('keywords'),
-            publication_date=metadata.get('publication_date'),
-            organization=metadata.get('organization')
-        )
+        args_metadata = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "title": metadata.get('title'),
+            "authors": metadata.get('authors'),
+            "abstract": metadata.get('abstract'),
+            "keywords": metadata.get('keywords'),
+            "publication_date": metadata.get('publication_date'),
+            "organization": metadata.get('organization')
+        }
 
-        # Mark as completed
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            status="Metadata extraction complete",
-            percentage_complete=100
-        )
+        if is_group:
+            args_metadata["group_id"] = group_id
+
+        update_document(**args_metadata)
+
+        args_status = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "status": "Metadata extraction complete",
+            "percentage_complete": 100
+        }
+
+        if is_group:
+            args_status["group_id"] = group_id
+
+        update_document(**args_status)
 
     except Exception as e:
         # Log any exceptions
-        update_document(
-            document_id=document_id,
-            user_id=user_id,
-            status=f"Metadata extraction failed: {str(e)}"
-        )
+        args = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "status": f"Metadata extraction failed: {str(e)}"
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        update_document(**args)
+
         
-def extract_document_metadata(document_id, user_id):
+def extract_document_metadata(document_id, user_id, group_id=None):
+    """
+    Extract metadata from a document stored in Cosmos DB.
+    This function is called in the background after the document is uploaded.
+    It retrieves the document from Cosmos DB, extracts metadata, and performs
+    content safety checks.
+    """
 
     settings = get_settings()
     enable_gpt_apim = settings.get('enable_gpt_apim', False)
     enable_user_workspace = settings.get('enable_user_workspace', False)
     enable_group_workspaces = settings.get('enable_group_workspaces', False)
 
+    is_group = group_id is not None
+    cosmos_container = cosmos_group_documents_container if is_group else cosmos_user_documents_container
+    id_key = "group_id" if is_group else "user_id"
+    id_value = group_id if is_group else user_id
+
     add_file_task_to_file_processing_log(
-        document_id, 
-        user_id, 
-        f"Querying metadata for document {document_id} and user {user_id}"
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id,
+        content=f"Querying metadata for document {document_id} and user {user_id}"
     )
     
     # Example structure for reference
@@ -826,39 +1221,61 @@ def extract_document_metadata(document_id, user_id):
         "abstract": ""
     }
 
-    # --- Step 1: Retrieve document from Cosmos ---
-    try:
+    if is_group:
         query = """
             SELECT *
             FROM c
-            WHERE c.id = @document_id AND c.user_id = @user_id
+            WHERE c.id = @document_id
+                AND c.group_id = @group_id
+        """
+        parameters = [
+            {"name": "@document_id", "value": document_id},
+            {"name": "@group_id", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.id = @document_id 
+                AND c.user_id = @user_id
         """
         parameters = [
             {"name": "@document_id", "value": document_id},
             {"name": "@user_id", "value": user_id}
         ]
-        document_items = list(documents_container.query_items(
-            query=query, 
-            parameters=parameters, 
-            enable_cross_partition_query=True
-        ))
 
-        update_document(
-            document_id=document_id, 
-            user_id=user_id,
-            status=f"Retrieved document items for document {document_id}"
+    # --- Step 1: Retrieve document from Cosmos ---
+    try:
+        document_items = list(
+            cosmos_container.query_items(
+                query=query, 
+                parameters=parameters, 
+                enable_cross_partition_query=True
+            )
         )
 
+        args = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "status": f"Retrieved document items for document {document_id}"
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        update_document(**args)
+
+
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Retrieved document items for document {document_id}: {document_items}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Retrieved document items for document {document_id}: {document_items}"
         )
     except Exception as e:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Error querying document items for document {document_id}: {e}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Error querying document items for document {document_id}: {e}"
         )
         print(f"Error querying document items for document {document_id}: {e}")
 
@@ -883,16 +1300,22 @@ def extract_document_metadata(document_id, user_id):
         meta_data["abstract"] = document_metadata["abstract"]
 
     add_file_task_to_file_processing_log(
-        document_id, 
-        user_id, 
-        f"Extracted metadata for document {document_id}, metadata: {meta_data}"
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id,
+        content=f"Extracted metadata for document {document_id}, metadata: {meta_data}"
     )
 
-    update_document(
-        document_id=document_id,
-        user_id=user_id,
-        status=f"Extracted metadata for document {document_id}"
-    )
+    args = {
+        "document_id": document_id,
+        "user_id": user_id,
+        "status": f"Extracted metadata for document {document_id}"
+    }
+
+    if is_group:
+        args["group_id"] = group_id
+
+    update_document(**args)
+
 
     # --- Step 3: Content Safety Check (if enabled) ---
     if settings.get('enable_content_safety') and "content_safety_client" in CLIENTS:
@@ -932,18 +1355,18 @@ def extract_document_metadata(document_id, user_id):
             
             if blocked:
                 add_file_task_to_file_processing_log(
-                    document_id, 
-                    user_id, 
-                    f"Blocked document metadata: {document_metadata}, reasons: {block_reasons}"
+                    document_id=document_id, 
+                    user_id=group_id if is_group else user_id,
+                    content=f"Blocked document metadata: {document_metadata}, reasons: {block_reasons}"
                 )
                 print(f"Blocked document metadata: {document_metadata}\nReasons: {block_reasons}")
                 return None
 
         except Exception as e:
             add_file_task_to_file_processing_log(
-                document_id, 
-                user_id, 
-                f"Error checking content safety for document metadata: {e}"
+                document_id=document_id, 
+                user_id=group_id if is_group else user_id,
+                content=f"Error checking content safety for document metadata: {e}"
             )
             print(f"Error checking content safety for document metadata: {e}")
 
@@ -951,35 +1374,53 @@ def extract_document_metadata(document_id, user_id):
     try:
         if enable_user_workspace or enable_group_workspaces:
             add_file_task_to_file_processing_log(
+                document_id=document_id, 
+                user_id=group_id if is_group else user_id,
+                content=f"Processing Hybrid search for document {document_id} using json dump of metadata {json.dumps(meta_data)}"
+            )
+
+            args = {
+                "document_id": document_id,
+                "user_id": user_id,
+                "status": f"Collecting document data to generate metadata from document: {document_id}"
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            update_document(**args)
+
+
+            document_scope, scope_id = detect_doc_type(
                 document_id, 
-                user_id, 
-                f"Processing Hybrid search for document {document_id} using json dump of metadata {json.dumps(meta_data)}"
+                user_id
             )
 
-            update_document(
-                document_id=document_id,
-                user_id=user_id,
-                status=f"Collecting document data to generate metadata from document: {document_id}"
-            )
-
-            document_scope, scope_id = detect_doc_type(document_id, user_id)
             if document_scope == "personal":
-                search_results = hybrid_search(json.dumps(meta_data), user_id, 
-                                               document_id=document_id, top_n=10, 
-                                               doc_scope=document_scope)
+                search_results = hybrid_search(
+                    json.dumps(meta_data), 
+                    user_id, 
+                    document_id=document_id, 
+                    top_n=10, 
+                    doc_scope=document_scope
+                )
             elif document_scope == "group":
-                search_results = hybrid_search(json.dumps(meta_data), user_id, 
-                                               document_id=document_id, top_n=10, 
-                                               doc_scope=document_scope, 
-                                               active_group_id=scope_id)
+                search_results = hybrid_search(
+                    json.dumps(meta_data), 
+                    user_id, 
+                    document_id=document_id,
+                    top_n=10, 
+                    doc_scope=document_scope, 
+                    active_group_id=scope_id
+                )
 
         else:
             search_results = "No Hybrid results"
     except Exception as e:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Error processing Hybrid search for document {document_id}: {e}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Error processing Hybrid search for document {document_id}: {e}"
         )
         print(f"Error processing Hybrid search for document {document_id}: {e}")
         search_results = "No Hybrid results"
@@ -1021,9 +1462,9 @@ def extract_document_metadata(document_id, user_id):
     # --- Step 6: GPT Prompt and JSON Parsing ---
     try:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id,
-            f"Sending search results to AI to generate metadata {document_id}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Sending search results to AI to generate metadata {document_id}"
         )
         messages = [
             {
@@ -1043,13 +1484,16 @@ def extract_document_metadata(document_id, user_id):
             }
         ]
 
-        response = gpt_client.chat.completions.create(model=gpt_model, messages=messages)
+        response = gpt_client.chat.completions.create(
+            model=gpt_model, 
+            messages=messages
+        )
         
     except Exception as e:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Error processing GPT request for document {document_id}: {e}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Error processing GPT request for document {document_id}: {e}"
         )
         print(f"Error processing GPT request for document {document_id}: {e}")
         return meta_data  # Return what we have so far
@@ -1059,33 +1503,33 @@ def extract_document_metadata(document_id, user_id):
 
     response_content = response.choices[0].message.content
     add_file_task_to_file_processing_log(
-        document_id, 
-        user_id, 
-        f"GPT response for document {document_id}: {response_content}"
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id,
+        content=f"GPT response for document {document_id}: {response_content}"
     )
 
     # --- Step 7: Clean and parse the GPT JSON output ---
     try:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id,
-            f"Decoding JSON from GPT response for document {document_id}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Decoding JSON from GPT response for document {document_id}"
         )
 
         cleaned_str = clean_json_codeFence(response_content)
 
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Cleaned JSON from GPT response for document {document_id}: {cleaned_str}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id, 
+            content=f"Cleaned JSON from GPT response for document {document_id}: {cleaned_str}"
         )
 
         gpt_output = json.loads(cleaned_str)
 
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id, 
-            f"Decoded JSON from GPT response for document {document_id}: {gpt_output}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Decoded JSON from GPT response for document {document_id}: {gpt_output}"
         )
 
         # Ensure authors and keywords are always lists
@@ -1094,9 +1538,9 @@ def extract_document_metadata(document_id, user_id):
 
     except (json.JSONDecodeError, TypeError) as e:
         add_file_task_to_file_processing_log(
-            document_id, 
-            user_id,
-            f"Error decoding JSON from GPT response for document {document_id}: {e}"
+            document_id=document_id, 
+            user_id=group_id if is_group else user_id,
+            content=f"Error decoding JSON from GPT response for document {document_id}: {e}"
         )
         print(f"Error decoding JSON from response: {e}")
         return meta_data  # or None
@@ -1134,16 +1578,22 @@ def extract_document_metadata(document_id, user_id):
         meta_data["abstract"] = gpt_output.get("abstract", meta_data["abstract"])
 
     add_file_task_to_file_processing_log(
-        document_id, 
-        user_id, 
-        f"Final metadata for document {document_id}: {meta_data}"
+        document_id=document_id, 
+        user_id=group_id if is_group else user_id,
+        content=f"Final metadata for document {document_id}: {meta_data}"
     )
 
-    update_document(
-        document_id=document_id,
-        user_id=user_id,
-        status=f"Metadata generated for document {document_id}"
-    )
+    args = {
+        "document_id": document_id,
+        "user_id": user_id,
+        "status": f"Metadata generated for document {document_id}"
+    }
+
+    if is_group:
+        args["group_id"] = group_id
+
+    update_document(**args)
+
 
     return meta_data
 
@@ -1206,40 +1656,71 @@ def estimate_word_count(text):
     return len(text.split())
 
 # --- Helper function for uploading to blob storage ---
-def upload_to_blob(temp_file_path, user_id, document_id, blob_filename, update_callback):
+def upload_to_blob(temp_file_path, user_id, document_id, blob_filename, update_callback, group_id=None):
     """Uploads the file to Azure Blob Storage."""
-    try:
-        blob_path = f"{user_id}/{blob_filename}"
-        blob_service_client = CLIENTS.get("office_docs_client") # Assuming CLIENTS is accessible
-        if not blob_service_client:
-            raise Exception("Blob service client not available/configured.")
 
-        # Assuming user_documents_container_name is accessible
+    is_group = group_id is not None
+    storage_account_container_name = (
+        storage_account_group_documents_container_name
+        if is_group else
+        storage_account_user_documents_container_name
+    )
+
+    try:
+        blob_path = f"{group_id}/{blob_filename}" if is_group else f"{user_id}/{blob_filename}"
+
+        blob_service_client = CLIENTS.get("storage_account_office_docs_client")
+        if not blob_service_client:
+            raise Exception("Blob service client not available or not configured.")
+
         blob_client = blob_service_client.get_blob_client(
-            container=user_documents_container_name,
+            container=storage_account_container_name,
             blob=blob_path
         )
-        blob_metadata = {"user_id": str(user_id), "document_id": str(document_id)}
+
+        metadata = {
+            "document_id": str(document_id),
+            "group_id": str(group_id) if is_group else None,
+            "user_id": str(user_id) if not is_group else None
+        }
+
+        metadata = {k: v for k, v in metadata.items() if v is not None}
+
         update_callback(status=f"Uploading {blob_filename} to Blob Storage...")
+
         with open(temp_file_path, "rb") as f:
-            blob_client.upload_blob(f, overwrite=True, metadata=blob_metadata)
+            blob_client.upload_blob(f, overwrite=True, metadata=metadata)
+
         print(f"Successfully uploaded {blob_filename} to blob storage at {blob_path}")
-        return blob_path # Return the path for potential use
+        return blob_path
+
     except Exception as e:
         print(f"Error uploading {blob_filename} to Blob Storage: {str(e)}")
-        # Decide if this should be a fatal error or just a warning
-        # For now, let's raise it to stop processing if upload fails when required
         raise Exception(f"Error uploading {blob_filename} to Blob Storage: {str(e)}")
 
+
 # --- Helper function to process TXT files ---
-def process_txt(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+def process_txt(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback, group_id=None):
     """Processes plain text files."""
+    is_group = group_id is not None
+
     update_callback(status="Processing TXT file...")
     total_chunks_saved = 0
     target_words_per_chunk = 400
 
     if enable_enhanced_citations:
-        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+        args = {
+            "temp_file_path": temp_file_path,
+            "user_id": user_id,
+            "document_id": document_id,
+            "blob_filename": original_filename,
+            "update_callback": update_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        upload_to_blob(**args)
 
     try:
         with open(temp_file_path, 'r', encoding='utf-8') as f:
@@ -1260,13 +1741,18 @@ def process_txt(document_id, user_id, temp_file_path, original_filename, enable_
                     current_file_chunk=chunk_index,
                     status=f"Saving chunk {chunk_index}/{num_chunks_estimated}..."
                 )
-                save_chunks(
-                    page_text_content=chunk_content,
-                    page_number=chunk_index,
-                    file_name=original_filename,
-                    user_id=user_id,
-                    document_id=document_id
-                )
+                args = {
+                    "page_text_content": chunk_content,
+                    "page_number": chunk_index,
+                    "file_name": original_filename,
+                    "user_id": user_id,
+                    "document_id": document_id
+                }
+
+                if is_group:
+                    args["group_id"] = group_id
+
+                save_chunks(**args)
                 total_chunks_saved += 1
 
     except Exception as e:
@@ -1275,15 +1761,28 @@ def process_txt(document_id, user_id, temp_file_path, original_filename, enable_
     return total_chunks_saved
 
 # --- Helper function to process HTML files ---
-def process_html(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+def process_html(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback, group_id=None):
     """Processes HTML files."""
+    is_group = group_id is not None
+
     update_callback(status="Processing HTML file...")
     total_chunks_saved = 0
     target_chunk_words = 1200 # Target size based on requirement
     min_chunk_words = 600 # Minimum size based on requirement
 
     if enable_enhanced_citations:
-        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+        args = {
+            "temp_file_path": temp_file_path,
+            "user_id": user_id,
+            "document_id": document_id,
+            "blob_filename": original_filename,
+            "update_callback": update_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        upload_to_blob(**args)
 
     try:
         # --- CHANGE HERE: Open in binary mode ('rb') ---
@@ -1331,13 +1830,18 @@ def process_html(document_id, user_id, temp_file_path, original_filename, enable
                 current_file_chunk=idx,
                 status=f"Saving chunk {idx}/{num_chunks_final}..."
             )
-            save_chunks(
-                page_text_content=chunk_content,
-                page_number=idx,
-                file_name=original_filename,
-                user_id=user_id,
-                document_id=document_id
-            )
+            args = {
+                "page_text_content": chunk_content,
+                "page_number": idx,
+                "file_name": original_filename,
+                "user_id": user_id,
+                "document_id": document_id
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            save_chunks(**args)
             total_chunks_saved += 1
 
     except Exception as e:
@@ -1348,15 +1852,28 @@ def process_html(document_id, user_id, temp_file_path, original_filename, enable
 
 
 # --- Helper function to process Markdown files ---
-def process_md(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+def process_md(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback, group_id=None):
     """Processes Markdown files."""
+    is_group = group_id is not None
+
     update_callback(status="Processing Markdown file...")
     total_chunks_saved = 0
     target_chunk_words = 1200 # Target size based on requirement
     min_chunk_words = 600 # Minimum size based on requirement
 
     if enable_enhanced_citations:
-        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+        args = {
+            "temp_file_path": temp_file_path,
+            "user_id": user_id,
+            "document_id": document_id,
+            "blob_filename": original_filename,
+            "update_callback": update_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        upload_to_blob(**args)
 
     try:
         with open(temp_file_path, 'r', encoding='utf-8') as f:
@@ -1410,13 +1927,18 @@ def process_md(document_id, user_id, temp_file_path, original_filename, enable_e
                 current_file_chunk=idx,
                 status=f"Saving chunk {idx}/{num_chunks_final}..."
             )
-            save_chunks(
-                page_text_content=chunk_content, # Save the raw markdown chunk
-                page_number=idx,
-                file_name=original_filename,
-                user_id=user_id,
-                document_id=document_id
-            )
+            args = {
+                "page_text_content": chunk_content,
+                "page_number": idx,
+                "file_name": original_filename,
+                "user_id": user_id,
+                "document_id": document_id
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            save_chunks(**args)
             total_chunks_saved += 1
 
     except Exception as e:
@@ -1426,15 +1948,29 @@ def process_md(document_id, user_id, temp_file_path, original_filename, enable_e
 
 
 # --- Helper function to process JSON files ---
-def process_json(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback):
+def process_json(document_id, user_id, temp_file_path, original_filename, enable_enhanced_citations, update_callback, group_id=None):
     """Processes JSON files using RecursiveJsonSplitter."""
+    is_group = group_id is not None
+
     update_callback(status="Processing JSON file...")
     total_chunks_saved = 0
     # Reflects character count limit for the splitter
     max_chunk_size_chars = 600 # As per original requirement
 
     if enable_enhanced_citations:
-        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+        args = {
+            "temp_file_path": temp_file_path,
+            "user_id": user_id,
+            "document_id": document_id,
+            "blob_filename": original_filename,
+            "update_callback": update_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        upload_to_blob(**args)
+
 
     try:
         # Load the JSON data first to ensure it's valid
@@ -1476,13 +2012,18 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
                 # Keep number_of_pages as initial estimate during saving loop
                 status=f"Saving chunk {idx}/{initial_chunk_count}..."
             )
-            save_chunks(
-                page_text_content=chunk_content, # Save the JSON string chunk
-                page_number=total_chunks_saved + 1, # Use sequential numbering for saved chunks
-                file_name=original_filename,
-                user_id=user_id,
-                document_id=document_id
-            )
+            args = {
+                "page_text_content": chunk_content,
+                "page_number": total_chunks_saved + 1,
+                "file_name": original_filename,
+                "user_id": user_id,
+                "document_id": document_id
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            save_chunks(**args)
             total_chunks_saved += 1 # Increment only when a chunk is actually saved
 
         # Final update with the actual number of chunks saved
@@ -1504,8 +2045,10 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
 
 
 # --- Helper function to process a single Tabular sheet (CSV or Excel tab) ---
-def process_single_tabular_sheet(df, document_id, user_id, effective_filename, update_callback):
+def process_single_tabular_sheet(df, document_id, user_id, effective_filename, update_callback, group_id=None):
     """Chunks a pandas DataFrame from a CSV or Excel sheet."""
+    is_group = group_id is not None
+
     total_chunks_saved = 0
     target_chunk_size_chars = 800 # Requirement: "800 size chunk" (assuming characters)
 
@@ -1562,56 +2105,103 @@ def process_single_tabular_sheet(df, document_id, user_id, effective_filename, u
             current_file_chunk=idx,
             status=f"Saving chunk {idx}/{num_chunks_final} from {effective_filename}..."
         )
-        save_chunks(
-            page_text_content=chunk_with_header, # Save rows including header
-            page_number=idx, # Use chunk index as page number
-            file_name=effective_filename, # Use filename possibly including sheet name
-            user_id=user_id,
-            document_id=document_id
-        )
+
+        args = {
+            "page_text_content": chunk_with_header,
+            "page_number": idx,
+            "file_name": effective_filename,
+            "user_id": user_id,
+            "document_id": document_id
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        save_chunks(**args)
         total_chunks_saved += 1
 
     return total_chunks_saved
 
 
 # --- Helper function to process Tabular files (CSV, XLSX, XLS) ---
-def process_tabular(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback):
+def process_tabular(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback, group_id=None):
     """Processes CSV, XLSX, or XLS files using pandas."""
+    is_group = group_id is not None
+
     update_callback(status=f"Processing Tabular file ({file_ext})...")
     total_chunks_saved = 0
 
     # Upload the original file once if enhanced citations are enabled
     if enable_enhanced_citations:
-        upload_to_blob(temp_file_path, user_id, document_id, original_filename, update_callback)
+        args = {
+            "temp_file_path": temp_file_path,
+            "user_id": user_id,
+            "document_id": document_id,
+            "blob_filename": original_filename,
+            "update_callback": update_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        upload_to_blob(**args)
 
     try:
         if file_ext == '.csv':
             # Process CSV
              # Read CSV, attempt to infer header, keep data as string initially
-            df = pd.read_csv(temp_file_path, keep_default_na=False, dtype=str)
-            total_chunks_saved = process_single_tabular_sheet(
-                df, document_id, user_id, original_filename, update_callback
+            df = pd.read_csv(
+                temp_file_path, 
+                keep_default_na=False, 
+                dtype=str
             )
+            args = {
+                "df": df,
+                "document_id": document_id,
+                "user_id": user_id,
+                "file_name": original_filename,
+                "update_callback": update_callback
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            total_chunks_saved = process_single_tabular_sheet(**args)
+
         elif file_ext in ('.xlsx', '.xls'):
             # Process Excel (potentially multiple sheets)
-            excel_file = pd.ExcelFile(temp_file_path, engine='openpyxl' if file_ext == '.xlsx' else 'xlrd')
+            excel_file = pd.ExcelFile(
+                temp_file_path, 
+                engine='openpyxl' if file_ext == '.xlsx' else 'xlrd'
+            )
             sheet_names = excel_file.sheet_names
             base_name, ext = os.path.splitext(original_filename)
 
             accumulated_total_chunks = 0
             for sheet_name in sheet_names:
-                 update_callback(status=f"Processing sheet '{sheet_name}'...")
-                 # Read specific sheet, get values (not formulas), keep data as string
-                 # Note: pandas typically reads values, not formulas by default.
-                 df = excel_file.parse(sheet_name, keep_default_na=False, dtype=str)
+                update_callback(status=f"Processing sheet '{sheet_name}'...")
+                # Read specific sheet, get values (not formulas), keep data as string
+                # Note: pandas typically reads values, not formulas by default.
+                df = excel_file.parse(sheet_name, keep_default_na=False, dtype=str)
 
-                 # Create effective filename for this sheet
-                 effective_filename = f"{base_name}-{sheet_name}{ext}" if len(sheet_names) > 1 else original_filename
+                # Create effective filename for this sheet
+                effective_filename = f"{base_name}-{sheet_name}{ext}" if len(sheet_names) > 1 else original_filename
 
-                 chunks_from_sheet = process_single_tabular_sheet(
-                     df, document_id, user_id, effective_filename, update_callback
-                 )
-                 accumulated_total_chunks += chunks_from_sheet
+                args = {
+                    "df": df,
+                    "document_id": document_id,
+                    "user_id": user_id,
+                    "file_name": effective_filename,
+                    "update_callback": update_callback
+                }
+
+                if is_group:
+                    args["group_id"] = group_id
+
+                chunks_from_sheet = process_single_tabular_sheet(**args)
+
+                accumulated_total_chunks += chunks_from_sheet
+
             total_chunks_saved = accumulated_total_chunks # Total across all sheets
 
 
@@ -1626,8 +2216,10 @@ def process_tabular(document_id, user_id, temp_file_path, original_filename, fil
 
 # --- Helper function for DI-supported types (PDF, DOCX, PPT, Image) ---
 # This function encapsulates the original logic for these file types
-def process_di_document(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback):
+def process_di_document(document_id, user_id, temp_file_path, original_filename, file_ext, enable_enhanced_citations, update_callback, group_id=None):
     """Processes documents supported by Azure Document Intelligence (PDF, Word, PPT, Image)."""
+    is_group = group_id is not None
+    
     # --- Extracted Metadata logic ---
     doc_title, doc_author, doc_subject, doc_keywords = '', '', None, None
     doc_authors_list = []
@@ -1707,7 +2299,18 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
 
         # Upload to Blob (if enhanced citations enabled for these types)
         if use_enhanced_citations_di:
-            upload_to_blob(chunk_path, user_id, document_id, chunk_effective_filename, update_callback)
+            args = {
+                "temp_file_path": temp_file_path,
+                "user_id": user_id,
+                "document_id": document_id,
+                "blob_filename": chunk_effective_filename,
+                "update_callback": update_callback
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            upload_to_blob(**args)
 
         # Send chunk to Azure DI
         update_callback(status=f"Sending {chunk_effective_filename} to Azure Document Intelligence...")
@@ -1736,7 +2339,7 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
         if is_word:
             update_callback(status=f"Chunking Word content from {chunk_effective_filename}...")
             try:
-                final_chunks_to_save = chunk_word_file_into_pages(document_id=document_id, user_id=user_id, di_pages=di_extracted_pages)
+                final_chunks_to_save = chunk_word_file_into_pages(di_pages=di_extracted_pages)
                 num_final_chunks = len(final_chunks_to_save)
                 # Update number_of_pages again for Word to reflect final chunk count
                 update_callback(number_of_pages=num_final_chunks, status=f"Created {num_final_chunks} content chunks for {chunk_effective_filename}.")
@@ -1756,7 +2359,16 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
             print(f"Info: No final content chunks to save for {chunk_effective_filename}.")
         else:
             update_callback(status=f"Saving {num_final_chunks} content chunk(s) for {chunk_effective_filename}...")
-            doc_metadata_temp = get_document_metadata(document_id, user_id) # Get latest count for progress
+            args = {
+                "document_id": document_id,
+                "user_id": user_id
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            doc_metadata_temp = get_document_metadata(**args)
+
             estimated_total_items = doc_metadata_temp.get('number_of_pages', num_final_chunks) if doc_metadata_temp else num_final_chunks
 
             try:
@@ -1773,17 +2385,24 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
                         number_of_pages=estimated_total_items,
                         status=f"Saving page/chunk {chunk_index}/{estimated_total_items} of {chunk_effective_filename}..."
                     )
-                    save_chunks(
-                        page_text_content=chunk_content,
-                        page_number=chunk_index,
-                        file_name=chunk_effective_filename,
-                        user_id=user_id,
-                        document_id=document_id
-                    )
+                    
+                    args = {
+                        "page_text_content": chunk_content,
+                        "page_number": chunk_index,
+                        "file_name": chunk_effective_filename,
+                        "user_id": user_id,
+                        "document_id": document_id
+                    }
+
+                    if is_group:
+                        args["group_id"] = group_id
+
+                    save_chunks(**args)
+
                     total_final_chunks_processed += 1
                 print(f"Saved {num_final_chunks} content chunk(s) from {chunk_effective_filename}.")
             except Exception as e:
-                raise Exception(f"Error saving extracted content chunk index {chunk_index} for {chunk_effective_filename}: {str(e)}")
+                raise Exception(f"Error saving extracted content chunk index {chunk_index} for {chunk_effective_filename}: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
 
         # Clean up local file chunk (if it's not the original temp file)
         if chunk_path != temp_file_path and os.path.exists(chunk_path):
@@ -1799,7 +2418,16 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
     if enable_extract_meta_data and total_final_chunks_processed > 0:
         try:
             update_callback(status="Extracting final metadata...")
-            document_metadata = extract_document_metadata(document_id, user_id)
+            args = {
+                "document_id": document_id,
+                "user_id": user_id
+            }
+
+            if is_group:
+                args["group_id"] = group_id
+
+            document_metadata = extract_document_metadata(**args)
+
             update_fields = {k: v for k, v in document_metadata.items() if v is not None and v != ""}
             if update_fields:
                  update_fields['status'] = "Final metadata extracted"
@@ -1813,12 +2441,13 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
 
     return total_final_chunks_processed
 
-def process_document_upload_background(document_id, user_id, temp_file_path, original_filename):
+def process_document_upload_background(document_id, user_id, temp_file_path, original_filename, group_id=None):
     """
     Main background task dispatcher for document processing.
     Handles various file types with specific chunking and processing logic.
     Integrates enhanced citations (blob upload) for all supported types.
     """
+    is_group = group_id is not None
     settings = get_settings()
     enable_enhanced_citations = settings.get('enable_enhanced_citations', False) # Default to False if missing
     enable_extract_meta_data = settings.get('enable_extract_meta_data', False) # Used by DI flow
@@ -1827,7 +2456,17 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
     # --- Define update_document callback wrapper ---
     # This makes it easier to pass the update function to helpers without repeating args
     def update_doc_callback(**kwargs):
-        update_document(document_id=document_id, user_id=user_id, **kwargs)
+        args = {
+            "document_id": document_id,
+            "user_id": user_id,
+            **kwargs  # includes any dynamic update fields
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
+        update_document(**args)
+
 
     total_chunks_saved = 0
     file_ext = '' # Initialize
@@ -1854,39 +2493,34 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
         di_supported_extensions = ('.pdf', '.docx', '.doc', '.pptx', '.ppt', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.heif')
         tabular_extensions = ('.csv', '.xlsx', '.xls')
 
+        is_group = group_id is not None
+
+        args = {
+            "document_id": document_id,
+            "user_id": user_id,
+            "temp_file_path": temp_file_path,
+            "original_filename": original_filename,
+            "file_ext": file_ext if file_ext in tabular_extensions or file_ext in di_supported_extensions else None,
+            "enable_enhanced_citations": enable_enhanced_citations,
+            "update_callback": update_doc_callback
+        }
+
+        if is_group:
+            args["group_id"] = group_id
+
         if file_ext == '.txt':
-            total_chunks_saved = process_txt(
-                document_id, user_id, temp_file_path, original_filename,
-                enable_enhanced_citations, update_doc_callback
-            )
+            total_chunks_saved = process_txt(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext == '.html':
-             total_chunks_saved = process_html(
-                 document_id, user_id, temp_file_path, original_filename,
-                 enable_enhanced_citations, update_doc_callback
-            )
+            total_chunks_saved = process_html(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext == '.md':
-             total_chunks_saved = process_md(
-                 document_id, user_id, temp_file_path, original_filename,
-                 enable_enhanced_citations, update_doc_callback
-             )
+            total_chunks_saved = process_md(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext == '.json':
-            total_chunks_saved = process_json(
-                 document_id, user_id, temp_file_path, original_filename,
-                 enable_enhanced_citations, update_doc_callback
-             )
+            total_chunks_saved = process_json(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext in tabular_extensions:
-            total_chunks_saved = process_tabular(
-                document_id, user_id, temp_file_path, original_filename, file_ext,
-                enable_enhanced_citations, update_doc_callback
-            )
+            total_chunks_saved = process_tabular(**args)
         elif file_ext in di_supported_extensions:
-            # Use the dedicated handler for DI types (which includes metadata, DI call, etc.)
-            total_chunks_saved = process_di_document(
-                document_id, user_id, temp_file_path, original_filename, file_ext,
-                enable_enhanced_citations, update_doc_callback
-            )
+            total_chunks_saved = process_di_document(**args)
         else:
-            # This case should technically be caught by allowed_file, but good to have fallback
             raise ValueError(f"Unsupported file type for processing: {file_ext}")
 
 

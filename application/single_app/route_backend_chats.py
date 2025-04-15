@@ -117,10 +117,10 @@ def register_route_backend_chats(app):
                 'last_updated': datetime.utcnow().isoformat(),
                 'title': 'New Conversation'
             }
-            container.upsert_item(conversation_item)
+            cosmos_conversations_container.upsert_item(conversation_item)
         else:
             try:
-                conversation_item = container.read_item(item=conversation_id, partition_key=conversation_id)
+                conversation_item = cosmos_conversations_container.read_item(item=conversation_id, partition_key=conversation_id)
             except CosmosResourceNotFoundError:
                 # If conversation ID is provided but not found, create a new one with that ID
                 # Or decide if you want to return an error instead
@@ -132,7 +132,7 @@ def register_route_backend_chats(app):
                 }
                 # Optionally log that a conversation was expected but not found
                 print(f"Warning: Conversation ID {conversation_id} not found, creating new.")
-                container.upsert_item(conversation_item)
+                cosmos_conversations_container.upsert_item(conversation_item)
             except Exception as e:
                 print(f"Error reading conversation {conversation_id}: {e}")
                 return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
@@ -149,7 +149,7 @@ def register_route_backend_chats(app):
             'timestamp': datetime.utcnow().isoformat(),
             'model_deployment_name': None # Model not used for user message
         }
-        messages_container.upsert_item(user_message_doc)
+        cosmos_messages_container.upsert_item(user_message_doc)
 
         # Set conversation title if it's still the default
         if conversation_item.get('title', 'New Conversation') == 'New Conversation' and user_message:
@@ -157,7 +157,7 @@ def register_route_backend_chats(app):
             conversation_item['title'] = new_title
 
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
-        container.upsert_item(conversation_item) # Update timestamp and potentially title
+        cosmos_conversations_container.upsert_item(conversation_item) # Update timestamp and potentially title
 
         # ---------------------------------------------------------------------
         # 3) Check Content Safety (but DO NOT return 403).
@@ -211,7 +211,7 @@ def register_route_backend_chats(app):
                         'timestamp': datetime.utcnow().isoformat(),
                         'reason': "; ".join(block_reasons)
                     }
-                    safety_container.upsert_item(safety_item)
+                    cosmos_safety_container.upsert_item(safety_item)
 
                     # Instead of 403, we'll add a "safety" message
                     blocked_msg_content = (
@@ -241,11 +241,11 @@ def register_route_backend_chats(app):
                         'timestamp': datetime.utcnow().isoformat(),
                         'model_deployment_name': None
                     }
-                    messages_container.upsert_item(safety_doc)
+                    cosmos_messages_container.upsert_item(safety_doc)
 
                     # Update conversation's last_updated
                     conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                    container.upsert_item(conversation_item)
+                    cosmos_conversations_container.upsert_item(conversation_item)
 
                     # Return a normal 200 with a special field: blocked=True
                     return jsonify({
@@ -279,7 +279,7 @@ def register_route_backend_chats(app):
                 
                 
                 try:
-                    last_messages_desc = list(messages_container.query_items(
+                    last_messages_desc = list(cosmos_messages_container.query_items(
                         query=query_search, parameters=params_search, partition_key=conversation_id, enable_cross_partition_query=True
                     ))
                     last_messages_asc = list(reversed(last_messages_desc))
@@ -505,10 +505,10 @@ def register_route_backend_chats(app):
                     'timestamp': datetime.utcnow().isoformat(),
                     'model_deployment_name': image_gen_model
                 }
-                messages_container.upsert_item(image_doc)
+                cosmos_messages_container.upsert_item(image_doc)
 
                 conversation_item['last_updated'] = datetime.utcnow().isoformat()
-                container.upsert_item(conversation_item)
+                cosmos_conversations_container.upsert_item(conversation_item)
 
                 return jsonify({
                     'reply': "Image loading...",
@@ -534,7 +534,7 @@ def register_route_backend_chats(app):
             # Fetch ALL messages for potential summarization, sorted OLD->NEW
             all_messages_query = "SELECT * FROM c WHERE c.conversation_id = @conv_id ORDER BY c.timestamp ASC"
             params_all = [{"name": "@conv_id", "value": conversation_id}]
-            all_messages = list(messages_container.query_items(
+            all_messages = list(cosmos_messages_container.query_items(
                 query=all_messages_query, parameters=params_all, partition_key=conversation_id, enable_cross_partition_query=True
             ))
 
@@ -611,7 +611,7 @@ def register_route_backend_chats(app):
                     'model_deployment_name': None, # As per your original structure
                     'timestamp': datetime.utcnow().isoformat()
                 }
-                messages_container.upsert_item(system_doc)
+                cosmos_messages_container.upsert_item(system_doc)
                 conversation_history_for_api.append(aug_msg) # Add to API context
 
 
@@ -725,12 +725,12 @@ def register_route_backend_chats(app):
             'user_message': user_message,
             'model_deployment_name': final_model_used
         }
-        messages_container.upsert_item(assistant_doc)
+        cosmos_messages_container.upsert_item(assistant_doc)
 
         # Update conversation's last_updated timestamp one last time
         conversation_item['last_updated'] = datetime.utcnow().isoformat()
         # Add any other final updates to conversation_item if needed (like classifications if not done earlier)
-        container.upsert_item(conversation_item)
+        cosmos_conversations_container.upsert_item(conversation_item)
 
         # ---------------------------------------------------------------------
         # 8) Return final success (even if AI generated an error message)

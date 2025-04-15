@@ -34,13 +34,13 @@ def register_route_backend_feedback(app):
 
         try:
             # --- CORRECTED PART ---
-            # Query the messages_container for all messages in this conversation
+            # Query the cosmos_messages_container for all messages in this conversation
             # Order by timestamp to find the preceding message correctly
             query = "SELECT * FROM c WHERE c.conversation_id = @conversationId ORDER BY c.timestamp ASC"
             parameters = [{"name": "@conversationId", "value": conversationId}]
 
-            # Execute the query against the messages_container, specifying the partition key
-            message_items = list(messages_container.query_items(
+            # Execute the query against the cosmos_messages_container, specifying the partition key
+            message_items = list(cosmos_messages_container.query_items(
                 query=query,
                 parameters=parameters,
                 partition_key=conversationId # Use the partition key for efficiency
@@ -61,7 +61,7 @@ def register_route_backend_feedback(app):
             for i, msg in enumerate(all_messages):
                 # **** IMPORTANT ASSUMPTION ****
                 # Assuming the 'messageId' sent from the frontend corresponds to the 'id' field
-                # of the message document in messages_container.
+                # of the message document in cosmos_messages_container.
                 # If your message documents use a different field like 'message_id', change 'msg.get("id")' below.
                 if msg.get("role") == "assistant" and msg.get("id") == messageId:
                     ai_message_text = msg.get("content")
@@ -100,10 +100,10 @@ def register_route_backend_feedback(app):
 
         # Set default text if messages weren't found
         if not ai_message_text:
-            ai_message_text = "[AI response text not found in messages_container]"
+            ai_message_text = "[AI response text not found in cosmos_messages_container]"
 
         if not user_prompt_text:
-            user_prompt_text = "[User prompt not found in messages_container]"
+            user_prompt_text = "[User prompt not found in cosmos_messages_container]"
 
         # --- Rest of the feedback saving logic remains the same ---
         feedback_id = str(uuid.uuid4())
@@ -129,7 +129,7 @@ def register_route_backend_feedback(app):
         }
 
         try:
-            feedback_container.upsert_item(item)
+            cosmos_feedback_container.upsert_item(item)
             return jsonify({"success": True, "feedbackId": feedback_id})
         except Exception as e:
             print(f"Error saving feedback item {feedback_id}: {e}")
@@ -197,7 +197,7 @@ def register_route_backend_feedback(app):
 
             # --- Execute Queries ---
             # Count Query (first, to know total pages)
-            total_count_result = list(feedback_container.query_items(
+            total_count_result = list(cosmos_feedback_container.query_items(
                 query=count_query,
                 parameters=parameters[:-2], # Exclude offset/limit params for count
                 enable_cross_partition_query=True
@@ -205,7 +205,7 @@ def register_route_backend_feedback(app):
             total_count = total_count_result[0] if total_count_result else 0
 
             # Data Query
-            items = list(feedback_container.query_items(
+            items = list(cosmos_feedback_container.query_items(
                 query=base_query,
                 parameters=parameters,
                 enable_cross_partition_query=True
@@ -252,7 +252,7 @@ def register_route_backend_feedback(app):
         """
         try:
             # Assuming feedbackId is the partition key as well
-            feedback_doc = feedback_container.read_item(
+            feedback_doc = cosmos_feedback_container.read_item(
                 item=feedbackId, partition_key=feedbackId
             )
 
@@ -288,7 +288,7 @@ def register_route_backend_feedback(app):
 
         try:
              # Assume feedbackId is the partition key
-            feedback_doc = feedback_container.read_item(
+            feedback_doc = cosmos_feedback_container.read_item(
                 item=feedbackId, partition_key=feedbackId
             )
         except CosmosResourceNotFoundError:
@@ -313,7 +313,7 @@ def register_route_backend_feedback(app):
         feedback_doc["adminReview"] = admin_review_data # Assign updated dict back
 
         try:
-             feedback_container.upsert_item(feedback_doc)
+             cosmos_feedback_container.upsert_item(feedback_doc)
              return jsonify({"success": True})
         except Exception as e:
              print(f"Error updating feedback item {feedbackId}: {e}")
@@ -395,7 +395,7 @@ def register_route_backend_feedback(app):
 
             # --- Execute Queries ---
             # 1. Get total count
-            count_results = list(feedback_container.query_items(
+            count_results = list(cosmos_feedback_container.query_items(
                 query=count_query,
                 parameters=parameters,
                 enable_cross_partition_query=True # Adjust based on partition key
@@ -403,7 +403,7 @@ def register_route_backend_feedback(app):
             total_count = count_results[0] if count_results else 0
 
             # 2. Get paginated items
-            all_matching_items = list(feedback_container.query_items(
+            all_matching_items = list(cosmos_feedback_container.query_items(
                 query=query,
                 parameters=parameters,
                 enable_cross_partition_query=True

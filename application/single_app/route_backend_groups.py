@@ -28,7 +28,7 @@ def register_route_backend_groups(app):
         show_all = (show_all_str == "true")
 
         query = "SELECT * FROM c WHERE c.type = 'group' or NOT IS_DEFINED(c.type)"
-        all_items = list(groups_container.query_items(
+        all_items = list(cosmos_groups_container.query_items(
             query=query,
             enable_cross_partition_query=True
         ))
@@ -212,7 +212,7 @@ def register_route_backend_groups(app):
         group_doc["description"] = description
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
         try:
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
         except exceptions.CosmosHttpResponseError as ex:
             return jsonify({"error": str(ex)}), 400
 
@@ -280,7 +280,7 @@ def register_route_backend_groups(app):
         })
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": "Membership request created"}), 201
 
@@ -353,7 +353,7 @@ def register_route_backend_groups(app):
 
         group_doc["pendingUsers"] = pending_list
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": msg}), 200
 
@@ -395,7 +395,7 @@ def register_route_backend_groups(app):
         group_doc["users"].append(new_member_doc)
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
 
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
         return jsonify({"message": "Member added"}), 200
 
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["DELETE"])
@@ -438,7 +438,7 @@ def register_route_backend_groups(app):
                 group_doc["documentManagers"].remove(member_id)
 
             group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
 
             if removed:
                 return jsonify({"message": "You have left the group"}), 200
@@ -468,7 +468,7 @@ def register_route_backend_groups(app):
                 group_doc["documentManagers"].remove(member_id)
 
             group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
 
             if removed:
                 return jsonify({"message": "User removed"}), 200
@@ -520,7 +520,7 @@ def register_route_backend_groups(app):
             pass
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": f"User {member_id} updated to {new_role}"}), 200
 
@@ -643,7 +643,7 @@ def register_route_backend_groups(app):
             group_doc["documentManagers"].remove(old_owner_id)
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": "Ownership transferred successfully"}), 200
 
@@ -675,7 +675,7 @@ def register_route_backend_groups(app):
         """
         params = [{ "name": "@groupId", "value": group_id }]
 
-        result_iter = group_documents_container.query_items(
+        result_iter = cosmos_group_documents_container.query_items(
             query=query,
             parameters=params,
             enable_cross_partition_query=True

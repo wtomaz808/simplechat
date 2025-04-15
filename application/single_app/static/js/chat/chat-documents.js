@@ -144,36 +144,22 @@ export function loadPersonalDocs() {
 }
 
 export function loadGroupDocs() {
-  return fetch("/api/groups")
+  return fetch("/api/group_documents")
     .then((r) => r.json())
-    .then((groups) => {
-      const activeGroup = groups.find((g) => g.isActive);
-      if (activeGroup) {
-        activeGroupName = activeGroup.name || "Active Group";
-        return fetch("/api/group_documents")
-          .then((r) => r.json())
-          .then((data) => {
-            if (data.error) {
-              console.warn("Error fetching group docs:", data.error);
-              groupDocs = [];
-              return;
-            }
-            groupDocs = data.documents || [];
-          })
-          .catch((err) => {
-            console.error("Error loading group docs:", err);
-            groupDocs = [];
-          });
-      } else {
-        activeGroupName = "";
+    .then((data) => {
+      if (data.error) {
+        console.warn("Error fetching user docs:", data.error);
         groupDocs = [];
+        return;
       }
+      groupDocs  = data.documents || [];
     })
     .catch((err) => {
-      console.error("Error loading groups:", err);
+      console.error("Error loading personal docs:", err);
       groupDocs = [];
     });
 }
+
 
 export function loadAllDocs() {
   const hasDocControls = searchDocumentsBtn || docScopeSelect || docSelectEl;

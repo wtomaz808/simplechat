@@ -89,7 +89,7 @@ body.layout-docked #left-pane {
   position: fixed !important; /* Force override */
   top: 66px !important; /* Matches calc(100vh - 66px) - ADJUST IF HEADER HEIGHT CHANGES */
   left: 0 !important;
-  width: 300px !important; /* Default docked width - ADJUST AS NEEDED */
+  width: 320px !important; /* Default docked width - ADJUST AS NEEDED */
   height: calc(100vh - 66px) !important; /* Full height minus header */
   z-index: 1031 !important;
   background: var(--bs-body-bg, white) !important;
@@ -101,7 +101,7 @@ body.layout-docked #left-pane {
 }
 
 body.layout-docked #right-pane {
-  margin-left: 300px !important; /* Same as docked left pane width */
+  margin-left: 320px !important; /* Same as docked left pane width */
   width: calc(100% - 300px) !important;
   transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
    /* Override flex basis potentially set by split.js before destroy */

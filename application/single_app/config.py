@@ -18,6 +18,7 @@ import math
 import mimetypes
 import openpyxl
 import xlrd
+import traceback
 
 from flask import (
     Flask, 
@@ -76,7 +77,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.207.535'
+app.config['VERSION'] = '0.207.575'
 Session(app)
 
 CLIENTS = {}
@@ -111,12 +112,12 @@ else:
 
 bing_search_endpoint = "https://api.bing.microsoft.com/"
 
-user_documents_container_name = "user-documents"
-group_documents_container_name = "group-documents"
-user_video_files_container_name = "user-video-files"
-group_video_files_container_name = "group-video-files"
-user_audio_files_container_name = "user-audio-files"
-group_audio_files_container_name = "group-audio-files"
+storage_account_user_documents_container_name = "user-documents"
+storage_account_group_documents_container_name = "group-documents"
+storage_account_user_video_files_container_name = "user-video-files"
+storage_account_group_video_files_container_name = "group-video-files"
+storage_account_user_audio_files_container_name = "user-audio-files"
+storage_account_group_audio_files_container_name = "group-audio-files"
 
 # Initialize Azure Cosmos DB client
 cosmos_endpoint = os.getenv("AZURE_COSMOS_ENDPOINT")
@@ -127,90 +128,90 @@ if cosmos_authentication_type == "managed_identity":
 else:
     cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 
-database_name = "SimpleChat"
-database = cosmos_client.create_database_if_not_exists(database_name)
+cosmos_database_name = "SimpleChat"
+cosmos_database = cosmos_client.create_database_if_not_exists(cosmos_database_name)
 
-container_name = "conversations"
-container = database.create_container_if_not_exists(
-    id=container_name,
+cosmos_conversations_container_name = "conversations"
+cosmos_conversations_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_conversations_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-messages_container_name = "messages"
-messages_container = database.create_container_if_not_exists(
-    id=messages_container_name,
+cosmos_messages_container_name = "messages"
+cosmos_messages_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_messages_container_name,
     partition_key=PartitionKey(path="/conversation_id")
 )
 
-documents_container_name = "documents"
-documents_container = database.create_container_if_not_exists(
-    id=documents_container_name,
+cosmos_user_documents_container_name = "documents"
+cosmos_user_documents_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_documents_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-settings_container_name = "settings"
-settings_container = database.create_container_if_not_exists(
-    id=settings_container_name,
+cosmos_settings_container_name = "settings"
+cosmos_settings_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_settings_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-groups_container_name = "groups"
-groups_container = database.create_container_if_not_exists(
-    id=groups_container_name,
+cosmos_groups_container_name = "groups"
+cosmos_groups_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_groups_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-group_documents_container_name = "group_documents"
-group_documents_container = database.create_container_if_not_exists(
-    id=group_documents_container_name,
+cosmos_group_documents_container_name = "group_documents"
+cosmos_group_documents_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_group_documents_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-user_settings_container_name = "user_settings"
-user_settings_container = database.create_container_if_not_exists(
-    id=user_settings_container_name,
+cosmos_user_settings_container_name = "user_settings"
+cosmos_user_settings_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_settings_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-safety_container_name = "safety"
-safety_container = database.create_container_if_not_exists(
-    id=safety_container_name,
+cosmos_safety_container_name = "safety"
+cosmos_safety_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_safety_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-feedback_container_name = "feedback"
-feedback_container = database.create_container_if_not_exists(
-    id=feedback_container_name,
+cosmos_feedback_container_name = "feedback"
+cosmos_feedback_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_feedback_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-archived_conversations_container_name = "archived_conversations"
-archived_conversations_container = database.create_container_if_not_exists(
-    id=archived_conversations_container_name,
+cosmos_archived_conversations_container_name = "archived_conversations"
+cosmos_archived_conversations_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_archived_conversations_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-archived_messages_container_name = "archived_messages"
-archived_messages_container = database.create_container_if_not_exists(
-    id=archived_messages_container_name,
+cosmos_archived_messages_container_name = "archived_messages"
+cosmos_archived_messages_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_archived_messages_container_name,
     partition_key=PartitionKey(path="/conversation_id")
 )
 
-prompts_container_name = "prompts"
-prompts_container = database.create_container_if_not_exists(
-    id=prompts_container_name,
+cosmos_user_prompts_container_name = "prompts"
+cosmos_user_prompts_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_user_prompts_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-group_prompts_container_name = "group_prompts"
-group_prompts_container = database.create_container_if_not_exists(
-    id=group_prompts_container_name,
+cosmos_group_prompts_container_name = "group_prompts"
+cosmos_group_prompts_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_group_prompts_container_name,
     partition_key=PartitionKey(path="/id")
 )
 
-file_processing_container_name = "file_processing"
-file_processing_container = database.create_container_if_not_exists(
-    id=file_processing_container_name,
+cosmos_file_processing_container_name = "file_processing"
+cosmos_file_processing_container = cosmos_database.create_container_if_not_exists(
+    id=cosmos_file_processing_container_name,
     partition_key=PartitionKey(path="/document_id")
 )
 
@@ -375,13 +376,10 @@ def initialize_clients(settings):
 
         try:
             if enable_enhanced_citations:
-                office_docs_client = BlobServiceClient.from_connection_string(settings.get("office_docs_storage_account_url"))
-                CLIENTS["office_docs_client"] = office_docs_client
+                CLIENTS["storage_account_office_docs_client"] = BlobServiceClient.from_connection_string(settings.get("office_docs_storage_account_url"))
                 if enable_video_file_support:
-                    video_files_client = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
-                    CLIENTS["video_files_client"] = video_files_client
+                    CLIENTS["storage_account_video_files_client"] = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
                 if enable_audio_file_support:
-                    audio_files_client = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
-                    CLIENTS["audio_files_client"] = audio_files_client
+                    CLIENTS["storage_account_audio_files_client"] = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
         except Exception as e:
             print(f"Failed to initialize Blob Storage clients: {e}")

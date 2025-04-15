@@ -17,7 +17,7 @@ def add_file_task_to_file_processing_log(document_id, user_id, content):
                 "log": content,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            file_processing_container.create_item(log_item)
+            cosmos_file_processing_container.create_item(log_item)
         except Exception as e:
             raise e
         

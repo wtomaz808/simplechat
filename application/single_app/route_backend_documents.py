@@ -23,7 +23,7 @@ def register_route_backend_documents(app):
             return jsonify({'error': 'Missing conversation_id or id'}), 400
 
         try:
-            _ = container.read_item(
+            _ = cosmos_conversations_container.read_item(
                 item=conversation_id,
                 partition_key=conversation_id
             )
@@ -39,7 +39,7 @@ def register_route_backend_documents(app):
                 WHERE c.conversation_id = @conversation_id
                 AND c.id = @file_id
             """
-            items = list(messages_container.query_items(
+            items = list(cosmos_messages_container.query_items(
                 query=query_str,
                 parameters=[
                     {'name': '@conversation_id', 'value': conversation_id},
@@ -96,7 +96,7 @@ def register_route_backend_documents(app):
     @login_required
     @user_required
     @enabled_required("enable_user_workspace")
-    def upload_document():
+    def api_user_upload_document():
         user_id = get_current_user_id()
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
@@ -169,13 +169,20 @@ def register_route_backend_documents(app):
                 # --- CHANGE: Pass original_filename ---
                 future = executor.submit(
                     process_document_upload_background,
-                    parent_document_id,
-                    user_id,
-                    temp_file_path, # Pass the actual path of the saved temp file
-                    original_filename
+                    document_id=parent_document_id,
+                    user_id=user_id,
+                    temp_file_path=temp_file_path, # Pass the actual path of the saved temp file
+                    original_filename=original_filename
                 )
                 # If you want to store the future in memory by name, you can do:
-                executor.submit_stored(parent_document_id, process_document_upload_background, parent_document_id, user_id, temp_file_path, original_filename)
+                executor.submit_stored(
+                    parent_document_id, 
+                    process_document_upload_background, 
+                    document_id=parent_document_id, 
+                    user_id=user_id, 
+                    temp_file_path=temp_file_path, 
+                    original_filename=original_filename
+                )
 
                 processed_docs.append({'document_id': parent_document_id, 'filename': original_filename})
 
@@ -280,7 +287,7 @@ def register_route_backend_documents(app):
             count_query_str = f"SELECT VALUE COUNT(1) FROM c WHERE {where_clause}"
             # print(f"DEBUG Count Query: {count_query_str}") # Optional Debugging
             # print(f"DEBUG Count Params: {query_params}")    # Optional Debugging
-            count_items = list(documents_container.query_items(
+            count_items = list(cosmos_user_documents_container.query_items(
                 query=count_query_str,
                 parameters=query_params,
                 enable_cross_partition_query=True # May be needed if user_id is not partition key
@@ -305,7 +312,7 @@ def register_route_backend_documents(app):
             """
             # print(f"DEBUG Data Query: {data_query_str}") # Optional Debugging
             # print(f"DEBUG Data Params: {query_params}")    # Optional Debugging
-            docs = list(documents_container.query_items(
+            docs = list(cosmos_user_documents_container.query_items(
                 query=data_query_str,
                 parameters=query_params,
                 enable_cross_partition_query=True # May be needed if user_id is not partition key
@@ -332,7 +339,7 @@ def register_route_backend_documents(app):
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
         
-        return get_user_document(user_id, document_id)
+        return get_document(user_id, document_id)
 
     @app.route('/api/documents/<document_id>', methods=['PATCH'])
     @login_required
@@ -420,8 +427,8 @@ def register_route_backend_documents(app):
             return jsonify({'error': 'User not authenticated'}), 401
         
         try:
-            delete_user_document(user_id, document_id)
-            delete_user_document_chunks(document_id)
+            delete_document(user_id, document_id)
+            delete_document_chunks(document_id)
             return jsonify({'message': 'Document deleted successfully'}), 200
         except Exception as e:
             return jsonify({'error': f'Error deleting document: {str(e)}'}), 500
@@ -430,7 +437,7 @@ def register_route_backend_documents(app):
     @login_required
     @user_required
     @enabled_required("enable_user_workspace")
-    def api_extract_metadata(document_id):
+    def api_extract_user_metadata(document_id):
         """
         POST /api/documents/<document_id>/extract_metadata
         Queues a background job that calls extract_document_metadata() 
@@ -447,12 +454,17 @@ def register_route_backend_documents(app):
         # Queue the background task (immediately returns a future)
         future = executor.submit(
             process_metadata_extraction_background,
-            document_id,
-            user_id
+            document_id=document_id,
+            user_id=user_id
         )
 
         # Optionally store or track this future:
-        executor.submit_stored(f"{document_id}_metadata", process_metadata_extraction_background, document_id, user_id)
+        executor.submit_stored(
+            f"{document_id}_metadata", 
+            process_metadata_extraction_background, 
+            document_id=document_id, 
+            user_id=user_id
+        )
 
         # Return an immediate response to the user
         return jsonify({

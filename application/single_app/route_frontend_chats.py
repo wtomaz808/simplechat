@@ -61,10 +61,10 @@ def register_route_frontend_chats(app):
                 'last_updated': datetime.utcnow().isoformat(),
                 'title': 'New Conversation'
             }
-            container.upsert_item(conversation_item)
+            cosmos_conversations_container.upsert_item(conversation_item)
         else:
             try:
-                conversation_item = container.read_item(
+                conversation_item = cosmos_conversations_container.read_item(
                     item=conversation_id,
                     partition_key=conversation_id
                 )
@@ -76,7 +76,7 @@ def register_route_frontend_chats(app):
                     'last_updated': datetime.utcnow().isoformat(),
                     'title': 'New Conversation'
                 }
-                container.upsert_item(conversation_item)
+                cosmos_conversations_container.upsert_item(conversation_item)
             except Exception as e:
                 return jsonify({'error': f'Error reading conversation: {str(e)}'}), 500
         
@@ -132,10 +132,10 @@ def register_route_frontend_chats(app):
                 'model_deployment_name': None
             }
 
-            messages_container.upsert_item(file_message)
+            cosmos_messages_container.upsert_item(file_message)
 
             conversation_item['last_updated'] = datetime.utcnow().isoformat()
-            container.upsert_item(conversation_item)
+            cosmos_conversations_container.upsert_item(conversation_item)
 
         except Exception as e:
             return jsonify({
@@ -172,7 +172,7 @@ def register_route_frontend_chats(app):
 
         # 2) Validate doc_id -> get the blob name
         #    For example, doc_id references the DB row that includes user_id & file_name
-        doc_response, status_code = get_user_document(user_id, doc_id)
+        doc_response, status_code = get_document(user_id, doc_id)
         if status_code != 200:
             return doc_response, status_code
 
@@ -181,8 +181,8 @@ def register_route_frontend_chats(app):
 
         # 3) Generate the SAS URL (short-lived, read-only)
         settings = get_settings()
-        blob_service_client = CLIENTS.get("office_docs_client")
-        container_client = blob_service_client.get_container_client(user_documents_container_name)
+        blob_service_client = CLIENTS.get("storage_account_office_docs_client")
+        container_client = blob_service_client.get_container_client(storage_account_user_documents_container_name)
 
         sas_token = generate_blob_sas(
             account_name=blob_service_client.account_name,
@@ -301,7 +301,7 @@ def register_route_frontend_chats(app):
              return jsonify({"error": "User not authenticated"}), 401 # Should be caught by @login_required anyway
 
         # Fetch Document Metadata (assuming get_user_document handles user auth checks implicitly)
-        doc_response, status_code = get_user_document(user_id, doc_id)
+        doc_response, status_code = get_document(user_id, doc_id)
         if status_code != 200:
             # Pass through the error response from get_user_document
             return doc_response, status_code
@@ -326,10 +326,10 @@ def register_route_frontend_chats(app):
         # Generate the SAS URL
         try:
             # Ensure CLIENTS dictionary and keys are correctly configured
-            blob_service_client = CLIENTS.get("office_docs_client")
+            blob_service_client = CLIENTS.get("storage_account_office_docs_client")
             storage_account_key = settings.get("office_docs_key")
             storage_account_name = blob_service_client.account_name # Get from client
-            container_name = user_documents_container_name # From config
+            container_name = storage_account_user_documents_container_name # From config
 
             if not all([blob_service_client, storage_account_key, container_name]):
                 return jsonify({"error": "Internal server error: Storage access not configured."}), 500

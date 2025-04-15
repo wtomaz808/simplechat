@@ -1,7 +1,6 @@
 # functions_settings.py
 
 from config import *
-from functions_authentication import *
 
 def get_settings():
     default_settings = {
@@ -150,7 +149,7 @@ def get_settings():
 
     try:
         # Attempt to read the existing doc
-        settings_item = settings_container.read_item(
+        settings_item = cosmos_settings_container.read_item(
             item="app_settings",
             partition_key="app_settings"
         )
@@ -161,7 +160,7 @@ def get_settings():
 
         # If merging added anything new, upsert back to Cosmos so future reads remain up to date
         if merged != settings_item:
-            settings_container.upsert_item(merged)
+            cosmos_settings_container.upsert_item(merged)
             print("App Settings had missing keys and was updated in Cosmos DB.")
             return merged
         else:
@@ -170,7 +169,7 @@ def get_settings():
 
     except CosmosResourceNotFoundError:
         # If there's no doc, create it from scratch:
-        settings_container.create_item(body=default_settings)
+        cosmos_settings_container.create_item(body=default_settings)
         print("Default settings created in Cosmos and returned.")
         return default_settings
 
@@ -184,7 +183,7 @@ def update_settings(new_settings):
         # always fetch the latest settings doc, which includes your merges
         settings_item = get_settings()
         settings_item.update(new_settings)
-        settings_container.upsert_item(settings_item)
+        cosmos_settings_container.upsert_item(settings_item)
         print("Settings updated successfully.")
         return True
     except Exception as e:
@@ -339,7 +338,7 @@ def decrypt_key(encrypted_key):
 def get_user_settings(user_id):
     """Fetches the user settings document from Cosmos DB."""
     try:
-        doc = user_settings_container.read_item(item=user_id, partition_key=user_id)
+        doc = cosmos_user_settings_container.read_item(item=user_id, partition_key=user_id)
         # Ensure the settings key exists for consistency downstream
         if 'settings' not in doc:
             doc['settings'] = {}
@@ -370,7 +369,7 @@ def update_user_settings(user_id, settings_to_update):
     try:
         # Try to read the existing document
         try:
-            doc = user_settings_container.read_item(item=user_id, partition_key=user_id)
+            doc = cosmos_user_settings_container.read_item(item=user_id, partition_key=user_id)
 
             # Ensure the 'settings' key exists and is a dictionary
             if 'settings' not in doc or not isinstance(doc.get('settings'), dict):
@@ -396,7 +395,7 @@ def update_user_settings(user_id, settings_to_update):
 
 
         # Upsert the modified document
-        user_settings_container.upsert_item(body=doc) # Use body=doc for clarity
+        cosmos_user_settings_container.upsert_item(body=doc) # Use body=doc for clarity
 
 
         return True
