@@ -1154,3 +1154,6 @@ togglePassword('toggle_azure_apim_document_intelligence_subscription_key', 'azur
 togglePassword('toggle_office_docs_key', 'office_docs_key');
 togglePassword('toggle_video_files_key', 'video_files_key');
 togglePassword('toggle_audio_files_key', 'audio_files_key');
+togglePassword('toggle_office_conn_str', 'office_docs_storage_account_url');
+togglePassword('toggle_video_conn_str', 'video_files_storage_account_url');
+togglePassword('toggle_audio_conn_str', 'audio_files_storage_account_url');
