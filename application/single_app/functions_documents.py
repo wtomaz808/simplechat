@@ -2569,5 +2569,93 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
             except Exception as cleanup_e:
                  print(f"Warning: Failed to clean up original temp file {temp_file_path}: {cleanup_e}")
 
-    # Return value is typically not used by Flask-Executor, but can be helpful for direct calls/testing
-    # return total_chunks_saved # Or None/True/False depending on convention
+def upgrade_legacy_documents(user_id, group_id=None):
+    """
+    Finds all user or group docs missing percentage_complete
+    and backfills them with the new fields.
+    Returns the number of docs updated.
+    """
+    is_group = group_id is not None
+
+    # Choose the correct container and query parameters
+    cosmos_container = (
+        cosmos_group_documents_container if is_group
+        else cosmos_user_documents_container
+    )
+
+    if is_group:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.group_id = @owner
+              AND NOT IS_DEFINED(c.percentage_complete)
+        """
+        parameters = [
+            {"name": "@owner", "value": group_id}
+        ]
+    else:
+        query = """
+            SELECT *
+            FROM c
+            WHERE c.user_id = @owner
+              AND NOT IS_DEFINED(c.percentage_complete)
+        """
+        parameters = [
+            {"name": "@owner", "value": user_id}
+        ]
+
+    # Fetch all legacy docs
+    legacy_docs = list(
+        cosmos_container.query_items(
+            query=query,
+            parameters=parameters,
+            enable_cross_partition_query=True
+        )
+    )
+
+    for doc in legacy_docs:
+        # Build the patch arguments
+        # Always include document_id first
+        if is_group:
+            # Group document
+            update_document(
+                document_id=doc["id"],
+                group_id=group_id,
+                user_id=user_id,
+                status="Processing complete",
+                percentage_complete=100,
+                num_chunks=doc.get("number_of_pages", doc.get("num_chunks", 1)),
+                number_of_pages=doc.get("number_of_pages", doc.get("num_chunks", 1)),
+                current_file_chunk=doc.get("num_chunks", 1),
+                num_file_chunks=1,
+                enhanced_citations=False,
+                document_classification="Pending",
+                title="",
+                authors=[],
+                organization="",
+                publication_date="",
+                keywords=[],
+                abstract=""
+            )
+        else:
+            # Personal document
+            update_document(
+                document_id=doc["id"],
+                user_id=user_id,
+                status="Processing complete",
+                percentage_complete=100,
+                num_chunks=doc.get("number_of_pages", doc.get("num_chunks", 1)),
+                number_of_pages=doc.get("number_of_pages", doc.get("num_chunks", 1)),
+                current_file_chunk=doc.get("num_chunks", 1),
+                num_file_chunks=1,
+                enhanced_citations=False,
+                document_classification="Pending",
+                title="",
+                authors=[],
+                organization="",
+                publication_date="",
+                keywords=[],
+                abstract=""
+            )
+
+    return len(legacy_docs)

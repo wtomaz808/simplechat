@@ -330,6 +330,10 @@ function fetchUserDocuments() {
     fetch(`/api/documents?${params.toString()}`)
         .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
         .then(data => {
+            if (data.needs_legacy_update_check) {
+                showLegacyUpdatePrompt();
+              }
+
             documentsTableBody.innerHTML = ""; // Clear loading/existing rows
             if (!data.documents || data.documents.length === 0) {
                 // Check if any filters are active
@@ -702,6 +706,86 @@ function pollDocumentStatus(documentId) {
             });
     }, 5000); // Poll every 5 seconds
 }
+
+// --- show the upgrade alert into your placeholder ---
+function showLegacyUpdatePrompt() {
+    // don’t re‑show if it’s already there
+    if (document.getElementById('legacy-update-alert')) return;
+  
+    const placeholder = document.getElementById('legacy-update-prompt-placeholder');
+    if (!placeholder) return;
+  
+    placeholder.innerHTML = `
+      <div
+        id="legacy-update-alert"
+        class="alert alert-info alert-dismissible fade show mt-3"
+        role="alert"
+      >
+        <h5 class="alert-heading">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          Update Older Documents
+        </h5>
+        <p class="mb-2 small">
+          Some of your documents were uploaded with an older version.
+          Updating them now will restore full compatibility
+          (including metadata display, search, etc.).
+        </p>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm me-2"
+          id="confirm-legacy-update-btn"
+        >
+          Update Now
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          data-bs-dismiss="alert"
+          aria-label="Close"
+        >
+          Maybe Later
+        </button>
+      </div>
+    `;
+  
+    document
+      .getElementById('confirm-legacy-update-btn')
+      .addEventListener('click', handleLegacyUpdateConfirm);
+  }
+  
+  // --- call the upgrade_legacy endpoint on confirmation ---
+  async function handleLegacyUpdateConfirm() {
+    const btn = document.getElementById('confirm-legacy-update-btn');
+    if (!btn) return;
+  
+    btn.disabled = true;
+    btn.innerHTML = `
+      <span
+        class="spinner-border spinner-border-sm me-2"
+        role="status"
+        aria-hidden="true"
+      ></span>Updating...
+    `;
+  
+    try {
+      const res = await fetch('/api/documents/upgrade_legacy', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+  
+      // if your endpoint returns { updated_count, failed_count }, you can use those
+      alert(json.message || 'All done!');
+  
+      // hide the prompt & reload
+      document.getElementById('legacy-update-alert')?.remove();
+      fetchUserDocuments();
+    } catch (err) {
+      console.error('Legacy update failed', err);
+      alert('Failed to upgrade documents: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'Update Now';
+    }
+  }
+  
 
 window.onEditDocument = function(docId) {
     if (!docMetadataModalEl) {
