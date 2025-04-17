@@ -21,11 +21,23 @@ def register_route_frontend_workspace(app):
             print("User not authenticated.")
             return redirect(url_for('login'))
         
-        legacy_docs_from_cosmos = list(cosmos_user_documents_container.query_items(
-            query="SELECT VALUE COUNT(1) FROM c WHERE c.user_id = @user_id AND NOT IS_DEFINED(c.percentage_complete)",
-            parameters=[{"name":"@user_id","value":user_id}],
-            enable_cross_partition_query=True
-        ))
+        query = """
+            SELECT VALUE COUNT(1)
+            FROM c 
+            WHERE c.user_id = @user_id
+                AND NOT IS_DEFINED(c.percentage_complete)
+        """
+        parameters = [
+            {"name": "@user_id", "value": user_id}
+        ]
+
+        legacy_docs_from_cosmos = list(
+            cosmos_user_documents_container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+        )
         legacy_count = legacy_docs_from_cosmos[0] if legacy_docs_from_cosmos else 0
                 
         return render_template(

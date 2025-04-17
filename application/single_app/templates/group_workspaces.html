@@ -568,15 +568,12 @@ app_settings.app_title }} {% endblock %} {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 <!-- Pass backend flags to JS -->
 <script>
-  window.classification_categories = JSON.parse(
-    "{{ settings.document_classification_categories|tojson(indent=None)|safe }}" ||
-      "[]"
-  );
-  if (!Array.isArray(window.classification_categories)) {
-    window.classification_categories = [];
-  }
-  window.enable_document_classification =
-    "{{ enable_document_classification | tojson }}";
+  window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
+    if (!Array.isArray(window.classification_categories)) {
+        window.classification_categories = [];
+    }
+
+  window.enable_document_classification = "{{ enable_document_classification | tojson }}";
   window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
   window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
   window.enable_audio_file_support = "{{ enable_audio_file_support | tojson }}";
@@ -637,19 +634,23 @@ app_settings.app_title }} {% endblock %} {% block head %}
     "group-docs-search-input"
   );
   const groupDocsClassificationFilterSelect =
-    window.enable_document_classification === true
+    window.enable_document_classification === true ||
+    window.enable_document_classification === "true"
       ? document.getElementById("group-docs-classification-filter")
       : null;
   const groupDocsAuthorFilterInput =
-    window.enable_extract_meta_data === true
+    window.enable_extract_meta_data === true ||
+    window.enable_extract_meta_data === "true"
       ? document.getElementById("group-docs-author-filter")
       : null;
   const groupDocsKeywordsFilterInput =
-    window.enable_extract_meta_data === true
+    window.enable_extract_meta_data === true ||
+    window.enable_extract_meta_data === "true"
       ? document.getElementById("group-docs-keywords-filter")
       : null;
   const groupDocsAbstractFilterInput =
-    window.enable_extract_meta_data === true
+    window.enable_extract_meta_data === true ||
+    window.enable_extract_meta_data === "true"
       ? document.getElementById("group-docs-abstract-filter")
       : null;
   const groupDocsApplyFiltersBtn = document.getElementById(
@@ -1050,6 +1051,13 @@ app_settings.app_title }} {% endblock %} {% block head %}
   function fetchGroupDocuments() {
     if (!groupDocumentsTableBody || !activeGroupId) return; // Need table and active group
 
+    const placeholder = document.getElementById("group-legacy-update-prompt-placeholder");
+    if (placeholder) {
+      // remove old alert div if present
+      const old = placeholder.querySelector("#group-legacy-update-alert");
+      if (old) old.remove();
+    }
+
     // Show loading state
     groupDocumentsTableBody.innerHTML = `<tr class="table-loading-row"><td colspan="4"><div class="spinner-border spinner-border-sm me-2" role="status"></div> Loading group documents...</td></tr>`;
     if (groupDocsPaginationContainer)
@@ -1083,6 +1091,9 @@ app_settings.app_title }} {% endblock %} {% block head %}
       .then((data) => {
         if (data.needs_legacy_update_check) {
           showGroupLegacyUpdatePrompt();
+        } else {
+          const placeholder = document.getElementById("group-legacy-update-prompt-placeholder");
+          placeholder?.querySelector("#group-legacy-update-alert")?.remove();
         }
         groupDocumentsTableBody.innerHTML = ""; // Clear loading/existing rows
         if (!data.documents || data.documents.length === 0) {

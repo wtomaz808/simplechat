@@ -14,6 +14,7 @@ def register_route_frontend_group_workspaces(app):
         user_id = get_current_user_id()
         settings = get_settings()
         public_settings = sanitize_settings_for_user(settings)
+        active_group_id = settings.get("activeGroupOid")
         enable_document_classification = settings.get('enable_document_classification', False)
         enable_extract_meta_data = settings.get('enable_extract_meta_data', False)
         enable_video_file_support = settings.get('enable_video_file_support', False)
@@ -21,7 +22,26 @@ def register_route_frontend_group_workspaces(app):
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
-                
+        
+        query = """
+            SELECT VALUE COUNT(1) 
+            FROM c 
+            WHERE c.group_id = @group_id 
+                AND NOT IS_DEFINED(c.percentage_complete)
+        """
+        parameters = [
+            {"name": "@group_id", "value": active_group_id}
+        ]
+        
+        legacy_docs_from_cosmos = list(
+            cosmos_group_documents_container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            )
+        )
+        legacy_count = legacy_docs_from_cosmos[0] if legacy_docs_from_cosmos else 0
+
         return render_template(
             'group_workspaces.html', 
             settings=public_settings, 
@@ -29,4 +49,5 @@ def register_route_frontend_group_workspaces(app):
             enable_extract_meta_data=enable_extract_meta_data,
             enable_video_file_support=enable_video_file_support,
             enable_audio_file_support=enable_audio_file_support,
+            legacy_docs_count=legacy_count
         )
