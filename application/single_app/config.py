@@ -77,7 +77,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.208.002'
+app.config['VERSION'] = '0.208.003'
 Session(app)
 
 CLIENTS = {}

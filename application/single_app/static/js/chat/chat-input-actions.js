@@ -1,7 +1,7 @@
 // chat-input-actions.js
 
 import { showToast } from "./chat-toast.js";
-import { createNewConversation } from "./chat-conversations.js";
+import { createNewConversation, loadConversations } from "./chat-conversations.js";
 import { 
   showFileUploadingMessage, 
   hideFileUploadingMessage, 
