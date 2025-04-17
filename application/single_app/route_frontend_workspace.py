@@ -20,6 +20,13 @@ def register_route_frontend_workspace(app):
         if not user_id:
             print("User not authenticated.")
             return redirect(url_for('login'))
+        
+        legacy_docs_from_cosmos = list(cosmos_user_documents_container.query_items(
+            query="SELECT VALUE COUNT(1) FROM c WHERE c.user_id = @user_id AND NOT IS_DEFINED(c.percentage_complete)",
+            parameters=[{"name":"@user_id","value":user_id}],
+            enable_cross_partition_query=True
+        ))
+        legacy_count = legacy_docs_from_cosmos[0] if legacy_docs_from_cosmos else 0
                 
         return render_template(
             'workspace.html', 
@@ -28,6 +35,7 @@ def register_route_frontend_workspace(app):
             enable_extract_meta_data=enable_extract_meta_data,
             enable_video_file_support=enable_video_file_support,
             enable_audio_file_support=enable_audio_file_support,
+            legacy_docs_count=legacy_count
         )
 
     

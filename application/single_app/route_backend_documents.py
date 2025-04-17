@@ -321,12 +321,33 @@ def register_route_backend_documents(app):
             print(f"Error executing data query: {e}") # Log the error
             return jsonify({"error": f"Error fetching documents: {str(e)}"}), 500
 
+        
+        # --- new: do we have any legacy documents? ---
+        try:
+            legacy_q = """
+                SELECT VALUE COUNT(1)
+                FROM c
+                WHERE c.user_id = @user_id
+                    AND NOT IS_DEFINED(c.percentage_complete)
+            """
+            legacy_docs = list(
+                cosmos_user_documents_container.query_items(
+                    query=legacy_q,
+                    parameters=[{"name":"@user_id","value":user_id}],
+                    enable_cross_partition_query=True
+                )
+            )
+            legacy_count = legacy_docs[0] if legacy_docs else 0
+        except Exception as e:
+            print(f"Error executing legacy query: {e}")
+
         # --- 5) Return results ---
         return jsonify({
             "documents": docs,
             "page": page,
             "page_size": page_size,
-            "total_count": total_count # This now reflects the filtered count
+            "total_count": total_count,
+            "needs_legacy_update_check": legacy_count > 0
         }), 200
 
 
@@ -518,3 +539,15 @@ def register_route_backend_documents(app):
 
         except Exception as e:
             return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+        
+    @app.route('/api/documents/upgrade_legacy', methods=['POST'])
+    @login_required
+    @user_required
+    @enabled_required("enable_user_workspace")
+    def api_upgrade_legacy_documents():
+        user_id = get_current_user_id()
+        # returns how many docs were updated
+        count = upgrade_legacy_documents(user_id)
+        return jsonify({
+            "message": f"Upgraded {count} document(s) to the new format."
+        }), 200

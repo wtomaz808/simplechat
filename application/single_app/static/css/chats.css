@@ -554,6 +554,16 @@ a.citation-link:hover {
   border-radius: 10px;
 }
 
+.message-bubble,
+.message-text {
+  /* fall back to normal wrapping for most text */
+  white-space: normal !important;
+
+  /* break long words or URLs anywhere if needed */
+  word-break: break-all;        /* or try break-word on modern browsers */
+  overflow-wrap: break-word;    /* legacy name for word-wrap */
+}
+
 /* Sender label */
 .message-sender {
   font-size: 12px;

@@ -245,11 +245,33 @@ def register_route_backend_group_documents(app):
             print(f"Error fetching group documents: {e}")
             return jsonify({"error": f"Error fetching documents: {str(e)}"}), 500
 
+        
+        # --- new: do we have any legacy documents? ---
+        try:
+            legacy_q = """
+                SELECT VALUE COUNT(1)
+                FROM c
+                WHERE c.group_id = @group_id
+                    AND NOT IS_DEFINED(c.percentage_complete)
+            """
+            legacy_docs = list(
+                cosmos_group_documents_container.query_items(
+                    query=legacy_q,
+                    parameters=[{"name":"@group_id","value":active_group_id}],
+                    enable_cross_partition_query=True
+                )
+            )
+            legacy_count = legacy_docs[0] if legacy_docs else 0
+        except Exception as e:
+            print(f"Error executing legacy query: {e}")
+
+        # --- 5) Return results ---
         return jsonify({
             "documents": docs,
             "page": page,
             "page_size": page_size,
-            "total_count": total_count
+            "total_count": total_count,
+            "needs_legacy_update_check": legacy_count > 0
         }), 200
 
 
@@ -463,3 +485,33 @@ def register_route_backend_group_documents(app):
             'document_id': document_id
         }), 200
 
+
+    @app.route('/api/group_documents/upgrade_legacy', methods=['POST'])
+    @login_required
+    @user_required
+    @enabled_required("enable_group_workspaces")
+    def api_upgrade_legacy_group_documents():
+        user_id = get_current_user_id()
+        settings = get_user_settings(user_id)
+        active_group_id = settings["settings"].get("activeGroupOid")
+        if not active_group_id:
+            return jsonify({'error':'No active group selected'}), 400
+
+        group_doc = find_group_by_id(active_group_id)
+        if not group_doc:
+            return jsonify({'error':'Active group not found'}), 404
+
+        role = get_user_role_in_group(group_doc, user_id)
+        if role not in ["Owner","Admin","DocumentManager"]:
+            return jsonify({'error':'Insufficient permissions'}), 403
+
+        try:
+            # your existing function, but pass group_id
+            updated_count, failed_count = upgrade_legacy_documents(user_id=user_id, group_id=active_group_id)
+            return jsonify({
+                'updated_count': updated_count,
+                'failed_count': failed_count,
+                'message': f'Updated {updated_count}, failed {failed_count}'
+            }), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500

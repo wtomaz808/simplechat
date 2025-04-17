@@ -1,12 +1,15 @@
 // chat-input-actions.js
 
 import { showToast } from "./chat-toast.js";
-import { createNewConversation } from "./chat-conversations.js";
-import { 
-  showFileUploadingMessage, 
-  hideFileUploadingMessage, 
-  showLoadingIndicator, 
-  hideLoadingIndicator  
+import {
+  createNewConversation,
+  loadConversations,
+} from "./chat-conversations.js";
+import {
+  showFileUploadingMessage,
+  hideFileUploadingMessage,
+  showLoadingIndicator,
+  hideLoadingIndicator,
 } from "./chat-loading-indicator.js";
 import { loadMessages } from "./chat-messages.js";
 
@@ -26,12 +29,12 @@ export function resetFileButton() {
   if (fileInputEl) {
     fileInputEl.value = "";
   }
-  
+
   if (fileBtn) {
     fileBtn.classList.remove("active");
     fileBtn.querySelector(".file-btn-text").textContent = "";
   }
-  
+
   if (uploadBtn) {
     uploadBtn.style.display = "none";
   }
@@ -40,7 +43,6 @@ export function resetFileButton() {
     cancelFileSelection.style.display = "none";
   }
 }
-
 
 export function uploadFileToConversation(file) {
   const uploadingIndicatorEl = showFileUploadingMessage();
@@ -60,7 +62,10 @@ export function uploadFileToConversation(file) {
       return response.json().then((data) => {
         if (!response.ok) {
           console.error("Upload failed:", data.error || "Unknown error");
-          showToast("Error uploading file: " + (data.error || "Unknown error"), "danger");
+          showToast(
+            "Error uploading file: " + (data.error || "Unknown error"),
+            "danger"
+          );
           throw new Error(data.error || "Upload failed");
         }
         return data;
@@ -216,7 +221,6 @@ if (imageGenBtn) {
   });
 }
 
-
 if (webSearchBtn) {
   webSearchBtn.addEventListener("click", function () {
     this.classList.toggle("active");
@@ -276,4 +280,3 @@ if (uploadBtn) {
     }
   });
 }
-

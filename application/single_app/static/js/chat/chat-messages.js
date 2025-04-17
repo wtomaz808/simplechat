@@ -11,9 +11,9 @@ import { promptSelect } from "./chat-prompts.js";
 import {
   createNewConversation,
   selectConversation,
-  addConversationToList,
+  addConversationToList
 } from "./chat-conversations.js";
-import { isColorLight, toBoolean, escapeHtml } from "./chat-utils.js";
+import { escapeHtml } from "./chat-utils.js";
 import { showToast } from "./chat-toast.js";
 
 export const userInput = document.getElementById("user-input");
