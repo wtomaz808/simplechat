@@ -18,6 +18,9 @@ __pycache__
 .pem
 .deployment
 
+# macOS  custom attributes file
+.ds_store
+
 # Configured custom script extensions, powershell scripts, and linux scripts
 priv-*
 
