@@ -200,7 +200,7 @@ export function enterEditMode(convoItem, convo, dropdownBtn, rightDiv) {
       // *** Call update API and get potentially updated convo data (including classification) ***
       const updatedConvoData = await updateConversationTitle(convo.id, newTitle);
       convo.title = updatedConvoData.title || newTitle; // Update local title
-
+      convoItem.setAttribute('data-conversation-title', convo.title);
       // *** Update local classification data if returned from API ***
       if (updatedConvoData.classification) {
           convoItem.dataset.classifications = JSON.stringify(updatedConvoData.classification);

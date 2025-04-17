@@ -484,8 +484,7 @@ def register_route_backend_group_documents(app):
             'message': 'Group metadata extraction has been queued. Check document status periodically.',
             'document_id': document_id
         }), 200
-
-
+        
     @app.route('/api/group_documents/upgrade_legacy', methods=['POST'])
     @login_required
     @user_required
@@ -504,14 +503,12 @@ def register_route_backend_group_documents(app):
         role = get_user_role_in_group(group_doc, user_id)
         if role not in ["Owner","Admin","DocumentManager"]:
             return jsonify({'error':'Insufficient permissions'}), 403
-
+        # returns how many docs were updated
         try:
             # your existing function, but pass group_id
-            updated_count, failed_count = upgrade_legacy_documents(user_id=user_id, group_id=active_group_id)
+            count = upgrade_legacy_documents(user_id=user_id, group_id=active_group_id)
             return jsonify({
-                'updated_count': updated_count,
-                'failed_count': failed_count,
-                'message': f'Updated {updated_count}, failed {failed_count}'
+                "message": f"Upgraded {count} group document(s) to the new format."
             }), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500

@@ -544,7 +544,7 @@ def register_route_backend_documents(app):
     @login_required
     @user_required
     @enabled_required("enable_user_workspace")
-    def api_upgrade_legacy_documents():
+    def api_upgrade_legacy_user_documents():
         user_id = get_current_user_id()
         # returns how many docs were updated
         count = upgrade_legacy_documents(user_id)
