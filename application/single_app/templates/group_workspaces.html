@@ -356,7 +356,7 @@ app_settings.app_title }} {% endblock %} {% block head %}
     </div>
     <!-- End Documents Tab -->
 
-    <!-- ============= GROUP PROMPTS TAB (Keep As Is) ============= -->
+    <!-- ============= GROUP PROMPTS TAB ============= -->
     <div
       class="tab-pane fade"
       id="prompts-tab"
@@ -365,6 +365,8 @@ app_settings.app_title }} {% endblock %} {% block head %}
     >
       <div class="card p-3 my-3">
         <h5>Group Prompts</h5>
+
+        <!-- Shown when user can't manage prompts -->
         <div
           id="group-prompts-role-warning"
           class="alert alert-warning"
@@ -372,6 +374,8 @@ app_settings.app_title }} {% endblock %} {% block head %}
         >
           You do not have permission to manage group prompts.
         </div>
+
+        <!-- Button to open modal -->
         <div
           class="mb-3"
           id="create-group-prompt-section"
@@ -381,6 +385,41 @@ app_settings.app_title }} {% endblock %} {% block head %}
             New Prompt
           </button>
         </div>
+        <hr />
+
+        <!-- Group Prompts Filters -->
+        <div class="row mb-3 align-items-end filter-controls-row">
+          <div class="col-md-6">
+            <label
+              for="group-prompts-search-input"
+              class="form-label mb-1 small"
+            >
+              Search Prompt Name:
+            </label>
+            <input
+              type="search"
+              id="group-prompts-search-input"
+              class="form-control form-control-sm"
+              placeholder="Enter search term..."
+            />
+          </div>
+          <div class="col-md-6 filter-buttons-col mt-2 mt-md-0">
+            <button
+              id="group-prompts-apply-filters-btn"
+              class="btn btn-primary btn-sm"
+            >
+              Apply Filters
+            </button>
+            <button
+              id="group-prompts-clear-filters-btn"
+              class="btn btn-secondary btn-sm ms-1"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Group Prompts List -->
         <table class="table table-striped" id="group-prompts-table">
           <thead>
             <tr>
@@ -389,12 +428,47 @@ app_settings.app_title }} {% endblock %} {% block head %}
             </tr>
           </thead>
           <tbody>
-            <!-- group prompts go here -->
+            <tr class="table-loading-row">
+              <td colspan="2">
+                <div
+                  class="spinner-border spinner-border-sm me-2"
+                  role="status"
+                >
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                Loading group prompts...
+              </td>
+            </tr>
           </tbody>
         </table>
+
+        <!-- Group Prompts Pagination & Page Size -->
+        <div class="d-flex align-items-center gap-3 mb-3 mt-3">
+          <div>
+            <label for="group-prompts-page-size-select" class="visually-hidden">
+              Items per page:
+            </label>
+            <select
+              id="group-prompts-page-size-select"
+              class="form-select form-select-sm d-inline-block"
+              style="width: auto"
+            >
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+            <span class="ms-1 small text-muted">items per page</span>
+          </div>
+          <div
+            id="group-prompts-pagination-container"
+            class="d-flex gap-1 ms-auto"
+          >
+            <!-- Populated by JS -->
+          </div>
+        </div>
       </div>
     </div>
-    <!-- End Prompts Tab -->
+    <!-- End GROUP PROMPTS TAB -->
   </div>
   <!-- End Tab Content -->
 </div>
@@ -568,12 +642,16 @@ app_settings.app_title }} {% endblock %} {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 <!-- Pass backend flags to JS -->
 <script>
-  window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
-    if (!Array.isArray(window.classification_categories)) {
-        window.classification_categories = [];
-    }
+  window.classification_categories = JSON.parse(
+    "{{ settings.document_classification_categories|tojson(indent=None)|safe }}" ||
+      "[]"
+  );
+  if (!Array.isArray(window.classification_categories)) {
+    window.classification_categories = [];
+  }
 
-  window.enable_document_classification = "{{ enable_document_classification | tojson }}";
+  window.enable_document_classification =
+    "{{ enable_document_classification | tojson }}";
   window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
   window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
   window.enable_audio_file_support = "{{ enable_audio_file_support | tojson }}";
@@ -598,9 +676,6 @@ app_settings.app_title }} {% endblock %} {% block head %}
   const groupActivePolls = new Set(); // Separate polling set for group docs
 
   // --- Modals ---
-  const groupPromptModal = new bootstrap.Modal(
-    document.getElementById("groupPromptModal")
-  );
   const loadingModal = new bootstrap.Modal(
     document.getElementById("loadingModal")
   );
@@ -611,6 +686,21 @@ app_settings.app_title }} {% endblock %} {% block head %}
   // --- Editors ---
   const groupPromptContentEl = document.getElementById("group-prompt-content");
   let groupSimplemde = null;
+
+  if (groupPromptContentEl && typeof SimpleMDE !== "undefined") {
+    try {
+      groupSimplemde = new SimpleMDE({
+        element: groupPromptContentEl,
+        spellChecker: false
+      });
+    } catch (e) {
+      console.error("Failed to initialize SimpleMDE for group prompts:", e);
+    }
+  } else if (!groupPromptContentEl) {
+    console.warn("Group prompt textarea not found; skipping SimpleMDE init.");
+  } else {
+    console.warn("SimpleMDE library not loaded; skipping init.");
+  }
 
   // --- DOM Elements (Group Documents Tab) ---
   const groupDocumentsTableBody = document.querySelector(
@@ -704,17 +794,6 @@ app_settings.app_title }} {% endblock %} {% block head %}
   // --- Initialization ---
   document.addEventListener("DOMContentLoaded", () => {
     console.log("Group Workspace initializing...");
-    // Initialize SimpleMDE for group prompts
-    if (groupPromptContentEl) {
-      groupSimplemde = new SimpleMDE({
-        element: groupPromptContentEl,
-        spellChecker: false,
-      });
-    } else {
-      console.warn(
-        "Group prompt content element not found for SimpleMDE init."
-      );
-    }
 
     // Load initial data
     fetchUserGroups().then(() => {
@@ -781,9 +860,6 @@ app_settings.app_title }} {% endblock %} {% block head %}
     document
       .getElementById("create-group-prompt-btn")
       ?.addEventListener("click", onCreateGroupPrompt);
-    document
-      .getElementById("group-prompt-form")
-      ?.addEventListener("submit", onGroupPromptSave);
 
     // --- Event Listeners (Tab Switching) ---
     const tabButtons = document.querySelectorAll(
@@ -1051,7 +1127,9 @@ app_settings.app_title }} {% endblock %} {% block head %}
   function fetchGroupDocuments() {
     if (!groupDocumentsTableBody || !activeGroupId) return; // Need table and active group
 
-    const placeholder = document.getElementById("group-legacy-update-prompt-placeholder");
+    const placeholder = document.getElementById(
+      "group-legacy-update-prompt-placeholder"
+    );
     if (placeholder) {
       // remove old alert div if present
       const old = placeholder.querySelector("#group-legacy-update-alert");
@@ -1092,7 +1170,9 @@ app_settings.app_title }} {% endblock %} {% block head %}
         if (data.needs_legacy_update_check) {
           showGroupLegacyUpdatePrompt();
         } else {
-          const placeholder = document.getElementById("group-legacy-update-prompt-placeholder");
+          const placeholder = document.getElementById(
+            "group-legacy-update-prompt-placeholder"
+          );
           placeholder?.querySelector("#group-legacy-update-alert")?.remove();
         }
         groupDocumentsTableBody.innerHTML = ""; // Clear loading/existing rows
@@ -1892,27 +1972,286 @@ app_settings.app_title }} {% endblock %} {% block head %}
   }
   window.searchGroupDocumentInChat = searchGroupDocumentInChat; // Expose globally
 
-  /* ===================== GROUP PROMPTS (Existing Logic - Kept As Is) ===================== */
+  /* ===================== GROUP PROMPTS ===================== */
+  // — State —
+  let groupPromptsCurrentPage = 1;
+  let groupPromptsPageSize = 10;
+  let groupPromptsSearchTerm = "";
+
+  // — DOM Elements —
+  const groupPromptsTableBody = document.querySelector(
+    "#group-prompts-table tbody"
+  );
+  const groupPromptsSearchInput = document.getElementById(
+    "group-prompts-search-input"
+  );
+  const groupPromptsApplyFiltersBtn = document.getElementById(
+    "group-prompts-apply-filters-btn"
+  );
+  const groupPromptsClearFiltersBtn = document.getElementById(
+    "group-prompts-clear-filters-btn"
+  );
+  const groupPromptsPageSizeSelect = document.getElementById(
+    "group-prompts-page-size-select"
+  );
+  const groupPromptsPagination = document.getElementById(
+    "group-prompts-pagination-container"
+  );
+
+  const createGroupPromptBtn = document.getElementById(
+    "create-group-prompt-btn"
+  );
+  const groupPromptModalEl = new bootstrap.Modal(
+    document.getElementById("groupPromptModal")
+  );
+  const groupPromptForm = document.getElementById("group-prompt-form");
+  const groupPromptIdEl = document.getElementById("group-prompt-id");
+  const groupPromptNameEl = document.getElementById("group-prompt-name");
+
+  // — Fetch & render group prompts —
   function fetchGroupPrompts() {
-    /* ... existing code ... */
+    groupPromptsTableBody.innerHTML = `
+      <tr class="table-loading-row">
+        <td colspan="2">
+          <div class="spinner-border spinner-border-sm me-2"></div>
+          Loading group prompts…
+        </td>
+      </tr>`;
+    groupPromptsPagination.innerHTML = "";
+
+    const params = new URLSearchParams({
+      page: groupPromptsCurrentPage,
+      page_size: groupPromptsPageSize,
+    });
+    if (groupPromptsSearchTerm) {
+      params.append("search", groupPromptsSearchTerm);
+    }
+
+    fetch(`/api/group_prompts?${params}`)
+      .then((r) =>
+        r.ok ? r.json() : r.json().then((err) => Promise.reject(err))
+      )
+      .then((data) => {
+        groupPromptsTableBody.innerHTML = "";
+        if (!data.prompts || data.prompts.length === 0) {
+          groupPromptsTableBody.innerHTML = `
+            <tr>
+              <td colspan="2" class="text-center p-4 text-muted">
+                ${
+                  groupPromptsSearchTerm
+                    ? "No group prompts found."
+                    : "No group prompts created yet."
+                }
+              </td>
+            </tr>`;
+        } else {
+          data.prompts.forEach((p) => renderGroupPromptRow(p));
+        }
+        renderGroupPromptsPagination(
+          data.page,
+          data.page_size,
+          data.total_count
+        );
+      })
+      .catch((err) => {
+        console.error("Error loading group prompts:", err);
+        groupPromptsTableBody.innerHTML = `
+          <tr>
+            <td colspan="2" class="text-center text-danger p-3">
+              Error: ${err.error || err.message || "Unknown error"}
+            </td>
+          </tr>`;
+      });
   }
-  function onEditGroupPrompt(promptId) {
-    /* ... existing code ... */
+
+  function renderGroupPromptRow(p) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td title="${p.name}">${p.name}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="onEditGroupPrompt('${p.id}')" title="Edit">
+          <i class="bi bi-pencil-fill"></i>
+        </button>
+        <button class="btn btn-sm btn-danger ms-1" onclick="onDeleteGroupPrompt('${p.id}', event)" title="Delete">
+          <i class="bi bi-trash-fill"></i>
+        </button>
+      </td>`;
+    groupPromptsTableBody.appendChild(tr);
   }
-  function onDeleteGroupPrompt(promptId) {
-    /* ... existing code ... */
+
+  function renderGroupPromptsPagination(page, pageSize, totalCount) {
+    groupPromptsPagination.innerHTML = "";
+    const totalPages = Math.ceil(totalCount / pageSize);
+    if (totalPages <= 1) return;
+
+    const ul = document.createElement("ul");
+    ul.classList.add("pagination", "pagination-sm", "mb-0");
+
+    // prev
+    const prev = document.createElement("li");
+    prev.classList.add("page-item", page <= 1 && "disabled");
+    prev.innerHTML = `<a class="page-link" href="#">«</a>`;
+    prev.querySelector("a").onclick = (e) => {
+      e.preventDefault();
+      if (page > 1) {
+        groupPromptsCurrentPage--;
+        fetchGroupPrompts();
+      }
+    };
+    ul.append(prev);
+
+    // pages
+    for (let p = 1; p <= totalPages; p++) {
+      const li = document.createElement("li");
+      li.classList.add("page-item", p === page && "active");
+      li.innerHTML = `<a class="page-link" href="#">${p}</a>`;
+      li.querySelector("a").onclick = (e) => {
+        e.preventDefault();
+        if (p !== groupPromptsCurrentPage) {
+          groupPromptsCurrentPage = p;
+          fetchGroupPrompts();
+        }
+      };
+      ul.append(li);
+    }
+
+    // next
+    const next = document.createElement("li");
+    next.classList.add("page-item", page >= totalPages && "disabled");
+    next.innerHTML = `<a class="page-link" href="#">»</a>`;
+    next.querySelector("a").onclick = (e) => {
+      e.preventDefault();
+      if (page < totalPages) {
+        groupPromptsCurrentPage++;
+        fetchGroupPrompts();
+      }
+    };
+    ul.append(next);
+
+    groupPromptsPagination.appendChild(ul);
   }
-  function onCreateGroupPrompt() {
-    /* ... existing code ... */
-  }
-  function onGroupPromptSave(e) {
-    /* ... existing code ... */
-  }
+
+  // — Handlers —
+  createGroupPromptBtn?.addEventListener("click", () => {
+    groupPromptIdEl.value = "";
+    groupPromptNameEl.value = "";
+    if (groupSimplemde) groupSimplemde.value("");
+    else groupPromptContentEl.value = "";
+    document.getElementById("groupPromptModalLabel").textContent =
+      "Create Group Prompt";
+    groupPromptModalEl.show();
+  });
+
+  groupPromptForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const id = groupPromptIdEl.value;
+    const url = id ? `/api/group_prompts/${id}` : "/api/group_prompts";
+    const method = id ? "PATCH" : "POST";
+    const name = groupPromptNameEl.value.trim();
+    const content = (
+      groupSimplemde ? groupSimplemde.value() : groupPromptContentEl.value
+    ).trim();
+    if (!name || !content) return alert("Name & content are required.");
+
+    const btn = document.getElementById("group-prompt-save-btn");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving…`;
+
+    fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, content }),
+    })
+      .then((r) =>
+        r.ok ? r.json() : r.json().then((err) => Promise.reject(err))
+      )
+      .then(() => {
+        groupPromptModalEl.hide();
+        fetchGroupPrompts();
+      })
+      .catch((err) => {
+        console.error("Error saving group prompt:", err);
+        alert(err.error || err.message || "Unknown error");
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = "Save Prompt";
+      });
+  });
+
+  window.onEditGroupPrompt = (promptId) => {
+    fetch(`/api/group_prompts/${promptId}`)
+      .then((r) =>
+        r.ok ? r.json() : r.json().then((err) => Promise.reject(err))
+      )
+      .then((data) => {
+        document.getElementById(
+          "groupPromptModalLabel"
+        ).textContent = `Edit: ${data.name}`;
+        groupPromptIdEl.value = data.id;
+        groupPromptNameEl.value = data.name;
+        if (groupSimplemde) groupSimplemde.value(data.content || "");
+        else groupPromptContentEl.value = data.content || "";
+        groupPromptModalEl.show();
+      })
+      .catch((err) => {
+        console.error("Error loading prompt:", err);
+        alert(err.error || err.message || "Unable to load prompt");
+      });
+  };
+
+  window.onDeleteGroupPrompt = (promptId, ev) => {
+    if (!confirm("Delete this prompt?")) return;
+    const btn = ev.target.closest("button");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+    }
+    fetch(`/api/group_prompts/${promptId}`, { method: "DELETE" })
+      .then((r) =>
+        r.ok ? fetchGroupPrompts() : r.json().then((err) => Promise.reject(err))
+      )
+      .catch((err) => {
+        console.error("Error deleting prompt:", err);
+        alert(err.error || err.message || "Could not delete");
+      });
+  };
+
+  // — Filters & pagination hooks —
+  groupPromptsApplyFiltersBtn?.addEventListener("click", () => {
+    groupPromptsSearchTerm = groupPromptsSearchInput.value.trim();
+    groupPromptsCurrentPage = 1;
+    fetchGroupPrompts();
+  });
+  groupPromptsClearFiltersBtn?.addEventListener("click", () => {
+    groupPromptsSearchInput.value = "";
+    groupPromptsSearchTerm = "";
+    groupPromptsCurrentPage = 1;
+    fetchGroupPrompts();
+  });
+  groupPromptsPageSizeSelect?.addEventListener("change", (e) => {
+    groupPromptsPageSize = +e.target.value;
+    groupPromptsCurrentPage = 1;
+    fetchGroupPrompts();
+  });
+  groupPromptsSearchInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") groupPromptsApplyFiltersBtn.click();
+  });
+
+  // — Role‑based UI toggles —
   function updateGroupPromptsRoleUI() {
-    /* ... existing code ... */
+    const canManage = ["Owner", "Admin", "PromptManager"].includes(
+      userRoleInActiveGroup
+    );
+    // show/hide “New Prompt” button & edit/delete
+    document.getElementById("create-group-prompt-section").style.display =
+      canManage ? "block" : "none";
+    document.getElementById("group-prompts-role-warning").style.display =
+      canManage ? "none" : "block";
   }
-  // Add existing prompt functions to window if needed by HTML onclick
-  window.onEditGroupPrompt = onEditGroupPrompt;
-  window.onDeleteGroupPrompt = onDeleteGroupPrompt;
+
+  // — Expose & initial load —
+  window.fetchGroupPrompts = fetchGroupPrompts;
+  window.onCreateGroupPrompt = createGroupPromptBtn?.onclick;
 </script>
 {% endblock %}
