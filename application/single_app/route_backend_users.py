@@ -18,9 +18,9 @@ def register_route_backend_users(app):
         if not query:
             return jsonify([]), 200
 
-        token = session.get("access_token")
+        token = get_valid_access_token()
         if not token:
-            return jsonify({"error": "No access token in session"}), 401
+            return jsonify({"error": "Could not acquire access token"}), 401
 
         user_endpoint = "https://graph.microsoft.com/v1.0/users"
         headers = {
