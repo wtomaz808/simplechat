@@ -51,6 +51,13 @@ $(document).ready(function () {
     searchUsers();
   });
 
+  $("#userSearchTerm").on("keydown", function (e) {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      e.preventDefault(); // prevent form submission
+      searchUsers(); // fire the search
+    }
+  });
+
   $("#transferOwnershipBtn").on("click", function () {
     $.get(`/api/groups/${groupId}/members`, function (members) {
       let options = "";
@@ -393,18 +400,34 @@ function searchUsers() {
     return;
   }
 
+  // UI state
   $("#searchStatus").text("Searching...");
   $("#searchUsersBtn").prop("disabled", true);
 
-  $.get(`/api/userSearch?query=${encodeURIComponent(term)}`)
+  $.ajax({
+    url: "/api/userSearch",
+    method: "GET",
+    data: { query: term },
+    dataType: "json",
+  })
     .done(function (results) {
       renderUserSearchResults(results);
     })
-    .fail(function (err) {
-      console.error(err);
-      alert("User search failed.");
+    .fail(function (jqXHR, textStatus, errorThrown) {
+      console.error("User search error:", textStatus, errorThrown);
+
+      if (jqXHR.status === 401) {
+        // Session expired or no token → force re-login
+        window.location.href = "/login";
+      } else {
+        const msg = jqXHR.responseJSON?.error
+          ? jqXHR.responseJSON.error
+          : "User search failed.";
+        alert(msg);
+      }
     })
     .always(function () {
+      // Restore UI state
       $("#searchStatus").text("");
       $("#searchUsersBtn").prop("disabled", false);
     });

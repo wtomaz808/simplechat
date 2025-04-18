@@ -2382,7 +2382,7 @@ components:
           default: false
         doc_scope:
           type: string
-          enum: [user, group, user_and_group] # Assuming possible values
+          enum: [all, group, personal]
           nullable: true
         active_group_id:
           type: string
