@@ -154,13 +154,28 @@ def get_document_metadata(document_id, user_id, group_id=None):
         print(f"Error retrieving document metadata: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
         return None
 
-def save_video_chunk(page_text_content, start_time, file_name, user_id, document_id, group_id=None):
-    """Saves one chunk—now with prints on every step/error."""
+def save_video_chunk(
+    page_text_content,
+    ocr_chunk_text,
+    start_time,
+    file_name,
+    user_id,
+    document_id,
+    group_id
+):
+    """
+    Saves one 30-second video chunk to the search index, with separate fields for transcript and OCR.
+    The chunk_id is built from document_id and the integer second offset to ensure a valid key.
+    """
     try:
         current_time = datetime.now(timezone.utc).isoformat()
         is_group = group_id is not None
 
-        # 1) generate embedding
+        # Convert start_time "HH:MM:SS.mmm" to integer seconds
+        h, m, s = start_time.split(':')
+        seconds = int(h) * 3600 + int(m) * 60 + int(float(s))
+
+        # 1) generate embedding on the transcript text
         try:
             embedding = generate_embedding(page_text_content)
             print(f"[VideoChunk] EMBEDDING OK for {document_id}@{start_time}", flush=True)
@@ -168,32 +183,36 @@ def save_video_chunk(page_text_content, start_time, file_name, user_id, document
             print(f"[VideoChunk] EMBEDDING ERROR for {document_id}@{start_time}: {e}", flush=True)
             return
 
-        # 2) build chunk
+        # 2) build chunk document
         try:
             meta = get_document_metadata(document_id, user_id, group_id)
             version = meta.get("version", 1) if meta else 1
-            chunk_id = f"{document_id}_{start_time.replace(':','-')}"
-            h, m, s = start_time.split(':')
-            s = s.split('.',1)[0]
-            chunk_seq_seconds  = int(h)*3600 + int(m)*60 + int(s)
+
+            # Use integer seconds to build a safe document key
+            chunk_id = f"{document_id}_{seconds}"
+
             chunk = {
-                "id":             chunk_id,
-                "document_id":    document_id,
-                "chunk_text":     page_text_content,
-                "embedding":      embedding,
-                "file_name":      file_name,
-                "start_time":     start_time,
-                "chunk_sequence": chunk_seq_seconds,
-                "upload_date":    current_time,
-                "version":        version
+                "id":                   chunk_id,
+                "document_id":          document_id,
+                "chunk_text":           page_text_content,
+                "video_ocr_chunk_text": ocr_chunk_text,
+                "embedding":            embedding,
+                "file_name":            file_name,
+                "start_time":           start_time,
+                "chunk_sequence":       seconds,
+                "upload_date":          current_time,
+                "version":              version,
             }
+
             if is_group:
                 chunk["group_id"] = group_id
                 client = CLIENTS["search_client_group"]
             else:
                 chunk["user_id"] = user_id
                 client = CLIENTS["search_client_user"]
+
             print(f"[VideoChunk] CHUNK BUILT {chunk_id}", flush=True)
+
         except Exception as e:
             print(f"[VideoChunk] CHUNK BUILD ERROR for {document_id}@{start_time}: {e}", flush=True)
             return
@@ -209,19 +228,58 @@ def save_video_chunk(page_text_content, start_time, file_name, user_id, document
         print(f"[VideoChunk] UNEXPECTED ERROR for {document_id}@{start_time}: {e}", flush=True)
 
 
-def process_video_document(document_id, user_id, temp_file_path, original_filename, update_callback, group_id=None):
+
+def process_video_document(
+    document_id,
+    user_id,
+    temp_file_path,
+    original_filename,
+    update_callback,
+    group_id
+):
+    """
+    Processes a video by dividing transcript into 30-second chunks,
+    extracting OCR separately, and saving each as a chunk with safe IDs.
+    """
+
+    def to_seconds(ts: str) -> float:
+        parts = ts.split(':')
+        parts = [float(p) for p in parts]
+        if len(parts) == 3:
+            h, m, s = parts
+        else:
+            h = 0.0
+            m, s = parts
+        return h * 3600 + m * 60 + s
+
     settings = get_settings()
     if not settings.get("enable_video_file_support", False):
         print("[VIDEO] indexing disabled in settings", flush=True)
         update_callback(status="VIDEO: indexing disabled")
         return 0
+    
+    if settings.get("enable_enhanced_citations", False):
+        update_callback(status="Uploading video for enhanced citations...")
+        try:
+            # this helper is already in your file below
+            blob_path = upload_to_blob(
+                temp_file_path,
+                user_id,
+                document_id,
+                original_filename,
+                update_callback,
+                group_id
+            )
+            update_callback(status=f"Enhanced citations: video at {blob_path}")
+        except Exception as e:
+            print(f"[VIDEO] BLOB UPLOAD ERROR: {e}", flush=True)
+            update_callback(status=f"VIDEO: blob upload failed → {e}")
 
     vi_ep, vi_loc, vi_acc = (
         settings["video_indexer_endpoint"],
         settings["video_indexer_location"],
         settings["video_indexer_account_id"]
     )
-    word_lim = settings.get("video_chunk_word_count", 400)
 
     # 1) Auth
     try:
@@ -231,7 +289,7 @@ def process_video_document(document_id, user_id, temp_file_path, original_filena
         update_callback(status=f"VIDEO: auth failed → {e}")
         return 0
 
-    # 2) Upload
+    # 2) Upload video to Indexer
     try:
         url = f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos"
         params = {"accessToken": token, "name": original_filename}
@@ -248,160 +306,89 @@ def process_video_document(document_id, user_id, temp_file_path, original_filena
         update_callback(status=f"VIDEO: upload failed → {e}")
         return 0
 
-    # 3) Poll until processingProgress == 100%
+    # 3) Poll until ready
     index_url = (
         f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos/{vid}/Index"
-        f"?accessToken={token}"
-        f"&includeInsights=Transcript"
-        f"&includeStreamingUrls=false"
+        f"?accessToken={token}&includeInsights=Transcript&includeStreamingUrls=false"
     )
     while True:
         r = requests.get(index_url)
         if r.status_code in (401, 404):
-            print(f"[VIDEO] POLL {r.status_code}, retry in 30s", flush=True)
-            time.sleep(30)
-            continue
+            time.sleep(30); continue
         if r.status_code == 429:
-            wait = int(r.headers.get("Retry-After", 30))
-            print(f"[VIDEO] POLL 429, retry after {wait}s", flush=True)
-            time.sleep(wait)
-            continue
+            time.sleep(int(r.headers.get("Retry-After", 30))); continue
         if r.status_code == 504:
-            print("[VIDEO] POLL 504, retry in 30s", flush=True)
-            time.sleep(30)
-            continue
+            time.sleep(30); continue
         r.raise_for_status()
         data = r.json()
 
-        try:
-            # Build a filename like "<videoId>_raw_index.json"
-            blob_filename = f"{vid}_raw_index.json"
-            # Choose the same container you use for enhanced‐citations blobs
-            container_name = (
-                storage_account_group_documents_container_name
-                if group_id else
-                storage_account_user_documents_container_name
-            )
-            blob_path = f"{group_id or user_id}/{blob_filename}"
-            blob_service_client = CLIENTS["storage_account_office_docs_client"]
-            blob_client = blob_service_client.get_blob_client(
-                container=container_name,
-                blob=blob_path
-            )
-            # Upload the JSON string; overwrite any prior dump
-            blob_client.upload_blob(
-                json.dumps(data),
-                overwrite=True
-            )
-            print(f"[VIDEO] SAVED RAW INDEX JSON to blob: {blob_path}", flush=True)
-        except Exception as e:
-            print(f"[VIDEO] ERROR saving raw index JSON to blob: {e}", flush=True)
 
         info = data.get("videos", [{}])[0]
         prog = info.get("processingProgress", "0%").rstrip("%")
-        state = info.get("state", "")
-        print(f"[VIDEO] PROGRESS={prog}% STATE={state}", flush=True)
+        state = info.get("state", "").lower()
         update_callback(status=f"VIDEO: {prog}%")
-
-        if state.lower() == "failed":
-            print("[VIDEO] STATE=FAILED", flush=True)
+        if state == "failed":
             update_callback(status="VIDEO: indexing failed")
             return 0
-
         if prog == "100":
             break
-
         time.sleep(30)
 
-    # 4) Fetch transcript
-    try:
-        insights   = info.get("insights", {})
-        transcript = insights.get("transcript", [])
-        print(f"[VIDEO] TRANSCRIPT lines={len(transcript)}", flush=True)
-        update_callback(status=f"VIDEO: transcript lines={len(transcript)}")
-    except Exception as e:
-        print(f"[VIDEO] TRANSCRIPT FETCH ERROR: {e}", flush=True)
-        update_callback(status=f"VIDEO: fetch transcript error → {e}")
-        return 0
+    # 4) Extract transcript & OCR
+    insights = info.get("insights", {})
+    transcript = insights.get("transcript", [])
+    ocr_blocks = insights.get("ocr", [])
 
-    if not transcript:
-        print("[VIDEO] NO TRANSCRIPT, nothing to index", flush=True)
-        update_callback(status="VIDEO: no transcript")
-        return 0
+    speech_context = [
+        {"text": seg["text"].strip(), "start": inst["start"]}
+        for seg in transcript if seg.get("text", "").strip()
+        for inst in seg.get("instances", [])
+    ]
+    ocr_context = [
+        {"text": block["text"].strip(), "start": inst["start"]}
+        for block in ocr_blocks if block.get("text", "").strip()
+        for inst in block.get("instances", [])
+    ]
 
-    try:
-        insights = info.get("insights", {})
+    speech_context.sort(key=lambda x: to_seconds(x["start"]))
+    ocr_context.sort(key=lambda x: to_seconds(x["start"]))
 
-        # 4a) Get actual speech transcript
-        speech = insights.get("transcript", [])
+    total = 0
+    idx_s = 0
+    n_s = len(speech_context)
+    idx_o = 0
+    n_o = len(ocr_context)
 
-        # 4b) Get on‑screen text via OCR, if any
-        ocr_blocks = insights.get("ocr", [])
+    while idx_s < n_s:
+        window_start = to_seconds(speech_context[idx_s]["start"])
+        window_end = window_start + 30.0
 
-        # 4c) Merge into a single list of segments
-        merged = []
+        speech_lines = []
+        while idx_s < n_s and to_seconds(speech_context[idx_s]["start"]) <= window_end:
+            speech_lines.append(speech_context[idx_s]["text"])
+            idx_s += 1
 
-        # Add all spoken segments first
-        for seg in speech:
-            if seg.get("text", "").strip():
-                merged.append({
-                    "text": seg["text"].strip(),
-                    "instances": seg.get("instances", [])
-                })
+        ocr_lines = []
+        while idx_o < n_o and to_seconds(ocr_context[idx_o]["start"]) <= window_end:
+            ocr_lines.append(ocr_context[idx_o]["text"])
+            idx_o += 1
 
-        # Then add all OCR segments
-        for block in ocr_blocks:
-            text = block.get("text", "").strip()
-            if not text:
-                continue
-            for inst in block.get("instances", []):
-                merged.append({
-                    "text": text,
-                    "instances": [{
-                        "start": inst.get("start"),
-                        "end": inst.get("end")
-                    }]
-                })
+        start_ts = speech_context[total]["start"]
+        chunk_text = " ".join(speech_lines).strip()
+        ocr_text = " ".join(ocr_lines).strip()
 
-        print(f"[VIDEO] MERGED SEGMENTS (speech+OCR)={len(merged)}", flush=True)
-        update_callback(status=f"VIDEO: segments to index={len(merged)}")
-    except Exception as e:
-        print(f"[VIDEO] FETCH ERROR: {e}", flush=True)
-        update_callback(status=f"VIDEO: fetch error → {e}")
-        return 0
-
-    if not merged:
-        print("[VIDEO] NO TEXT OR SPEECH TO INDEX", flush=True)
-        update_callback(status="VIDEO: no content")
-        return 0
-
-    # 5) Chunk & save using merged segments
-    total, buf, count, start = 0, [], 0, None
-
-    for seg in merged:
-        txt = seg.get("text", "").strip()
-        if not txt:
-            continue
-        words = txt.split()
-        if not buf:
-            inst = seg.get("instances", [])
-            start = inst[0].get("start", "00:00:00.000") if inst else "00:00:00.000"
-        buf.extend(words)
-        count += len(words)
-        if count >= word_lim:
-            print(f"[VIDEO] SAVING CHUNK {total+1} @ {start}", flush=True)
-            update_callback(current_file_chunk=total+1, status=f"VIDEO: save chunk @ {start}")
-            save_video_chunk(" ".join(buf), start, original_filename, user_id, document_id, group_id)
-            total += 1
-            buf, count = [], 0
-
-    if buf:
-        print(f"[VIDEO] SAVING FINAL CHUNK {total+1} @ {start}", flush=True)
-        update_callback(current_file_chunk=total+1, status=f"VIDEO: save final @ {start}")
-        save_video_chunk(" ".join(buf), start, original_filename, user_id, document_id, group_id)
+        update_callback(current_file_chunk=total+1, status=f"VIDEO: saving chunk @ {start_ts}")
+        save_video_chunk(
+            page_text_content=chunk_text,
+            ocr_chunk_text=ocr_text,
+            start_time=start_ts,
+            file_name=original_filename,
+            user_id=user_id,
+            document_id=document_id,
+            group_id=group_id
+        )
         total += 1
 
-    print(f"[VIDEO] DONE, total chunks={total}", flush=True)
     update_callback(status=f"VIDEO: done, {total} chunks")
     return total
 

@@ -642,19 +642,14 @@ app_settings.app_title }} {% endblock %} {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.js"></script>
 <!-- Pass backend flags to JS -->
 <script>
-  window.classification_categories = JSON.parse(
-    "{{ settings.document_classification_categories|tojson(indent=None)|safe }}" ||
-      "[]"
-  );
-  if (!Array.isArray(window.classification_categories)) {
-    window.classification_categories = [];
-  }
-
-  window.enable_document_classification =
-    "{{ enable_document_classification | tojson }}";
-  window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
-  window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
-  window.enable_audio_file_support = "{{ enable_audio_file_support | tojson }}";
+  window.classification_categories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
+    if (!Array.isArray(window.classification_categories)) {
+        window.classification_categories = [];
+    }
+    window.enable_document_classification = "{{ enable_document_classification | tojson }}";
+    window.enable_extract_meta_data = "{{ enable_extract_meta_data | tojson }}";
+    window.enable_video_file_support = "{{ enable_video_file_support | tojson }}";
+    window.enable_audio_file_support = "{{ enable_audio_file_support | tojson }}";
 </script>
 
 <!-- Main JS Logic for Group Workspace -->
@@ -1713,7 +1708,7 @@ app_settings.app_title }} {% endblock %} {% block head %}
         r.ok ? r.json() : r.json().then((err) => Promise.reject(err))
       )
       .then((data) => {
-        alert(data.message || "Metadata extraction process initiated.");
+        //alert(data.message || "Metadata extraction process initiated.");
         // Refresh after delay
         setTimeout(fetchGroupDocuments, 1500);
         const detailsRow = document.getElementById(

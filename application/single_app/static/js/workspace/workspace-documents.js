@@ -854,7 +854,7 @@ window.onExtractMetadata = function (docId, event) {
             console.log("Metadata extraction started/completed:", data);
             // Refresh the list after a short delay to allow backend processing
             setTimeout(fetchUserDocuments, 1500);
-            alert(data.message || "Metadata extraction process initiated.");
+            //alert(data.message || "Metadata extraction process initiated.");
             // Optionally close the details view if open
             const detailsRow = document.getElementById(`details-row-${docId}`);
             if (detailsRow && detailsRow.style.display !== "none") {
