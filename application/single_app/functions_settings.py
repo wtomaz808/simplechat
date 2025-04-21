@@ -153,7 +153,7 @@ def get_settings():
             item="app_settings",
             partition_key="app_settings"
         )
-        print("Successfully retrieved settings from Cosmos DB.")
+        #print("Successfully retrieved settings from Cosmos DB.")
 
         # Merge default_settings in, to fill in any missing or nested keys
         merged = deep_merge_dicts(default_settings, settings_item)

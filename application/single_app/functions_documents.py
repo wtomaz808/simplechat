@@ -5,6 +5,7 @@ from functions_content import *
 from functions_settings import *
 from functions_search import *
 from functions_logging import *
+from functions_authentication import *
 
 def allowed_file(filename, allowed_extensions=None):
     if not allowed_extensions:
@@ -153,6 +154,256 @@ def get_document_metadata(document_id, user_id, group_id=None):
         print(f"Error retrieving document metadata: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
         return None
 
+def save_video_chunk(page_text_content, start_time, file_name, user_id, document_id, group_id=None):
+    """Saves one chunk—now with prints on every step/error."""
+    try:
+        current_time = datetime.now(timezone.utc).isoformat()
+        is_group = group_id is not None
+
+        # 1) generate embedding
+        try:
+            embedding = generate_embedding(page_text_content)
+            print(f"[VideoChunk] EMBEDDING OK for {document_id}@{start_time}", flush=True)
+        except Exception as e:
+            print(f"[VideoChunk] EMBEDDING ERROR for {document_id}@{start_time}: {e}", flush=True)
+            return
+
+        # 2) build chunk
+        try:
+            meta = get_document_metadata(document_id, user_id, group_id)
+            version = meta.get("version", 1) if meta else 1
+            chunk_id = f"{document_id}_{start_time.replace(':','-')}"
+            h, m, s = start_time.split(':')
+            s = s.split('.',1)[0]
+            chunk_seq_seconds  = int(h)*3600 + int(m)*60 + int(s)
+            chunk = {
+                "id":             chunk_id,
+                "document_id":    document_id,
+                "chunk_text":     page_text_content,
+                "embedding":      embedding,
+                "file_name":      file_name,
+                "start_time":     start_time,
+                "chunk_sequence": chunk_seq_seconds,
+                "upload_date":    current_time,
+                "version":        version
+            }
+            if is_group:
+                chunk["group_id"] = group_id
+                client = CLIENTS["search_client_group"]
+            else:
+                chunk["user_id"] = user_id
+                client = CLIENTS["search_client_user"]
+            print(f"[VideoChunk] CHUNK BUILT {chunk_id}", flush=True)
+        except Exception as e:
+            print(f"[VideoChunk] CHUNK BUILD ERROR for {document_id}@{start_time}: {e}", flush=True)
+            return
+
+        # 3) upload to search index
+        try:
+            client.upload_documents(documents=[chunk])
+            print(f"[VideoChunk] UPLOAD OK for {chunk_id}", flush=True)
+        except Exception as e:
+            print(f"[VideoChunk] UPLOAD ERROR for {chunk_id}: {e}", flush=True)
+
+    except Exception as e:
+        print(f"[VideoChunk] UNEXPECTED ERROR for {document_id}@{start_time}: {e}", flush=True)
+
+
+def process_video_document(document_id, user_id, temp_file_path, original_filename, update_callback, group_id=None):
+    settings = get_settings()
+    if not settings.get("enable_video_file_support", False):
+        print("[VIDEO] indexing disabled in settings", flush=True)
+        update_callback(status="VIDEO: indexing disabled")
+        return 0
+
+    vi_ep, vi_loc, vi_acc = (
+        settings["video_indexer_endpoint"],
+        settings["video_indexer_location"],
+        settings["video_indexer_account_id"]
+    )
+    word_lim = settings.get("video_chunk_word_count", 400)
+
+    # 1) Auth
+    try:
+        token = get_video_indexer_account_token(settings)
+    except Exception as e:
+        print(f"[VIDEO] AUTH ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: auth failed → {e}")
+        return 0
+
+    # 2) Upload
+    try:
+        url = f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos"
+        params = {"accessToken": token, "name": original_filename}
+        with open(temp_file_path, "rb") as f:
+            resp = requests.post(url, params=params, files={"file": f})
+        resp.raise_for_status()
+        vid = resp.json().get("id")
+        if not vid:
+            raise ValueError("no video ID returned")
+        print(f"[VIDEO] UPLOAD OK, videoId={vid}", flush=True)
+        update_callback(status=f"VIDEO: uploaded id={vid}")
+    except Exception as e:
+        print(f"[VIDEO] UPLOAD ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: upload failed → {e}")
+        return 0
+
+    # 3) Poll until processingProgress == 100%
+    index_url = (
+        f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos/{vid}/Index"
+        f"?accessToken={token}"
+        f"&includeInsights=Transcript"
+        f"&includeStreamingUrls=false"
+    )
+    while True:
+        r = requests.get(index_url)
+        if r.status_code in (401, 404):
+            print(f"[VIDEO] POLL {r.status_code}, retry in 30s", flush=True)
+            time.sleep(30)
+            continue
+        if r.status_code == 429:
+            wait = int(r.headers.get("Retry-After", 30))
+            print(f"[VIDEO] POLL 429, retry after {wait}s", flush=True)
+            time.sleep(wait)
+            continue
+        if r.status_code == 504:
+            print("[VIDEO] POLL 504, retry in 30s", flush=True)
+            time.sleep(30)
+            continue
+        r.raise_for_status()
+        data = r.json()
+
+        try:
+            # Build a filename like "<videoId>_raw_index.json"
+            blob_filename = f"{vid}_raw_index.json"
+            # Choose the same container you use for enhanced‐citations blobs
+            container_name = (
+                storage_account_group_documents_container_name
+                if group_id else
+                storage_account_user_documents_container_name
+            )
+            blob_path = f"{group_id or user_id}/{blob_filename}"
+            blob_service_client = CLIENTS["storage_account_office_docs_client"]
+            blob_client = blob_service_client.get_blob_client(
+                container=container_name,
+                blob=blob_path
+            )
+            # Upload the JSON string; overwrite any prior dump
+            blob_client.upload_blob(
+                json.dumps(data),
+                overwrite=True
+            )
+            print(f"[VIDEO] SAVED RAW INDEX JSON to blob: {blob_path}", flush=True)
+        except Exception as e:
+            print(f"[VIDEO] ERROR saving raw index JSON to blob: {e}", flush=True)
+
+        info = data.get("videos", [{}])[0]
+        prog = info.get("processingProgress", "0%").rstrip("%")
+        state = info.get("state", "")
+        print(f"[VIDEO] PROGRESS={prog}% STATE={state}", flush=True)
+        update_callback(status=f"VIDEO: {prog}%")
+
+        if state.lower() == "failed":
+            print("[VIDEO] STATE=FAILED", flush=True)
+            update_callback(status="VIDEO: indexing failed")
+            return 0
+
+        if prog == "100":
+            break
+
+        time.sleep(30)
+
+    # 4) Fetch transcript
+    try:
+        insights   = info.get("insights", {})
+        transcript = insights.get("transcript", [])
+        print(f"[VIDEO] TRANSCRIPT lines={len(transcript)}", flush=True)
+        update_callback(status=f"VIDEO: transcript lines={len(transcript)}")
+    except Exception as e:
+        print(f"[VIDEO] TRANSCRIPT FETCH ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: fetch transcript error → {e}")
+        return 0
+
+    if not transcript:
+        print("[VIDEO] NO TRANSCRIPT, nothing to index", flush=True)
+        update_callback(status="VIDEO: no transcript")
+        return 0
+
+    try:
+        insights = info.get("insights", {})
+
+        # 4a) Get actual speech transcript
+        speech = insights.get("transcript", [])
+
+        # 4b) Get on‑screen text via OCR, if any
+        ocr_blocks = insights.get("ocr", [])
+
+        # 4c) Merge into a single list of segments
+        merged = []
+
+        # Add all spoken segments first
+        for seg in speech:
+            if seg.get("text", "").strip():
+                merged.append({
+                    "text": seg["text"].strip(),
+                    "instances": seg.get("instances", [])
+                })
+
+        # Then add all OCR segments
+        for block in ocr_blocks:
+            text = block.get("text", "").strip()
+            if not text:
+                continue
+            for inst in block.get("instances", []):
+                merged.append({
+                    "text": text,
+                    "instances": [{
+                        "start": inst.get("start"),
+                        "end": inst.get("end")
+                    }]
+                })
+
+        print(f"[VIDEO] MERGED SEGMENTS (speech+OCR)={len(merged)}", flush=True)
+        update_callback(status=f"VIDEO: segments to index={len(merged)}")
+    except Exception as e:
+        print(f"[VIDEO] FETCH ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: fetch error → {e}")
+        return 0
+
+    if not merged:
+        print("[VIDEO] NO TEXT OR SPEECH TO INDEX", flush=True)
+        update_callback(status="VIDEO: no content")
+        return 0
+
+    # 5) Chunk & save using merged segments
+    total, buf, count, start = 0, [], 0, None
+
+    for seg in merged:
+        txt = seg.get("text", "").strip()
+        if not txt:
+            continue
+        words = txt.split()
+        if not buf:
+            inst = seg.get("instances", [])
+            start = inst[0].get("start", "00:00:00.000") if inst else "00:00:00.000"
+        buf.extend(words)
+        count += len(words)
+        if count >= word_lim:
+            print(f"[VIDEO] SAVING CHUNK {total+1} @ {start}", flush=True)
+            update_callback(current_file_chunk=total+1, status=f"VIDEO: save chunk @ {start}")
+            save_video_chunk(" ".join(buf), start, original_filename, user_id, document_id, group_id)
+            total += 1
+            buf, count = [], 0
+
+    if buf:
+        print(f"[VIDEO] SAVING FINAL CHUNK {total+1} @ {start}", flush=True)
+        update_callback(current_file_chunk=total+1, status=f"VIDEO: save final @ {start}")
+        save_video_chunk(" ".join(buf), start, original_filename, user_id, document_id, group_id)
+        total += 1
+
+    print(f"[VIDEO] DONE, total chunks={total}", flush=True)
+    update_callback(status=f"VIDEO: done, {total} chunks")
+    return total
 
 
 def calculate_processing_percentage(doc_metadata):
@@ -2453,6 +2704,8 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
     enable_extract_meta_data = settings.get('enable_extract_meta_data', False) # Used by DI flow
     max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
 
+    video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.flv')
+
     # --- Define update_document callback wrapper ---
     # This makes it easier to pass the update function to helpers without repeating args
     def update_doc_callback(**kwargs):
@@ -2518,6 +2771,15 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
             total_chunks_saved = process_json(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext in tabular_extensions:
             total_chunks_saved = process_tabular(**args)
+        elif file_ext in video_extensions:
+            total_chunks_saved = process_video_document(
+                document_id=document_id,
+                user_id=user_id,
+                temp_file_path=temp_file_path,
+                original_filename=original_filename,
+                update_callback=update_doc_callback,
+                group_id=group_id
+            )
         elif file_ext in di_supported_extensions:
             total_chunks_saved = process_di_document(**args)
         else:

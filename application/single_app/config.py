@@ -19,6 +19,7 @@ import mimetypes
 import openpyxl
 import xlrd
 import traceback
+import subprocess
 
 from flask import (
     Flask, 
@@ -60,7 +61,7 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
-from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
+from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError, ServiceRequestError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.identity import ClientSecretCredential, DefaultAzureCredential, get_bearer_token_provider, AzureAuthorityHosts
@@ -77,14 +78,16 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.211.009'
+app.config['VERSION'] = '0.212.012'
 Session(app)
 
 CLIENTS = {}
 CLIENTS_LOCK = threading.Lock()
 
 ALLOWED_EXTENSIONS = {
-    'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json'
+    'txt', 'pdf', 'docx', 'xlsx', 'xls', 'csv', 'pptx', 'html', 'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'heif', 'md', 'json', 
+    'mp4', 'mov', 'avi', 'mkv', 'flv', 'mxf', 'gxf', 'ts', 'ps', '3gp', '3gpp', 'mpg', 'wmv', 'asf', 'm4a', 'm4v', 'isma', 'ismv', 
+    'dvr-ms', 'wav'
 }
 ALLOWED_EXTENSIONS_IMG = {'png', 'jpg', 'jpeg'}
 MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 16 MB
