@@ -2193,7 +2193,7 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
     update_callback(status="Processing JSON file...")
     total_chunks_saved = 0
     # Reflects character count limit for the splitter
-    max_chunk_size_chars = 600 # As per original requirement
+    max_chunk_size_chars = 4000 # As per original requirement
 
     if enable_enhanced_citations:
         args = {
@@ -2288,7 +2288,7 @@ def process_single_tabular_sheet(df, document_id, user_id, effective_filename, u
     is_group = group_id is not None
 
     total_chunks_saved = 0
-    target_chunk_size_chars = 800 # Requirement: "800 size chunk" (assuming characters)
+    target_chunk_size_chars = 4000 # Requirement: "800 size chunk" (assuming characters)
 
     if df.empty:
         print(f"Skipping empty sheet/file: {effective_filename}")
