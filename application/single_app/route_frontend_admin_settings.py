@@ -277,6 +277,17 @@ def register_route_frontend_admin_settings(app):
                 'max_file_size_mb': max_file_size_mb,
                 'conversation_history_limit': conversation_history_limit,
                 'default_system_prompt': form_data.get('default_system_prompt', '').strip(),
+
+                # Video Indexer
+                'video_indexer_endpoint': form_data.get('video_indexer_endpoint', 'https://api.videoindexer.ai').strip(),
+                'video_indexer_location': form_data.get('video_indexer_location', '').strip(),
+                'video_indexer_account_id': form_data.get('video_indexer_account_id', '').strip(),
+                'video_indexer_api_key': form_data.get('video_indexer_api_key', '').strip(),
+                'video_indexer_resource_group': form_data.get('video_indexer_resource_group', '').strip(),
+                'video_indexer_subscription_id': form_data.get('video_indexer_subscription_id', '').strip(),
+                'video_indexer_account_name': form_data.get('video_indexer_account_name', '').strip(),
+                'video_indexer_arm_api_version': form_data.get('video_indexer_arm_api_version', '2021-11-10-preview').strip(),
+                'video_index_timeout': int(form_data.get('video_index_timeout', 600))
             }
             
             logo_file = request.files.get('logo_file')
