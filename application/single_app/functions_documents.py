@@ -1639,7 +1639,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id, 
-                    top_n=10, 
+                    top_n=20, 
                     doc_scope=document_scope
                 )
             elif document_scope == "group":
@@ -1647,7 +1647,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id,
-                    top_n=10, 
+                    top_n=20, 
                     doc_scope=document_scope, 
                     active_group_id=scope_id
                 )
@@ -2283,15 +2283,15 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
 
 
 # --- Helper function to process a single Tabular sheet (CSV or Excel tab) ---
-def process_single_tabular_sheet(df, document_id, user_id, effective_filename, update_callback, group_id=None):
+def process_single_tabular_sheet(df, document_id, user_id, file_name, update_callback, group_id=None):
     """Chunks a pandas DataFrame from a CSV or Excel sheet."""
     is_group = group_id is not None
 
     total_chunks_saved = 0
-    target_chunk_size_chars = 4000 # Requirement: "800 size chunk" (assuming characters)
+    target_chunk_size_chars = 800 # Requirement: "800 size chunk" (assuming characters)
 
     if df.empty:
-        print(f"Skipping empty sheet/file: {effective_filename}")
+        print(f"Skipping empty sheet/file: {file_name}")
         return 0
 
     # Get header
@@ -2341,13 +2341,13 @@ def process_single_tabular_sheet(df, document_id, user_id, effective_filename, u
 
         update_callback(
             current_file_chunk=idx,
-            status=f"Saving chunk {idx}/{num_chunks_final} from {effective_filename}..."
+            status=f"Saving chunk {idx}/{num_chunks_final} from {file_name}..."
         )
 
         args = {
             "page_text_content": chunk_with_header,
             "page_number": idx,
-            "file_name": effective_filename,
+            "file_name": file_name,
             "user_id": user_id,
             "document_id": document_id
         }
