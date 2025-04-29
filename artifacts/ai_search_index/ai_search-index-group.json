@@ -98,6 +98,44 @@
       "synonymMaps": []
     },
     {
+      "name": "video_ocr_chunk_text",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "indexAnalyzer": null,
+      "searchAnalyzer": null,
+      "analyzer": "standard.lucene",
+      "normalizer": null,
+      "dimensions": null,
+      "vectorSearchProfile": null,
+      "vectorEncoding": null,
+      "synonymMaps": []
+    },
+    {
+      "name": "video_ocr_embedding",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "indexAnalyzer": null,
+      "searchAnalyzer": null,
+      "analyzer": null,
+      "normalizer": null,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vector-profile-1728235379870",
+      "vectorEncoding": null,
+      "synonymMaps": []
+    },
+    {
       "name": "file_name",
       "type": "Edm.String",
       "searchable": true,
@@ -232,6 +270,25 @@
       "synonymMaps": []
     },
     {
+      "name": "start_time",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "retrievable": true,
+      "stored": true,
+      "sortable": true,
+      "facetable": false,
+      "key": false,
+      "indexAnalyzer": null,
+      "searchAnalyzer": null,
+      "analyzer": null,
+      "normalizer": null,
+      "dimensions": null,
+      "vectorSearchProfile": null,
+      "vectorEncoding": null,
+      "synonymMaps": []
+    },  
+    {
       "name": "author",
       "type": "Collection(Edm.String)",
       "searchable": true,
@@ -348,6 +405,9 @@
             },
             {
               "fieldName": "chunk_text"
+            },
+            {
+              "fieldName": "video_ocr_chunk_text"
             }
           ],
           "prioritizedKeywordsFields": [

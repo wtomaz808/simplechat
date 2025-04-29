@@ -71,18 +71,19 @@ function renderGPTModels() {
 
     let html = '<ul class="list-group">';
     gptAll.forEach(m => {
-        const isSelected = gptSelected.some(sel =>
-            sel.deploymentName === m.deploymentName &&
-            sel.modelName === m.modelName
-        );
-        const buttonLabel = isSelected ? 'Selected' : 'Select';
-        const buttonDisabled = isSelected ? 'disabled' : '';
+        const isSelected = gptSelected.some(sel => sel.deploymentName === m.deploymentName);
+        // use green for selected, blue for not
+        const btnClass = isSelected ? 'btn-success' : 'btn-primary';
+        const btnLabel = isSelected ? 'Selected' : 'Select';
+
         html += `
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span>${m.deploymentName} (Model: ${m.modelName})</span>
-                <button class="btn btn-sm btn-primary" ${buttonDisabled}
-                    onclick="selectGptModel('${m.deploymentName}', '${m.modelName}')">
-                    ${buttonLabel}
+                <button
+                  class="btn btn-sm ${btnClass}"
+                  onclick="selectGptModel('${m.deploymentName}', '${m.modelName}')"
+                >
+                  ${btnLabel}
                 </button>
             </li>
         `;
@@ -90,6 +91,7 @@ function renderGPTModels() {
     html += '</ul>';
     listDiv.innerHTML = html;
 }
+
 
 function renderEmbeddingModels() {
     const listDiv = document.getElementById('embedding_models_list');
@@ -175,12 +177,19 @@ if (fetchGptBtn) {
 }
 
 window.selectGptModel = (deploymentName, modelName) => {
-    // Always store just one selected GPT model
-    gptSelected = [{ deploymentName, modelName }];
-    renderGPTModels();
-    updateGptHiddenInput();
-    //alert(`Selected GPT model: ${deploymentName}`);
-};
+    const idx = gptSelected.findIndex(x => x.deploymentName === deploymentName);
+  
+    if (idx === -1) {
+      // not yet selected → add
+      gptSelected.push({ deploymentName, modelName });
+    } else {
+      // already selected → remove
+      gptSelected.splice(idx, 1);
+    }
+  
+    updateGptHiddenInput();  // rewrite the JSON payload
+    renderGPTModels();       // refresh the button states
+  };
 
 function updateGptHiddenInput() {
     const gptInput = document.getElementById('gpt_model_json');
@@ -1137,6 +1146,18 @@ function togglePassword(btnId, inputId) {
     }
 }
 
+// --- Video Indexer Settings toggle ---
+const videoSupportToggle = document.getElementById('enable_video_file_support');
+const videoIndexerDiv    = document.getElementById('video_indexer_settings');
+if (videoSupportToggle && videoIndexerDiv) {
+  // on load
+  videoIndexerDiv.style.display = videoSupportToggle.checked ? 'block' : 'none';
+  // on change
+  videoSupportToggle.addEventListener('change', () => {
+    videoIndexerDiv.style.display = videoSupportToggle.checked ? 'block' : 'none';
+  });
+}
+
 togglePassword('toggle_gpt_key', 'azure_openai_gpt_key');
 togglePassword('toggle_embedding_key', 'azure_openai_embedding_key');
 togglePassword('toggle_image_gen_key', 'azure_openai_image_gen_key');
@@ -1157,3 +1178,4 @@ togglePassword('toggle_audio_files_key', 'audio_files_key');
 togglePassword('toggle_office_conn_str', 'office_docs_storage_account_url');
 togglePassword('toggle_video_conn_str', 'video_files_storage_account_url');
 togglePassword('toggle_audio_conn_str', 'audio_files_storage_account_url');
+togglePassword('toggle_video_indexer_api_key', 'video_indexer_api_key');

@@ -141,6 +141,21 @@
                      </div>
                     {% endif %}
 
+                    <!-- Model selector -->
+                    <div class="flex-shrink-0">
+                        <label for="model-select" class="visually-hidden">Model</label>
+                        <select id="model-select" class="form-select">
+                        {% for m in settings.gpt_model.selected %}
+                            <option 
+                            value="{{ m.deploymentName }}" 
+                            {% if m.deploymentName == settings.gpt_model.selected[0].deploymentName %}selected{% endif %}
+                            >
+                            {{ m.modelName }}
+                            </option>
+                        {% endfor %}
+                        </select>
+                    </div>
+
                      <!-- Send Button (doesn't shrink) -->
                      <button class="btn btn-primary flex-shrink-0" id="send-btn" title="Send Message">
                           <i class="bi bi-send-fill"></i> <span class="d-none d-sm-inline">Send</span>

@@ -144,7 +144,18 @@ def get_settings():
         'max_file_size_mb': 150,
         'conversation_history_limit': 10,
         'default_system_prompt': '',
-        'enable_file_processing_logs': True
+        'enable_file_processing_logs': True,
+
+        # Video Indexer Settings
+        'video_indexer_endpoint': 'https://api.videoindexer.ai',
+        'video_indexer_location': '',
+        'video_indexer_account_id': '',
+        'video_indexer_api_key': '',
+        'video_indexer_resource_group': '',
+        'video_indexer_subscription_id': '',
+        'video_indexer_account_name': '',
+        'video_indexer_arm_api_version': '2021-11-10-preview',
+        'video_index_timeout': 600
     }
 
     try:
@@ -153,7 +164,7 @@ def get_settings():
             item="app_settings",
             partition_key="app_settings"
         )
-        print("Successfully retrieved settings from Cosmos DB.")
+        #print("Successfully retrieved settings from Cosmos DB.")
 
         # Merge default_settings in, to fill in any missing or nested keys
         merged = deep_merge_dicts(default_settings, settings_item)

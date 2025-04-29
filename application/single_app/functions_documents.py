@@ -5,6 +5,7 @@ from functions_content import *
 from functions_settings import *
 from functions_search import *
 from functions_logging import *
+from functions_authentication import *
 
 def allowed_file(filename, allowed_extensions=None):
     if not allowed_extensions:
@@ -153,6 +154,243 @@ def get_document_metadata(document_id, user_id, group_id=None):
         print(f"Error retrieving document metadata: {repr(e)}\nTraceback:\n{traceback.format_exc()}")
         return None
 
+def save_video_chunk(
+    page_text_content,
+    ocr_chunk_text,
+    start_time,
+    file_name,
+    user_id,
+    document_id,
+    group_id
+):
+    """
+    Saves one 30-second video chunk to the search index, with separate fields for transcript and OCR.
+    The chunk_id is built from document_id and the integer second offset to ensure a valid key.
+    """
+    try:
+        current_time = datetime.now(timezone.utc).isoformat()
+        is_group = group_id is not None
+
+        # Convert start_time "HH:MM:SS.mmm" to integer seconds
+        h, m, s = start_time.split(':')
+        seconds = int(h) * 3600 + int(m) * 60 + int(float(s))
+
+        # 1) generate embedding on the transcript text
+        try:
+            embedding = generate_embedding(page_text_content)
+            print(f"[VideoChunk] EMBEDDING OK for {document_id}@{start_time}", flush=True)
+        except Exception as e:
+            print(f"[VideoChunk] EMBEDDING ERROR for {document_id}@{start_time}: {e}", flush=True)
+            return
+
+        # 2) build chunk document
+        try:
+            meta = get_document_metadata(document_id, user_id, group_id)
+            version = meta.get("version", 1) if meta else 1
+
+            # Use integer seconds to build a safe document key
+            chunk_id = f"{document_id}_{seconds}"
+
+            chunk = {
+                "id":                   chunk_id,
+                "document_id":          document_id,
+                "chunk_text":           page_text_content,
+                "video_ocr_chunk_text": ocr_chunk_text,
+                "embedding":            embedding,
+                "file_name":            file_name,
+                "start_time":           start_time,
+                "chunk_sequence":       seconds,
+                "upload_date":          current_time,
+                "version":              version,
+            }
+
+            if is_group:
+                chunk["group_id"] = group_id
+                client = CLIENTS["search_client_group"]
+            else:
+                chunk["user_id"] = user_id
+                client = CLIENTS["search_client_user"]
+
+            print(f"[VideoChunk] CHUNK BUILT {chunk_id}", flush=True)
+
+        except Exception as e:
+            print(f"[VideoChunk] CHUNK BUILD ERROR for {document_id}@{start_time}: {e}", flush=True)
+            return
+
+        # 3) upload to search index
+        try:
+            client.upload_documents(documents=[chunk])
+            print(f"[VideoChunk] UPLOAD OK for {chunk_id}", flush=True)
+        except Exception as e:
+            print(f"[VideoChunk] UPLOAD ERROR for {chunk_id}: {e}", flush=True)
+
+    except Exception as e:
+        print(f"[VideoChunk] UNEXPECTED ERROR for {document_id}@{start_time}: {e}", flush=True)
+
+
+
+def process_video_document(
+    document_id,
+    user_id,
+    temp_file_path,
+    original_filename,
+    update_callback,
+    group_id
+):
+    """
+    Processes a video by dividing transcript into 30-second chunks,
+    extracting OCR separately, and saving each as a chunk with safe IDs.
+    """
+
+    def to_seconds(ts: str) -> float:
+        parts = ts.split(':')
+        parts = [float(p) for p in parts]
+        if len(parts) == 3:
+            h, m, s = parts
+        else:
+            h = 0.0
+            m, s = parts
+        return h * 3600 + m * 60 + s
+
+    settings = get_settings()
+    if not settings.get("enable_video_file_support", False):
+        print("[VIDEO] indexing disabled in settings", flush=True)
+        update_callback(status="VIDEO: indexing disabled")
+        return 0
+    
+    if settings.get("enable_enhanced_citations", False):
+        update_callback(status="Uploading video for enhanced citations...")
+        try:
+            # this helper is already in your file below
+            blob_path = upload_to_blob(
+                temp_file_path,
+                user_id,
+                document_id,
+                original_filename,
+                update_callback,
+                group_id
+            )
+            update_callback(status=f"Enhanced citations: video at {blob_path}")
+        except Exception as e:
+            print(f"[VIDEO] BLOB UPLOAD ERROR: {e}", flush=True)
+            update_callback(status=f"VIDEO: blob upload failed → {e}")
+
+    vi_ep, vi_loc, vi_acc = (
+        settings["video_indexer_endpoint"],
+        settings["video_indexer_location"],
+        settings["video_indexer_account_id"]
+    )
+
+    # 1) Auth
+    try:
+        token = get_video_indexer_account_token(settings)
+    except Exception as e:
+        print(f"[VIDEO] AUTH ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: auth failed → {e}")
+        return 0
+
+    # 2) Upload video to Indexer
+    try:
+        url = f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos"
+        params = {"accessToken": token, "name": original_filename}
+        with open(temp_file_path, "rb") as f:
+            resp = requests.post(url, params=params, files={"file": f})
+        resp.raise_for_status()
+        vid = resp.json().get("id")
+        if not vid:
+            raise ValueError("no video ID returned")
+        print(f"[VIDEO] UPLOAD OK, videoId={vid}", flush=True)
+        update_callback(status=f"VIDEO: uploaded id={vid}")
+    except Exception as e:
+        print(f"[VIDEO] UPLOAD ERROR: {e}", flush=True)
+        update_callback(status=f"VIDEO: upload failed → {e}")
+        return 0
+
+    # 3) Poll until ready
+    index_url = (
+        f"{vi_ep}/{vi_loc}/Accounts/{vi_acc}/Videos/{vid}/Index"
+        f"?accessToken={token}&includeInsights=Transcript&includeStreamingUrls=false"
+    )
+    while True:
+        r = requests.get(index_url)
+        if r.status_code in (401, 404):
+            time.sleep(30); continue
+        if r.status_code == 429:
+            time.sleep(int(r.headers.get("Retry-After", 30))); continue
+        if r.status_code == 504:
+            time.sleep(30); continue
+        r.raise_for_status()
+        data = r.json()
+
+
+        info = data.get("videos", [{}])[0]
+        prog = info.get("processingProgress", "0%").rstrip("%")
+        state = info.get("state", "").lower()
+        update_callback(status=f"VIDEO: {prog}%")
+        if state == "failed":
+            update_callback(status="VIDEO: indexing failed")
+            return 0
+        if prog == "100":
+            break
+        time.sleep(30)
+
+    # 4) Extract transcript & OCR
+    insights = info.get("insights", {})
+    transcript = insights.get("transcript", [])
+    ocr_blocks = insights.get("ocr", [])
+
+    speech_context = [
+        {"text": seg["text"].strip(), "start": inst["start"]}
+        for seg in transcript if seg.get("text", "").strip()
+        for inst in seg.get("instances", [])
+    ]
+    ocr_context = [
+        {"text": block["text"].strip(), "start": inst["start"]}
+        for block in ocr_blocks if block.get("text", "").strip()
+        for inst in block.get("instances", [])
+    ]
+
+    speech_context.sort(key=lambda x: to_seconds(x["start"]))
+    ocr_context.sort(key=lambda x: to_seconds(x["start"]))
+
+    total = 0
+    idx_s = 0
+    n_s = len(speech_context)
+    idx_o = 0
+    n_o = len(ocr_context)
+
+    while idx_s < n_s:
+        window_start = to_seconds(speech_context[idx_s]["start"])
+        window_end = window_start + 30.0
+
+        speech_lines = []
+        while idx_s < n_s and to_seconds(speech_context[idx_s]["start"]) <= window_end:
+            speech_lines.append(speech_context[idx_s]["text"])
+            idx_s += 1
+
+        ocr_lines = []
+        while idx_o < n_o and to_seconds(ocr_context[idx_o]["start"]) <= window_end:
+            ocr_lines.append(ocr_context[idx_o]["text"])
+            idx_o += 1
+
+        start_ts = speech_context[total]["start"]
+        chunk_text = " ".join(speech_lines).strip()
+        ocr_text = " ".join(ocr_lines).strip()
+
+        update_callback(current_file_chunk=total+1, status=f"VIDEO: saving chunk @ {start_ts}")
+        save_video_chunk(
+            page_text_content=chunk_text,
+            ocr_chunk_text=ocr_text,
+            start_time=start_ts,
+            file_name=original_filename,
+            user_id=user_id,
+            document_id=document_id,
+            group_id=group_id
+        )
+        total += 1
+
+    update_callback(status=f"VIDEO: done, {total} chunks")
+    return total
 
 
 def calculate_processing_percentage(doc_metadata):
@@ -1401,7 +1639,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id, 
-                    top_n=10, 
+                    top_n=20, 
                     doc_scope=document_scope
                 )
             elif document_scope == "group":
@@ -1409,7 +1647,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id,
-                    top_n=10, 
+                    top_n=20, 
                     doc_scope=document_scope, 
                     active_group_id=scope_id
                 )
@@ -1955,7 +2193,7 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
     update_callback(status="Processing JSON file...")
     total_chunks_saved = 0
     # Reflects character count limit for the splitter
-    max_chunk_size_chars = 600 # As per original requirement
+    max_chunk_size_chars = 4000 # As per original requirement
 
     if enable_enhanced_citations:
         args = {
@@ -2045,7 +2283,7 @@ def process_json(document_id, user_id, temp_file_path, original_filename, enable
 
 
 # --- Helper function to process a single Tabular sheet (CSV or Excel tab) ---
-def process_single_tabular_sheet(df, document_id, user_id, effective_filename, update_callback, group_id=None):
+def process_single_tabular_sheet(df, document_id, user_id, file_name, update_callback, group_id=None):
     """Chunks a pandas DataFrame from a CSV or Excel sheet."""
     is_group = group_id is not None
 
@@ -2053,7 +2291,7 @@ def process_single_tabular_sheet(df, document_id, user_id, effective_filename, u
     target_chunk_size_chars = 800 # Requirement: "800 size chunk" (assuming characters)
 
     if df.empty:
-        print(f"Skipping empty sheet/file: {effective_filename}")
+        print(f"Skipping empty sheet/file: {file_name}")
         return 0
 
     # Get header
@@ -2103,13 +2341,13 @@ def process_single_tabular_sheet(df, document_id, user_id, effective_filename, u
 
         update_callback(
             current_file_chunk=idx,
-            status=f"Saving chunk {idx}/{num_chunks_final} from {effective_filename}..."
+            status=f"Saving chunk {idx}/{num_chunks_final} from {file_name}..."
         )
 
         args = {
             "page_text_content": chunk_with_header,
             "page_number": idx,
-            "file_name": effective_filename,
+            "file_name": file_name,
             "user_id": user_id,
             "document_id": document_id
         }
@@ -2453,6 +2691,8 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
     enable_extract_meta_data = settings.get('enable_extract_meta_data', False) # Used by DI flow
     max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
 
+    video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.flv')
+
     # --- Define update_document callback wrapper ---
     # This makes it easier to pass the update function to helpers without repeating args
     def update_doc_callback(**kwargs):
@@ -2518,6 +2758,15 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
             total_chunks_saved = process_json(**{k: v for k, v in args.items() if k != "file_ext"})
         elif file_ext in tabular_extensions:
             total_chunks_saved = process_tabular(**args)
+        elif file_ext in video_extensions:
+            total_chunks_saved = process_video_document(
+                document_id=document_id,
+                user_id=user_id,
+                temp_file_path=temp_file_path,
+                original_filename=original_filename,
+                update_callback=update_doc_callback,
+                group_id=group_id
+            )
         elif file_ext in di_supported_extensions:
             total_chunks_saved = process_di_document(**args)
         else:

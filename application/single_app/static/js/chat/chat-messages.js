@@ -22,6 +22,7 @@ const promptSelectionContainer = document.getElementById(
   "prompt-selection-container"
 );
 const chatbox = document.getElementById("chatbox");
+const modelSelect       = document.getElementById("model-select");
 
 function createCitationsHtml(
   hybridCitations = [],
@@ -442,6 +443,8 @@ export function actuallySendMessage(finalMessageToSend) {
   userInput.style.height = "";
   showLoadingIndicatorInChatbox();
 
+  const modelDeployment = modelSelect?.value;
+
   // ... (keep existing logic for hybridSearchEnabled, selectedDocumentId, classificationsToSend, bingSearchEnabled, imageGenEnabled)
   let hybridSearchEnabled = false;
   const sdbtn = document.getElementById("search-documents-btn");
@@ -491,6 +494,7 @@ export function actuallySendMessage(finalMessageToSend) {
       image_generation: imageGenEnabled,
       doc_scope: docScopeSelect ? docScopeSelect.value : "all",
       active_group_id: window.activeGroupId,
+      model_deployment: modelDeployment
     }),
   })
     .then((response) => {

@@ -99,6 +99,46 @@ def get_valid_access_token(scopes=None):
         # This might happen if the cache was cleared or the user logged in differently
         return None # Cannot acquire token without an account context
     
+def get_video_indexer_account_token(settings, video_id=None):
+    """
+    For ARM-based VideoIndexer accounts:
+    1) Acquire an ARM token with DefaultAzureCredential
+    2) POST to the ARM generateAccessToken endpoint
+    3) Return the account-level accessToken
+    """
+    # 1) ARM token
+    arm_scope = "https://management.azure.com/.default"
+    credential = DefaultAzureCredential()
+    arm_token = credential.get_token(arm_scope).token
+    print("[VIDEO] ARM token acquired", flush=True)
+
+    # 2) Call the generateAccessToken API
+    rg       = settings["video_indexer_resource_group"]
+    sub      = settings["video_indexer_subscription_id"]
+    acct     = settings["video_indexer_account_name"]
+    api_ver  = settings.get("video_indexer_arm_api_version", "2021-11-10-preview")
+    url      = (
+        f"https://management.azure.com/subscriptions/{sub}"
+        f"/resourceGroups/{rg}"
+        f"/providers/Microsoft.VideoIndexer/accounts/{acct}"
+        f"/generateAccessToken?api-version={api_ver}"
+    )
+    body = {
+        "permissionType": "Contributor",
+        "scope": "Account"
+    }
+    if video_id:
+        body["videoId"] = video_id
+
+    resp = requests.post(
+        url,
+        json=body,
+        headers={"Authorization": f"Bearer {arm_token}"}
+    )
+    resp.raise_for_status()
+    ai = resp.json().get("accessToken")
+    print(f"[VIDEO] Account token acquired (len={len(ai)})", flush=True)
+    return ai
 
 def login_required(f):
     @wraps(f)

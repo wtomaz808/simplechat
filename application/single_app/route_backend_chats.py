@@ -28,6 +28,7 @@ def register_route_backend_chats(app):
         image_gen_enabled = data.get('image_generation')
         document_scope = data.get('doc_scope')
         active_group_id = data.get('active_group_id')
+        frontend_gpt_model = data.get('model_deployment')
         
         search_query = user_message # <--- ADD THIS LINE (Initialize search_query)
         hybrid_citations_list = [] # <--- ADD THIS LINE (Initialize hybrid list)
@@ -80,6 +81,14 @@ def register_route_backend_chats(app):
                     gpt_model = selected_gpt_model['deploymentName']
                 else:
                     # Fallback or raise error if no model selected/configured
+                    raise ValueError("No GPT model selected or configured.")
+
+                if frontend_gpt_model:
+                    gpt_model = frontend_gpt_model
+                elif gpt_model_obj and gpt_model_obj.get('selected'):
+                    selected_gpt_model = gpt_model_obj['selected'][0]
+                    gpt_model = selected_gpt_model['deploymentName']
+                else:
                     raise ValueError("No GPT model selected or configured.")
 
                 if auth_type == 'managed_identity':
@@ -311,7 +320,7 @@ def register_route_backend_chats(app):
                 search_args = {
                     "query": search_query,
                     "user_id": user_id,
-                    "top_n": 10,
+                    "top_n": 20,
                     "doc_scope": document_scope,
                     "active_group_id": active_group_id
                 }
