@@ -22,7 +22,7 @@ const promptSelectionContainer = document.getElementById(
   "prompt-selection-container"
 );
 const chatbox = document.getElementById("chatbox");
-const modelSelect       = document.getElementById("model-select");
+const modelSelect = document.getElementById("model-select");
 
 function createCitationsHtml(
   hybridCitations = [],

@@ -20,6 +20,10 @@ import openpyxl
 import xlrd
 import traceback
 import subprocess
+import ffmpeg_binaries as ffmpeg_bin
+ffmpeg_bin.init()
+import ffmpeg as ffmpeg_py
+import glob
 
 from flask import (
     Flask, 
@@ -32,7 +36,8 @@ from flask import (
     session, 
     send_from_directory, 
     send_file, 
-    Markup
+    Markup,
+    current_app
 )
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
@@ -53,6 +58,7 @@ from langchain_text_splitters import (
 )
 from PIL import Image
 from io import BytesIO
+from typing import List
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -61,6 +67,8 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.search.documents import SearchClient, IndexDocumentsBatch
 from azure.search.documents.models import VectorizedQuery
+from azure.search.documents.indexes import SearchIndexClient
+from azure.search.documents.indexes.models import SearchIndex, SearchField, SearchFieldDataType
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError, ServiceRequestError
 from azure.core.polling import LROPoller
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
@@ -78,7 +86,7 @@ executor.init_app(app)
 
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['VERSION'] = '0.212.026'
+app.config['VERSION'] = '0.212.078'
 Session(app)
 
 CLIENTS = {}
@@ -380,9 +388,9 @@ def initialize_clients(settings):
         try:
             if enable_enhanced_citations:
                 CLIENTS["storage_account_office_docs_client"] = BlobServiceClient.from_connection_string(settings.get("office_docs_storage_account_url"))
-                if enable_video_file_support:
-                    CLIENTS["storage_account_video_files_client"] = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
-                if enable_audio_file_support:
-                    CLIENTS["storage_account_audio_files_client"] = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
+                # if enable_video_file_support:
+                #     CLIENTS["storage_account_video_files_client"] = BlobServiceClient.from_connection_string(settings.get("video_files_storage_account_url"))
+                # if enable_audio_file_support:
+                #     CLIENTS["storage_account_audio_files_client"] = BlobServiceClient.from_connection_string(settings.get("audio_files_storage_account_url"))
         except Exception as e:
             print(f"Failed to initialize Blob Storage clients: {e}")

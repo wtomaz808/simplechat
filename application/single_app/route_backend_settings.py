@@ -6,6 +6,105 @@ from functions_authentication import *
 from functions_settings import *
 
 def register_route_backend_settings(app):
+    @app.route('/api/admin/settings/check_index_fields', methods=['POST'])
+    @login_required
+    @admin_required
+    def check_index_fields():
+        data     = request.get_json(force=True)
+        idx_type = data.get('indexType')  # 'user' or 'group'
+
+        # load your golden JSON
+        fname = f'ai_search-index-{idx_type}.json'
+        fpath = os.path.join(current_app.root_path, 'static', 'json', fname)
+        with open(fpath,'r') as f:
+            expected = json.load(f)
+
+        client  = get_index_client()
+        current = client.get_index(expected['name'])
+
+        existing_names   = { fld.name        for fld in current.fields }
+        expected_names   = { fld['name']      for fld in expected['fields'] }
+        missing          = sorted(expected_names - existing_names)
+
+        return jsonify({ 'missingFields': missing }), 200
+
+
+    @app.route('/api/admin/settings/fix_index_fields', methods=['POST'])
+    @login_required
+    @admin_required
+    def fix_index_fields():
+        try:
+            data     = request.get_json(force=True)
+            idx_type = data.get('indexType')  # 'user' or 'group'
+
+            # load your “golden” JSON schema
+            json_name = f'ai_search-index-{idx_type}.json'
+            json_path = os.path.join(current_app.root_path, 'static', 'json', json_name)
+            with open(json_path, 'r') as f:
+                full_def = json.load(f)
+
+            client    = get_index_client()
+            index_obj = client.get_index(full_def['name'])
+
+            existing_names = {fld.name for fld in index_obj.fields}
+            missing_defs   = [fld for fld in full_def['fields'] if fld['name'] not in existing_names]
+
+            if not missing_defs:
+                return jsonify({'status': 'nothingToAdd'}), 200
+
+            new_fields = []
+            for fld in missing_defs:
+                name = fld['name']
+                ftype = fld['type']  # e.g. "Edm.String" or "Collection(Edm.Single)"
+
+                if ftype.lower() == "collection(edm.single)":
+                    # Vector field: hardcode dimensions if missing, pass profile name
+                    dims = fld.get('dimensions', 1536)
+                    vp   = fld.get('vectorSearchProfile')
+                    new_fields.append(
+                        SearchField(
+                            name=name,
+                            type=ftype,
+                            searchable=True,
+                            filterable=False,
+                            retrievable=True,
+                            sortable=False,
+                            facetable=False,
+                            vector_search_dimensions=dims,
+                            vector_search_profile_name=vp
+                        )
+                    )
+                else:
+                    # Regular field: mirror the JSON props
+                    new_fields.append(
+                        SearchField(
+                            name=name,
+                            type=ftype,
+                            searchable=fld.get('searchable', False),
+                            filterable=fld.get('filterable', False),
+                            retrievable=fld.get('retrievable', True),
+                            sortable=fld.get('sortable', False),
+                            facetable=fld.get('facetable', False),
+                            key=fld.get('key', False),
+                            analyzer_name=fld.get('analyzer'),
+                            index_analyzer_name=fld.get('indexAnalyzer'),
+                            search_analyzer_name=fld.get('searchAnalyzer'),
+                            normalizer_name=fld.get('normalizer'),
+                            synonym_map_names=fld.get('synonymMaps', [])
+                        )
+                    )
+
+            # append the new fields, bypass ETag checks, and update
+            index_obj.fields.extend(new_fields)
+            index_obj.etag = "*"
+            client.create_or_update_index(index_obj)
+
+            added = [f.name for f in new_fields]
+            return jsonify({ 'status': 'success', 'added': added }), 200
+
+        except Exception as e:
+            return jsonify({ 'error': str(e) }), 500
+    
     @app.route('/api/admin/settings/test_connection', methods=['POST'])
     @login_required
     @admin_required
@@ -49,7 +148,27 @@ def register_route_backend_settings(app):
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+    
+def get_index_client() -> SearchIndexClient:
+    """
+    Returns a SearchIndexClient wired up based on:
+      - enable_ai_search_apim
+      - azure_ai_search_authentication_type (managed_identity vs key)
+      - and the various endpoint & key settings.
+    """
+    settings = get_settings()
 
+    if settings.get("enable_ai_search_apim", False):
+        endpoint = settings["azure_apim_ai_search_endpoint"].rstrip("/")
+        credential = AzureKeyCredential(settings["azure_apim_ai_search_subscription_key"])
+    else:
+        endpoint = settings["azure_ai_search_endpoint"].rstrip("/")
+        if settings.get("azure_ai_search_authentication_type", "key") == "managed_identity":
+            credential = DefaultAzureCredential()
+        else:
+            credential = AzureKeyCredential(settings["azure_ai_search_key"])
+
+    return SearchIndexClient(endpoint=endpoint, credential=credential)
 
 def _test_gpt_connection(payload):
     """Attempt to connect to GPT using ephemeral settings from the admin UI."""
