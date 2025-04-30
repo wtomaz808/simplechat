@@ -643,7 +643,7 @@ def update_document(**kwargs):
                         chunk_updates['document_classification'] = existing_document.get('document_classification')
 
                     if chunk_updates: # Only call update if there's something to change
-                         update_chunk_metadata(chunk['id'], user_id, document_id, **chunk_updates)
+                         update_chunk_metadata(chunk_id=chunk['id'], user_id=user_id, document_id=document_id, group_id=group_id, **chunk_updates)
                 add_file_task_to_file_processing_log(
                     document_id=document_id, 
                     user_id=group_id if is_group else user_id,
@@ -1663,10 +1663,11 @@ def extract_document_metadata(document_id, user_id, group_id=None):
         print(f"Error processing Hybrid search for document {document_id}: {e}")
         search_results = "No Hybrid results"
 
+    gpt_model = settings.get('metadata_extraction_model')
+
     # --- Step 5: Prepare GPT Client ---
     if enable_gpt_apim:
         # APIM-based GPT client
-        gpt_model = settings.get('azure_apim_gpt_deployment')
         gpt_client = AzureOpenAI(
             api_version=settings.get('azure_apim_gpt_api_version'),
             azure_endpoint=settings.get('azure_apim_gpt_endpoint'),
@@ -1690,12 +1691,6 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                 azure_endpoint=settings.get('azure_openai_gpt_endpoint'),
                 api_key=settings.get('azure_openai_gpt_key')
             )
-
-        # Retrieve the selected deployment name if provided
-        gpt_model_obj = settings.get('gpt_model', {})
-        if gpt_model_obj and gpt_model_obj.get('selected'):
-            selected_gpt_model = gpt_model_obj['selected'][0]
-            gpt_model = selected_gpt_model['deploymentName']
 
     # --- Step 6: GPT Prompt and JSON Parsing ---
     try:
@@ -2679,6 +2674,152 @@ def process_di_document(document_id, user_id, temp_file_path, original_filename,
 
     return total_final_chunks_processed
 
+# --- Audio transcription support ---
+def _get_content_type(path: str) -> str:
+    ext = os.path.splitext(path)[1].lower()
+    mapping = {
+        '.wav': 'audio/wav',
+        '.mp3': 'audio/mpeg',
+        '.m4a': 'audio/mp4',
+        '.mp4': 'audio/mp4'
+    }
+    return mapping.get(ext, 'application/octet-stream')
+
+
+def _split_audio_file(input_path: str, chunk_seconds: int = 540) -> List[str]:
+    """
+    Splits `input_path` into WAV segments of length `chunk_seconds` seconds,
+    writing files like input_chunk_000.wav.
+    Returns the list of generated WAV chunk file paths.
+    Each chunk is re-encoded to PCM WAV (16kHz) for compatibility.
+    """
+    base, _ = os.path.splitext(input_path)
+    pattern = f"{base}_chunk_%03d.wav"
+
+    try:
+        (
+            ffmpeg_py
+            .input(input_path)
+            .output(
+                pattern,
+                acodec='pcm_s16le',
+                ar='16000',
+                f='segment',
+                segment_time=chunk_seconds,
+                reset_timestamps=1,
+                map='0'
+            )
+            .run(quiet=True, overwrite_output=True)
+        )
+    except Exception as e:
+        print(f"[Error] FFmpeg segmentation to WAV failed for '{input_path}': {e}")
+        raise RuntimeError(f"Segmentation failed: {e}")
+
+    chunks = sorted(glob.glob(f"{base}_chunk_*.wav"))
+    if not chunks:
+        print(f"[Error] No WAV chunks produced for '{input_path}'.")
+        raise RuntimeError(f"No chunks produced by ffmpeg for file '{input_path}'")
+    print(f"[Debug] Produced {len(chunks)} WAV chunks: {chunks}")
+    return chunks
+
+
+def process_audio_document(
+    document_id: str,
+    user_id: str,
+    temp_file_path: str,
+    original_filename: str,
+    update_callback,
+    group_id=None
+) -> int:
+    """Transcribe an audio file via Azure Speech, splitting >10 min into WAV chunks."""
+
+    settings = get_settings()
+    if settings.get("enable_enhanced_citations", False):
+        update_callback(status="Uploading audio for enhanced citations…")
+        blob_path = upload_to_blob(
+            temp_file_path,
+            user_id,
+            document_id,
+            original_filename,
+            update_callback,
+            group_id
+        )
+        update_callback(status=f"Enhanced citations: audio at {blob_path}")
+
+
+    # 1) size guard
+    file_size = os.path.getsize(temp_file_path)
+    print(f"[Debug] File size: {file_size} bytes")
+    if file_size > 300 * 1024 * 1024:
+        raise ValueError("Audio exceeds 300 MB limit.")
+
+    # 2) split to WAV chunks
+    update_callback(status="Preparing audio for transcription…")
+    chunk_paths = _split_audio_file(temp_file_path, chunk_seconds=540)
+
+    # 3) transcribe each WAV chunk
+    settings = get_settings()
+    endpoint = settings.get("speech_service_endpoint", "").rstrip('/')
+    key = settings.get("speech_service_key", "")
+    locale = settings.get("speech_service_locale", "en-US")
+    url = f"{endpoint}/speechtotext/transcriptions:transcribe?api-version=2024-11-15"
+
+    all_phrases: List[str] = []
+    for idx, chunk_path in enumerate(chunk_paths, start=1):
+        update_callback(current_file_chunk=idx, status=f"Transcribing chunk {idx}/{len(chunk_paths)}…")
+        print(f"[Debug] Transcribing WAV chunk: {chunk_path}")
+
+        with open(chunk_path, 'rb') as audio_f:
+            files = {
+                'audio': (os.path.basename(chunk_path), audio_f, 'audio/wav'),
+                'definition': (None, json.dumps({'locales':[locale]}), 'application/json')
+            }
+            headers = {'Ocp-Apim-Subscription-Key': key}
+            resp = requests.post(url, headers=headers, files=files)
+        try:
+            resp.raise_for_status()
+        except Exception as e:
+            print(f"[Error] HTTP error for {chunk_path}: {e}")
+            raise
+
+        result = resp.json()
+        phrases = result.get('combinedPhrases', [])
+        print(f"[Debug] Received {len(phrases)} phrases")
+        all_phrases += [p.get('text','').strip() for p in phrases if p.get('text')]
+
+    # 4) cleanup WAV chunks
+    for p in chunk_paths:
+        try:
+            os.remove(p)
+            print(f"[Debug] Removed chunk: {p}")
+        except Exception as e:
+            print(f"[Warning] Could not remove chunk {p}: {e}")
+
+    # 5) stitch and save transcript chunks
+    full_text = ' '.join(all_phrases).strip()
+    words = full_text.split()
+    chunk_size = 400
+    total_pages = max(1, math.ceil(len(words) / chunk_size))
+    print(f"[Debug] Creating {total_pages} transcript pages")
+
+    for i in range(total_pages):
+        page_text = ' '.join(words[i*chunk_size:(i+1)*chunk_size])
+        update_callback(current_file_chunk=i+1, status=f"Saving transcript chunk {i+1}/{total_pages}…")
+        save_chunks(
+            page_text_content=page_text,
+            page_number=i+1,
+            file_name=original_filename,
+            user_id=user_id,
+            document_id=document_id,
+            group_id=group_id
+        )
+
+    update_callback(number_of_pages=total_pages, status="Audio transcription complete", percentage_complete=100, current_file_chunk=None)
+    print("[Info] Audio transcription complete")
+    return total_pages
+
+
+
 def process_document_upload_background(document_id, user_id, temp_file_path, original_filename, group_id=None):
     """
     Main background task dispatcher for document processing.
@@ -2692,6 +2833,7 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
     max_file_size_bytes = settings.get('max_file_size_mb', 16) * 1024 * 1024
 
     video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.flv')
+    audio_extensions = ('.mp3', '.wav', '.ogg', '.aac', '.flac', '.m4a')
 
     # --- Define update_document callback wrapper ---
     # This makes it easier to pass the update function to helpers without repeating args
@@ -2760,6 +2902,15 @@ def process_document_upload_background(document_id, user_id, temp_file_path, ori
             total_chunks_saved = process_tabular(**args)
         elif file_ext in video_extensions:
             total_chunks_saved = process_video_document(
+                document_id=document_id,
+                user_id=user_id,
+                temp_file_path=temp_file_path,
+                original_filename=original_filename,
+                update_callback=update_doc_callback,
+                group_id=group_id
+            )
+        elif file_ext in audio_extensions:
+            total_chunks_saved = process_audio_document(
                 document_id=document_id,
                 user_id=user_id,
                 temp_file_path=temp_file_path,

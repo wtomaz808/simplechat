@@ -1158,6 +1158,122 @@ if (videoSupportToggle && videoIndexerDiv) {
   });
 }
 
+// --- Speech Service Settings toggle ---
+const audioSupportToggle  = document.getElementById('enable_audio_file_support');
+const audioServiceDiv     = document.getElementById('audio_service_settings');
+if (audioSupportToggle && audioServiceDiv) {
+  // initial visibility
+  audioServiceDiv.style.display = audioSupportToggle.checked ? 'block' : 'none';
+  audioSupportToggle.addEventListener('change', () => {
+    audioServiceDiv.style.display = audioSupportToggle.checked ? 'block' : 'none';
+  });
+}
+
+// Metadata Extraction UI
+const extractToggle = document.getElementById('enable_extract_meta_data');
+const extractModelDiv = document.getElementById('metadata_extraction_model_settings');
+const extractSelect   = document.getElementById('metadata_extraction_model');
+
+function populateExtractionModels() {
+  // remember previously chosen value
+  const prev = extractSelect.getAttribute('data-prev') || '';
+
+  // clear out old options
+  extractSelect.innerHTML = '';
+
+  if (document.getElementById('enable_gpt_apim').checked) {
+    // use comma-separated APIM deployments
+    const text = document.getElementById('azure_apim_gpt_deployment').value || '';
+    text.split(',')
+        .map(s => s.trim())
+        .filter(s => s)
+        .forEach(d => {
+          const opt = new Option(d, d);
+          extractSelect.add(opt);
+        });
+  } else {
+    // use direct GPT selected deployments
+    (window.gptSelected || []).forEach(m => {
+      const label = `${m.deploymentName} (${m.modelName})`;
+      const opt = new Option(label, m.deploymentName);
+      extractSelect.add(opt);
+    });
+  }
+
+  // restore previous
+  extractSelect.value = prev;
+}
+
+if (extractToggle) {
+  // show/hide the model dropdown
+  extractModelDiv.style.display = extractToggle.checked ? 'block' : 'none';
+  extractToggle.addEventListener('change', () => {
+    extractModelDiv.style.display = extractToggle.checked ? 'block' : 'none';
+  });
+}
+
+// when APIM‐toggle flips, repopulate
+const apimToggle = document.getElementById('enable_gpt_apim');
+if (apimToggle) {
+  apimToggle.addEventListener('change', populateExtractionModels);
+}
+
+// on load, stash previous & populate
+document.addEventListener('DOMContentLoaded', () => {
+  if (extractSelect) {
+    extractSelect.setAttribute('data-prev', extractSelect.value);
+    populateExtractionModels();
+  }
+});
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    ['user','group'].forEach(type => {
+      const warnDiv     = document.getElementById(`index-warning-${type}`);
+      const missingSpan = document.getElementById(`missing-fields-${type}`);
+      const fixBtn      = document.getElementById(`fix-${type}-index-btn`);
+  
+      // 1) check for missing fields
+      fetch('/api/admin/settings/check_index_fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ indexType: type })
+      })
+      .then(r => r.json())
+      .then(({ missingFields }) => {
+        if (missingFields?.length) {
+          missingSpan.textContent = missingFields.join(', ');
+          warnDiv.style.display   = 'block';
+        }
+      })
+      .catch(err => console.error(`Error checking ${type} index:`, err));
+  
+      // 2) wire up the “fix” button
+      fixBtn.addEventListener('click', () => {
+        fixBtn.disabled = true;
+        fetch('/api/admin/settings/fix_index_fields', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ indexType: type })
+        })
+        .then(r => r.json())
+        .then(resp => {
+          if (resp.status === 'success') {
+            window.location.reload();
+          } else {
+            alert(`Failed to fix ${type} index: ${resp.error}`);
+            fixBtn.disabled = false;
+          }
+        })
+        .catch(err => {
+          alert(`Error fixing ${type} index: ${err}`);
+          fixBtn.disabled = false;
+        });
+      });
+    });
+  });
+  
+
 togglePassword('toggle_gpt_key', 'azure_openai_gpt_key');
 togglePassword('toggle_embedding_key', 'azure_openai_embedding_key');
 togglePassword('toggle_image_gen_key', 'azure_openai_image_gen_key');
@@ -1179,3 +1295,4 @@ togglePassword('toggle_office_conn_str', 'office_docs_storage_account_url');
 togglePassword('toggle_video_conn_str', 'video_files_storage_account_url');
 togglePassword('toggle_audio_conn_str', 'audio_files_storage_account_url');
 togglePassword('toggle_video_indexer_api_key', 'video_indexer_api_key');
+togglePassword('toggle_speech_service_key', 'speech_service_key');

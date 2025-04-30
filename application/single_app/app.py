@@ -95,6 +95,7 @@ def favicon():
 def acceptable_use_policy():
     return render_template('acceptable_use_policy.html')
 
+
 # =================== Front End Routes ===================
 # ------------------- User Authentication Routes ---------
 register_route_frontend_authentication(app)

@@ -145,14 +145,27 @@
                     <div class="flex-shrink-0">
                         <label for="model-select" class="visually-hidden">Model</label>
                         <select id="model-select" class="form-select">
-                        {% for m in settings.gpt_model.selected %}
-                            <option 
-                            value="{{ m.deploymentName }}" 
-                            {% if m.deploymentName == settings.gpt_model.selected[0].deploymentName %}selected{% endif %}
-                            >
-                            {{ m.modelName }}
+                        {% if settings.enable_gpt_apim %}
+                            {# when using APIM, azure_apim_gpt_deployment may be "dep1" or "dep1,dep2,…" #}
+                            {% set raw = settings.azure_apim_gpt_deployment or "" %}
+                            {% set apim_list = raw.split(',') %}
+                            {% for dep in apim_list %}
+                            {% set d = dep.strip() %}
+                            <option value="{{ d }}" {% if loop.first %}selected{% endif %}>
+                                {{ d }}
                             </option>
-                        {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            {# normal direct-Azure OpenAI flow: show whatever you fetched into settings.gpt_model.selected #}
+                            {% for model in settings.gpt_model.selected %}
+                            <option
+                                value="{{ model.deploymentName }}"
+                                {% if loop.first %}selected{% endif %}
+                            >
+                                {{ model.modelName }}
+                            </option>
+                            {% endfor %}
+                        {% endif %}
                         </select>
                     </div>
 

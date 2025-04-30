@@ -278,7 +278,7 @@ def register_route_frontend_admin_settings(app):
                 'conversation_history_limit': conversation_history_limit,
                 'default_system_prompt': form_data.get('default_system_prompt', '').strip(),
 
-                # Video Indexer
+                # Video file settings with Azure Video Indexer Settings
                 'video_indexer_endpoint': form_data.get('video_indexer_endpoint', 'https://api.videoindexer.ai').strip(),
                 'video_indexer_location': form_data.get('video_indexer_location', '').strip(),
                 'video_indexer_account_id': form_data.get('video_indexer_account_id', '').strip(),
@@ -287,7 +287,15 @@ def register_route_frontend_admin_settings(app):
                 'video_indexer_subscription_id': form_data.get('video_indexer_subscription_id', '').strip(),
                 'video_indexer_account_name': form_data.get('video_indexer_account_name', '').strip(),
                 'video_indexer_arm_api_version': form_data.get('video_indexer_arm_api_version', '2021-11-10-preview').strip(),
-                'video_index_timeout': int(form_data.get('video_index_timeout', 600))
+                'video_index_timeout': int(form_data.get('video_index_timeout', 600)),
+
+                # Audio file settings with Azure speech service
+                'speech_service_endpoint': form_data.get('speech_service_endpoint', '').strip(),
+                'speech_service_location': form_data.get('speech_service_location', '').strip(),
+                'speech_service_locale': form_data.get('speech_service_locale', '').strip(),
+                'speech_service_key': form_data.get('speech_service_key', '').strip(),
+
+                'metadata_extraction_model': form_data.get('metadata_extraction_model', '').strip(),
             }
             
             logo_file = request.files.get('logo_file')

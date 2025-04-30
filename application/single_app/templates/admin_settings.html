@@ -38,6 +38,19 @@
 {% endblock %}
 
 {% block content %}
+<div id="index-warning-user" class="alert alert-warning" style="display:none;">
+    <strong>⚠️ User-index schema mismatch:</strong>
+    Missing fields: <span id="missing-fields-user"></span>
+    <button id="fix-user-index-btn" class="btn btn-sm btn-primary ms-2">Add missing user-fields</button>
+</div>
+  
+<div id="index-warning-group" class="alert alert-warning" style="display:none;">
+    <strong>⚠️ Group-index schema mismatch:</strong>
+    Missing fields: <span id="missing-fields-group"></span>
+    <button id="fix-group-index-btn" class="btn btn-sm btn-primary ms-2">Add missing group-fields</button>
+</div>
+  
+
 
 <div class="container">
     <h2>Admin Settings</h2>
@@ -689,20 +702,6 @@
                         </label>
                     </div>
 
-                    
-                    <div class="form-group form-check form-switch mb-3">
-                        <input
-                            type="checkbox"
-                            class="form-check-input"
-                            id="enable_audio_file_support"
-                            name="enable_audio_file_support"
-                            {% if settings.enable_audio_file_support %}checked{% endif %}
-                        >
-                        <label class="form-check-label ms-2" for="enable_audio_file_support">
-                            Enable Audio File Support
-                        </label>
-                    </div>
-
                     <div id="video_indexer_settings" class="card mb-3 p-3"
                             {% if not settings.enable_video_file_support %}style="display: none;"{% endif %}>
                         <h5>Video Indexer Settings</h5>
@@ -776,6 +775,57 @@
                         </div>
                     </div>
 
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_audio_file_support"
+                            name="enable_audio_file_support"
+                            {% if settings.enable_audio_file_support %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_audio_file_support">
+                            Enable Audio File Support
+                        </label>
+                    </div>
+
+                    <div id="audio_service_settings" class="card mb-3 p-3"
+                            {% if not settings.enable_audio_file_support %}style="display: none;"{% endif %}>
+                        <h5>Speech Service Settings</h5>
+                        <p class="text-muted">Configure Azure Speech Service for audio transcription & embedding.</p>
+
+                        <div class="mb-3">
+                            <label for="speech_service_endpoint" class="form-label">Endpoint</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_endpoint" name="speech_service_endpoint"
+                                value="{{ settings.speech_service_endpoint or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_location" class="form-label">Location</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_location" name="speech_service_location"
+                                value="{{ settings.speech_service_location or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_locale" class="form-label">Locale</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_locale" name="speech_service_locale"
+                                value="{{ settings.speech_service_locale or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_key" class="form-label">API Key</label>
+                            <div class="input-group">
+                            <input type="password" class="form-control"
+                                    id="speech_service_key" name="speech_service_key"
+                                    value="{{ settings.speech_service_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="toggle_speech_service_key">Show</button>
+                            </div>
+                        </div>
+                    </div>
+
 
                     <p class="mt-2 mb-0">
                         <small class="text-muted">
@@ -788,23 +838,46 @@
                 </div>
 
                 <div class="card mb-3 p-3">
-                    
-                     <h5>Metadata Extraction</h5>
+                    <h5>Metadata Extraction</h5>
                     <p class="text-muted">
-                        Enable this to automatically parse and store file metadata for advanced indexing and search.
+                      Enable this to automatically parse and store file metadata for advanced indexing and search.
                     </p>
-                    <div class="form-group form-check form-switch mb-3">
-                        <input
-                            type="checkbox"
-                            class="form-check-input"
-                            id="enable_extract_meta_data"
-                            name="enable_extract_meta_data"
-                            {% if settings.enable_extract_meta_data %}checked{% endif %}>
-                        <label class="form-check-label ms-2" for="enable_extract_meta_data">
-                            Enable Extract Meta Data
-                        </label>
+                    <div class="form-check form-switch mb-3">
+                      <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="enable_extract_meta_data"
+                        name="enable_extract_meta_data"
+                        {% if settings.enable_extract_meta_data %}checked{% endif %}>
+                      <label class="form-check-label ms-2" for="enable_extract_meta_data">
+                        Enable Extract Meta Data
+                      </label>
+                    </div>
+                  
+                    <div id="metadata_extraction_model_settings" class="mb-3"
+                         {% if not settings.enable_extract_meta_data %}style="display: none;"{% endif %}>
+                      <label for="metadata_extraction_model" class="form-label">Extraction Model</label>
+                      <select class="form-select" id="metadata_extraction_model" name="metadata_extraction_model"
+                              data-prev="{{ settings.metadata_extraction_model or '' }}">
+                        {% if settings.enable_gpt_apim %}
+                          {% for d in (settings.azure_apim_gpt_deployment or '').split(',') if d %}
+                            <option value="{{ d }}"
+                              {% if settings.metadata_extraction_model == d %}selected{% endif %}>
+                              {{ d }}
+                            </option>
+                          {% endfor %}
+                        {% else %}
+                          {% for m in settings.gpt_model.selected %}
+                            <option value="{{ m.deploymentName }}"
+                              {% if settings.metadata_extraction_model == m.deploymentName %}selected{% endif %}>
+                              {{ m.deploymentName }} ({{ m.modelName }})
+                            </option>
+                          {% endfor %}
+                        {% endif %}
+                      </select>
                     </div>
                 </div>
+                  
 
                 
                 <div class="card mb-3 p-3">
@@ -873,8 +946,9 @@
                 <div class="card p-3">
                     <h5>Enhanced Citations</h5>
                     <p class="text-muted mb-2">
-                        Enable Enhanced Citation to store files (Office, Video, Audio) in a Storage Account,
-                        and show direct references (timestamps for video/audio, direct file references, etc.).
+                        Enable Enhanced Citation to store files in a Storage Account,
+                        and show direct references (Preview feature, files are saved to storage, presentation 
+                        layer will be available in a future release).
                     </p>
 
                     
@@ -895,7 +969,7 @@
                     <div id="enhanced_citation_settings" style="display: none;">
                         
                         <div class="card mb-3 p-3">
-                            <h6><strong>Office Documents</strong></h6>
+                            <h6><strong>All filetypes</strong></h6>
                             <div class="mb-3">
                                 <label for="office_docs_storage_account_url" class="form-label">
                                     Storage Account Connection String
@@ -916,7 +990,7 @@
                         </div>
 
                         
-                        <div class="card mb-3 p-3">
+                        <!-- <div class="card mb-3 p-3">
                             <h6><strong>Video Files</strong></h6>
                             {% if settings.enable_video_file_support %}
                                 
@@ -991,7 +1065,7 @@
                                     </small>
                                 </p>
                             {% endif %}
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>

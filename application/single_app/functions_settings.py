@@ -78,6 +78,7 @@ def get_settings():
 
         # Metadata Extraction
         'enable_extract_meta_data': False,
+        'metadata_extraction_model': '',
         'enable_summarize_content_history_for_search': False,
         'number_of_historical_messages_to_summarize': 10,
         'enable_summarize_content_history_beyond_conversation_history_limit': False,
@@ -146,7 +147,7 @@ def get_settings():
         'default_system_prompt': '',
         'enable_file_processing_logs': True,
 
-        # Video Indexer Settings
+        # Video file settings with Azure Video Indexer Settings
         'video_indexer_endpoint': 'https://api.videoindexer.ai',
         'video_indexer_location': '',
         'video_indexer_account_id': '',
@@ -155,7 +156,13 @@ def get_settings():
         'video_indexer_subscription_id': '',
         'video_indexer_account_name': '',
         'video_indexer_arm_api_version': '2021-11-10-preview',
-        'video_index_timeout': 600
+        'video_index_timeout': 600,
+
+        # Audio file settings with Azure speech service
+        "speech_service_endpoint": "https://eastus.api.cognitive.microsoft.com",
+        "speech_service_location": "eastus",
+        "speech_service_locale": "en-US",
+        "speech_service_key": ""
     }
 
     try:
