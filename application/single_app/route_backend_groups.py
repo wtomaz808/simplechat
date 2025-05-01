@@ -28,7 +28,7 @@ def register_route_backend_groups(app):
         show_all = (show_all_str == "true")
 
         query = "SELECT * FROM c WHERE c.type = 'group' or NOT IS_DEFINED(c.type)"
-        all_items = list(groups_container.query_items(
+        all_items = list(cosmos_groups_container.query_items(
             query=query,
             enable_cross_partition_query=True
         ))
@@ -59,35 +59,73 @@ def register_route_backend_groups(app):
     @user_required
     @enabled_required("enable_group_workspaces")
     def api_list_groups():
+        """
+        Returns the user's groups with server-side pagination and search.
+        Query Parameters:
+            page (int): Page number (default: 1).
+            page_size (int): Items per page (default: 10).
+            search (str): Search term for group name/description.
+        """
         user_info = get_current_user_info()
         user_id = user_info["userId"]
-                
-        user_settings_data = get_user_settings(user_id)
-        db_active_group_id = user_settings_data["settings"].get("activeGroupOid", "")
 
-        search_query = request.args.get("search", "")
-        if search_query:
-            results = search_groups(search_query, user_id)
-        else:
-            results = get_user_groups(user_id)
+        try:
+            # --- Pagination Parameters ---
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 10))
+            if page < 1: page = 1
+            if page_size < 1: page_size = 10
+            offset = (page - 1) * page_size
 
-        mapped = []
-        for g in results:
-            role = get_user_role_in_group(g, user_id)
-            mapped.append({
-                "id": g["id"],
-                "name": g["name"],
-                "description": g.get("description", ""),
-                "userRole": role,
-                "isActive": (g["id"] == db_active_group_id)
-            })
+            # --- Search Parameter ---
+            search_query = request.args.get("search", "").strip()
 
-        return jsonify(mapped), 200
+            # --- Fetch ALL relevant groups first ---
+            # The existing functions get all groups for the user or filtered by search
+            # We'll do pagination *after* getting the full relevant list.
+            if search_query:
+                # Assuming search_groups returns all groups for the user matching the query
+                all_matching_groups = search_groups(search_query, user_id)
+            else:
+                # Assuming get_user_groups returns all groups for the user
+                all_matching_groups = get_user_groups(user_id)
+
+            # --- Calculate total count and apply pagination ---
+            total_count = len(all_matching_groups)
+            paginated_groups = all_matching_groups[offset : offset + page_size]
+
+            # --- Get active group ID ---
+            user_settings_data = get_user_settings(user_id)
+            db_active_group_id = user_settings_data["settings"].get("activeGroupOid", "")
+
+            # --- Map results ---
+            mapped_results = []
+            for g in paginated_groups:
+                role = get_user_role_in_group(g, user_id)
+                mapped_results.append({
+                    "id": g["id"],
+                    "name": g.get("name", "Untitled Group"), # Provide default name
+                    "description": g.get("description", ""),
+                    "userRole": role,
+                    "isActive": (g["id"] == db_active_group_id)
+                })
+
+            return jsonify({
+                "groups": mapped_results,
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count
+            }), 200
+
+        except Exception as e:
+            print(f"Error in api_list_groups: {str(e)}")
+            return jsonify({"error": f"An error occurred while fetching your groups: {str(e)}"}), 500
 
 
     @app.route("/api/groups", methods=["POST"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_create_group():
         """
@@ -123,6 +161,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["DELETE"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_delete_group(group_id):
         """
@@ -146,6 +185,7 @@ def register_route_backend_groups(app):
     @app.route("/api/groups/<group_id>", methods=["PATCH", "PUT"])
     @login_required
     @user_required
+    @create_group_role_required
     @enabled_required("enable_group_workspaces")
     def api_update_group(group_id):
         """
@@ -172,7 +212,7 @@ def register_route_backend_groups(app):
         group_doc["description"] = description
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
         try:
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
         except exceptions.CosmosHttpResponseError as ex:
             return jsonify({"error": str(ex)}), 400
 
@@ -203,7 +243,7 @@ def register_route_backend_groups(app):
         if not role:
             return jsonify({"error": "You are not a member of this group"}), 403
 
-        update_active_group_for_user(user_id, group_id)
+        update_active_group_for_user(group_id)
 
         return jsonify({"message": f"Active group set to {group_id}"}), 200
 
@@ -240,7 +280,7 @@ def register_route_backend_groups(app):
         })
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": "Membership request created"}), 201
 
@@ -313,7 +353,7 @@ def register_route_backend_groups(app):
 
         group_doc["pendingUsers"] = pending_list
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": msg}), 200
 
@@ -355,7 +395,7 @@ def register_route_backend_groups(app):
         group_doc["users"].append(new_member_doc)
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
 
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
         return jsonify({"message": "Member added"}), 200
 
     @app.route("/api/groups/<group_id>/members/<member_id>", methods=["DELETE"])
@@ -398,7 +438,7 @@ def register_route_backend_groups(app):
                 group_doc["documentManagers"].remove(member_id)
 
             group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
 
             if removed:
                 return jsonify({"message": "You have left the group"}), 200
@@ -428,7 +468,7 @@ def register_route_backend_groups(app):
                 group_doc["documentManagers"].remove(member_id)
 
             group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-            groups_container.upsert_item(group_doc)
+            cosmos_groups_container.upsert_item(group_doc)
 
             if removed:
                 return jsonify({"message": "User removed"}), 200
@@ -480,7 +520,7 @@ def register_route_backend_groups(app):
             pass
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": f"User {member_id} updated to {new_role}"}), 200
 
@@ -603,7 +643,7 @@ def register_route_backend_groups(app):
             group_doc["documentManagers"].remove(old_owner_id)
 
         group_doc["modifiedDate"] = datetime.utcnow().isoformat()
-        groups_container.upsert_item(group_doc)
+        cosmos_groups_container.upsert_item(group_doc)
 
         return jsonify({"message": "Ownership transferred successfully"}), 200
 
@@ -635,7 +675,7 @@ def register_route_backend_groups(app):
         """
         params = [{ "name": "@groupId", "value": group_id }]
 
-        result_iter = group_documents_container.query_items(
+        result_iter = cosmos_group_documents_container.query_items(
             query=query,
             parameters=params,
             enable_cross_partition_query=True

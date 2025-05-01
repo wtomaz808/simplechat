@@ -1,5 +1,3 @@
-<!-- templates/admin_settings.html -->
-
 {% extends "base.html" %}
 {% block title %}
     Admin Settings - {{ app_settings.app_title }}
@@ -7,19 +5,71 @@
 
 {% block head %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplemde/dist/simplemde.min.css">
+    <style>
+        /* Style for the color swatch in the table */
+        .color-swatch-container {
+            display: flex;
+            align-items: center;
+        }
+        .color-input-swatch {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        /* Hide the actual color input visually but keep it functional */
+        .classification-color-input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            padding: 0;
+            border: none;
+            position: absolute;
+        }
+         /* Ensure table cells have consistent vertical alignment */
+        #classification-categories-tbody td {
+            vertical-align: middle;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
+<div id="index-warning-user" class="alert alert-warning" style="display:none;">
+    <strong>⚠️ User-index schema mismatch:</strong>
+    Missing fields: <span id="missing-fields-user"></span>
+    <button id="fix-user-index-btn" class="btn btn-sm btn-primary ms-2">Add missing user-fields</button>
+</div>
+  
+<div id="index-warning-group" class="alert alert-warning" style="display:none;">
+    <strong>⚠️ Group-index schema mismatch:</strong>
+    Missing fields: <span id="missing-fields-group"></span>
+    <button id="fix-group-index-btn" class="btn btn-sm btn-primary ms-2">Add missing group-fields</button>
+</div>
+  
+
 
 <div class="container">
     <h2>Admin Settings</h2>
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="admin-settings-form">
         <p class="text-muted">Use this form to configure the administrative settings for your application.</p>
-        <p class="text-muted">Version: {{ config['VERSION'] }}</p>
+        <p class="text-muted">
+            Version: {{ config['VERSION'] }}
+            {% if update_available %}
+                <span class="ms-2 badge bg-warning text-dark align-middle"> 
+                    New version available, v{{ latest_version }}.
+                    <a href="{{ download_url }}" target="_blank" rel="noopener noreferrer" class="link-primary text-decoration-underline">Download here</a>.
+                </span>
+            {% endif %}
+        </p>
         <button type="submit" class="btn btn-primary mt-3 mb-3">Save Settings</button>
 
-        <!-- Nav Tabs -->
+        
         <ul class="nav nav-tabs" id="adminSettingsTab" role="tablist">
+            
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general"
                     type="button" role="tab" aria-controls="general" aria-selected="true">
@@ -45,9 +95,15 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="Workspaces" data-bs-toggle="tab" data-bs-target="#workspaces" type="button"
+                <button class="nav-link" id="workspaces-tab" data-bs-toggle="tab" data-bs-target="#workspaces" type="button"
                     role="tab" aria-controls="workspaces" aria-selected="false">
                     Workspaces
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="citation-tab" data-bs-toggle="tab" data-bs-target="#citation"
+                    type="button" role="tab" aria-controls="citation" aria-selected="false">
+                    Citations
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -70,12 +126,13 @@
             </li>
         </ul>
 
-        <!-- Tab Panes -->
+        
         <div class="tab-content mt-3" id="adminSettingsTabContent">
 
-            <!-- GENERAL TAB -->
+            
             <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure general application settings, including the application’s title, logo, and landing page text.
                 </p>
                 <div class="card p-3 mb-3">
@@ -95,12 +152,12 @@
                     </div>
                 </div>
 
-                <!-- Landing Page Text card -->
+                
                 <div class="card p-3">
-                    <label class="form-label fw-bold">Landing Page Text (Markdown)</label>
+                    <h5>Page Text (Markdown)</h5>
                     <p class="text-muted mb-1">You can either edit the text in a Markdown editor or switch to a preview mode.</p>
 
-                    <!-- Toggle for enabling the editor vs. viewing Markdown preview -->
+                    
                     <div class="form-check form-switch mb-3">
                         <input
                             class="form-check-input"
@@ -114,7 +171,7 @@
                         </label>
                     </div>
 
-                    <!-- The text area that SimpleMDE will attach to -->
+                    
                     <div id="landingPageEditorContainer" style="display: none;">
                         <textarea
                             class="form-control"
@@ -124,7 +181,7 @@
                         >{{ settings.landing_page_text }}</textarea>
                     </div>
 
-                    <!-- A read-only container for rendered markdown preview -->
+                    
                     <div
                         id="landingPageMarkdownPreview"
                         class="p-2 border rounded"
@@ -133,9 +190,10 @@
                 </div>
             </div>
 
-            <!-- GPT TAB -->
+            
             <div class="tab-pane fade" id="gpt" role="tabpanel" aria-labelledby="gpt-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure your GPT model settings. These are used for generating AI text responses.
                 </p>
 
@@ -196,13 +254,13 @@
                         </div>
                         <div class="mb-3">
                             <div id="gpt_models_list" class="mt-2 mb-3">
-                                <!-- Dynamically show the "all" models returned from /api/models/gpt -->
+                                
                             </div>
-                            <!-- Hidden input that will store the final "selected" GPT JSON -->
+                            
                             <input type="hidden" name="gpt_model_json" id="gpt_model_json" />
 
-                            <!-- Also hidden input for the actual selected deployment name -->
-                            <input type="hidden" id="gpt_model" value="" />
+                            
+                            <input type="hidden" id="gpt_model" value="{{ settings.gpt_model.selected[0].deploymentName if settings.gpt_model.selected else '' }}" />
 
                             <button type="button" class="btn btn-secondary" id="fetch_gpt_models_btn">
                                 Fetch GPT Models
@@ -263,9 +321,10 @@
                 <div id="test_gpt_result" class="mt-2"></div>
             </div>
 
-            <!-- EMBEDDINGS TAB -->
+            
             <div class="tab-pane fade" id="embeddings" role="tabpanel" aria-labelledby="embeddings-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure your embeddings settings. These are used for semantic search, knowledge-base lookups, etc.
                 </p>
 
@@ -298,8 +357,7 @@
                                     Key
                                 </option>
                                 <option value="managed_identity" {% if
-                                    settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{%
-                                    endif %}>
+                                    settings.azure_openai_embedding_authentication_type=='managed_identity' %}selected{% endif %}>
                                     Managed Identity
                                 </option>
                             </select>
@@ -332,15 +390,15 @@
                         </div>
                         <div class="mb-3">
                             <div id="embedding_models_list" class="mt-2 mb-3">
-                                <!-- Dynamically show the "all" models returned from /api/models/embedding -->
+                                
                             </div>
-                            <!-- Hidden input that will store the final "selected" Embedding JSON -->
+                            
                             <input type="hidden" name="embedding_model_json" id="embedding_model_json" />
 
-                            <!-- Also hidden input for the actual selected deployment name -->
-                            <input type="hidden" id="embedding_model" value="" />
+                            
+                            <input type="hidden" id="embedding_model" value="{{ settings.embedding_model.selected[0].deploymentName if settings.embedding_model.selected else '' }}" />
 
-                            <!-- FETCH Embedding MODELS Button -->
+                            
                             <button type="button" class="btn btn-secondary" id="fetch_embedding_models_btn">
                                 Fetch Embedding Models
                             </button>
@@ -404,9 +462,10 @@
                 <div id="test_embedding_result" class="mt-2"></div>
             </div>
 
-            <!-- IMAGE GENERATION TAB -->
+            
             <div class="tab-pane fade" id="image-gen" role="tabpanel" aria-labelledby="image-gen-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure image generation settings. Enable/disable, set endpoints, and choose a model.
                 </p>
 
@@ -484,15 +543,15 @@
                             </div>
                             <div class="mb-3">
                                 <div id="image_models_list" class="mt-2 mb-3">
-                                    <!-- Dynamically show the "all" models returned from /api/models/embedding -->
+                                    
                                 </div>
-                                <!-- Hidden input that will store the final "selected" model JSON -->
+                                
                                 <input type="hidden" name="image_gen_model_json" id="image_gen_model_json" />
 
-                                <!-- Also hidden input for the actual selected deployment name -->
-                                <input type="hidden" id="image_gen_model" value="" />
+                                
+                                <input type="hidden" id="image_gen_model" value="{{ settings.image_gen_model.selected[0].deploymentName if settings.image_gen_model.selected else '' }}" />
 
-                                <!-- FETCH Image Generation MODELS Button -->
+                                
                                 <button type="button" class="btn btn-secondary" id="fetch_image_models_btn">
                                     Fetch Image Generation Models
                                 </button>
@@ -559,21 +618,22 @@
                 <div id="test_image_result" class="mt-2"></div>
             </div>
 
-            <!-- WORKSPACES TAB -->
+            
             <div class="tab-pane fade" id="workspaces" role="tabpanel" aria-labelledby="workspaces-tab">
                 <p class="text-muted">
-                    Configure workspace settings. Enable or disable workspaces and set the default workspace.
+                    Configure workspace settings like personal/group access, multimedia support, metadata, and document classification.
                 </p>
+
                 
-                <!-- Card for "Enable Your Workspace" -->
                 <div class="card mb-3 p-3">
+                    
                     <h5>Enable Your Workspace</h5>
                     <p class="text-muted">
                         Turn this on to allow access and management of your personal workspace.
                     </p>
                     <div class="form-group form-check form-switch mb-3">
-                        <input type="checkbox" 
-                            class="form-check-input" 
+                        <input type="checkbox"
+                            class="form-check-input"
                             id="enable_user_workspace"
                             name="enable_user_workspace"
                             {% if settings.enable_user_workspace %}checked{% endif %}>
@@ -583,15 +643,16 @@
                     </div>
                 </div>
 
-                <!-- Card for "Enable My Groups (includes Group Workspaces)" -->
-                <div class="card p-3">
+               
+               <div class="card mb-3 p-3">
+                    
                     <h5>Enable My Groups (includes Group Workspaces)</h5>
                     <p class="text-muted">
-                        Turn this on to allow access and management of group workspaces, as well as group collaboration.
+                        Turn this on to allow access and management of group workspaces, as well as group collaboration features.
                     </p>
                     <div class="form-group form-check form-switch mb-3">
-                        <input type="checkbox" 
-                            class="form-check-input" 
+                        <input type="checkbox"
+                            class="form-check-input"
                             id="enable_group_workspaces"
                             name="enable_group_workspaces"
                             {% if settings.enable_group_workspaces %}checked{% endif %}>
@@ -599,19 +660,426 @@
                             Enable My Groups (includes Group Workspaces)
                         </label>
                     </div>
+
+                    
+                    <div id="create_group_permission_setting" {% if not settings.enable_group_workspaces %}style="display: none;"{% endif %}>
+                        <hr> 
+                        <div class="form-group form-check form-switch mb-2">
+                            <input type="checkbox"
+                                class="form-check-input"
+                                id="require_member_of_create_group"
+                                name="require_member_of_create_group"
+                                {% if settings.require_member_of_create_group %}checked{% endif %}>
+                            <label class="form-check-label ms-2" for="require_member_of_create_group">
+                                Require Membership to Create Groups
+                            </label>
+                        </div>
+                        <p class="text-muted small mb-0">
+                            If enabled, only users who are members of the 'CreateGroups' role (defined in your App registration) can create new groups. If disabled, any authenticated user can create groups (provided 'Enable My Groups' is active).
+                        </p>
+                    </div>
+                    
+                </div>
+
+                <div class="card mb-3 p-3">
+                    
+                     <h5>Multimedia Support</h5>
+                    <p class="text-muted mb-2">
+                        Support video and audio file upload for transcription, indexing, and embedding.
+                    </p>
+
+                    
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_video_file_support"
+                            name="enable_video_file_support"
+                            {% if settings.enable_video_file_support %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_video_file_support">
+                            Enable Video File Support
+                        </label>
+                    </div>
+
+                    <div id="video_indexer_settings" class="card mb-3 p-3"
+                            {% if not settings.enable_video_file_support %}style="display: none;"{% endif %}>
+                        <h5>Video Indexer Settings</h5>
+                        <p class="text-muted">Configure Azure Video Indexer for transcription & indexing.</p>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_endpoint" class="form-label">Endpoint</label>
+                            <input type="text" readonly class="form-control"
+                                id="video_indexer_endpoint" name="video_indexer_endpoint"
+                                value="{{ settings.video_indexer_endpoint or 'https://api.videoindexer.ai' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_arm_api_version" class="form-label">ARM API Version</label>
+                            <input type="text" readonly class="form-control"
+                                id="video_indexer_arm_api_version" name="video_indexer_arm_api_version"
+                                value="{{ settings.video_indexer_arm_api_version or '2021-11-10-preview' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_location" class="form-label">Location</label>
+                            <input type="text" class="form-control"
+                                id="video_indexer_location" name="video_indexer_location"
+                                value="{{ settings.video_indexer_location or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_account_id" class="form-label">Account ID</label>
+                            <input type="text" class="form-control"
+                                id="video_indexer_account_id" name="video_indexer_account_id"
+                                value="{{ settings.video_indexer_account_id or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_api_key" class="form-label">API Key</label>
+                            <div class="input-group">
+                            <input type="password" class="form-control"
+                                    id="video_indexer_api_key" name="video_indexer_api_key"
+                                    value="{{ settings.video_indexer_api_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="toggle_video_indexer_api_key">Show</button>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_resource_group" class="form-label">Resource Group</label>
+                            <input type="text" class="form-control"
+                                id="video_indexer_resource_group" name="video_indexer_resource_group"
+                                value="{{ settings.video_indexer_resource_group or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_subscription_id" class="form-label">Subscription ID</label>
+                            <input type="text" class="form-control"
+                                id="video_indexer_subscription_id" name="video_indexer_subscription_id"
+                                value="{{ settings.video_indexer_subscription_id or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_indexer_account_name" class="form-label">Account Name</label>
+                            <input type="text" class="form-control"
+                                id="video_indexer_account_name" name="video_indexer_account_name"
+                                value="{{ settings.video_indexer_account_name or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="video_index_timeout" class="form-label">Timeout (seconds)</label>
+                            <input type="number" class="form-control"
+                                id="video_index_timeout" name="video_index_timeout"
+                                value="{{ settings.video_index_timeout or 600 }}">
+                        </div>
+                    </div>
+
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_audio_file_support"
+                            name="enable_audio_file_support"
+                            {% if settings.enable_audio_file_support %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_audio_file_support">
+                            Enable Audio File Support
+                        </label>
+                    </div>
+
+                    <div id="audio_service_settings" class="card mb-3 p-3"
+                            {% if not settings.enable_audio_file_support %}style="display: none;"{% endif %}>
+                        <h5>Speech Service Settings</h5>
+                        <p class="text-muted">Configure Azure Speech Service for audio transcription & embedding.</p>
+
+                        <div class="mb-3">
+                            <label for="speech_service_endpoint" class="form-label">Endpoint</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_endpoint" name="speech_service_endpoint"
+                                value="{{ settings.speech_service_endpoint or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_location" class="form-label">Location</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_location" name="speech_service_location"
+                                value="{{ settings.speech_service_location or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_locale" class="form-label">Locale</label>
+                            <input type="text" class="form-control"
+                                id="speech_service_locale" name="speech_service_locale"
+                                value="{{ settings.speech_service_locale or '' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="speech_service_key" class="form-label">API Key</label>
+                            <div class="input-group">
+                            <input type="password" class="form-control"
+                                    id="speech_service_key" name="speech_service_key"
+                                    value="{{ settings.speech_service_key or '' }}">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="toggle_speech_service_key">Show</button>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <p class="mt-2 mb-0">
+                        <small class="text-muted">
+                            <a href="#citation" onclick="switchTab(event, 'citation-tab')">
+                                Enhanced Citations
+                            </a>
+                             will dramatically improve the citation experience for video and audio files.
+                        </small>
+                    </p>
+                </div>
+
+                <div class="card mb-3 p-3">
+                    <h5>Metadata Extraction</h5>
+                    <p class="text-muted">
+                      Enable this to automatically parse and store file metadata for advanced indexing and search.
+                    </p>
+                    <div class="form-check form-switch mb-3">
+                      <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="enable_extract_meta_data"
+                        name="enable_extract_meta_data"
+                        {% if settings.enable_extract_meta_data %}checked{% endif %}>
+                      <label class="form-check-label ms-2" for="enable_extract_meta_data">
+                        Enable Extract Meta Data
+                      </label>
+                    </div>
+                  
+                    <div id="metadata_extraction_model_settings" class="mb-3"
+                         {% if not settings.enable_extract_meta_data %}style="display: none;"{% endif %}>
+                      <label for="metadata_extraction_model" class="form-label">Extraction Model</label>
+                      <select class="form-select" id="metadata_extraction_model" name="metadata_extraction_model"
+                              data-prev="{{ settings.metadata_extraction_model or '' }}">
+                        {% if settings.enable_gpt_apim %}
+                          {% for d in (settings.azure_apim_gpt_deployment or '').split(',') if d %}
+                            <option value="{{ d }}"
+                              {% if settings.metadata_extraction_model == d %}selected{% endif %}>
+                              {{ d }}
+                            </option>
+                          {% endfor %}
+                        {% else %}
+                          {% for m in settings.gpt_model.selected %}
+                            <option value="{{ m.deploymentName }}"
+                              {% if settings.metadata_extraction_model == m.deploymentName %}selected{% endif %}>
+                              {{ m.deploymentName }} ({{ m.modelName }})
+                            </option>
+                          {% endfor %}
+                        {% endif %}
+                      </select>
+                    </div>
+                </div>
+                  
+
+                
+                <div class="card mb-3 p-3">
+                    <h5>Document Classification</h5>
+                    <p class="text-muted">
+                        Enable this feature to allow users to classify documents uploaded to their workspaces using predefined categories.
+                    </p>
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_document_classification"
+                            name="enable_document_classification"
+                            {% if settings.enable_document_classification %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="enable_document_classification">
+                            Enable Document Classification
+                        </label>
+                    </div>
+
+                    
+                    <div id="document_classification_settings" {% if not settings.enable_document_classification %}style="display: none;"{% endif %}>
+                        <h6>Classification Categories</h6>
+                        <p class="text-muted small">Define the labels and corresponding colors for document classification.</p>
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50%;">Label</th>
+                                    <th style="width: 30%;">Color</th>
+                                    <th style="width: 20%;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classification-categories-tbody">
+                                
+                            </tbody>
+                        </table>
+                        <button type="button" id="add-classification-btn" class="btn btn-success btn-sm mt-2">
+                            <i class="bi bi-plus-circle"></i> Add New Category
+                        </button>
+                        
+                        <input type="hidden" name="document_classification_categories_json" id="document_classification_categories_json">
+                    </div>
+                </div>
+                
+
+            </div>
+
+            
+            <div class="tab-pane fade" id="citation" role="tabpanel" aria-labelledby="citation-tab">
+                
+                 <p class="text-muted">
+                    Configure standard and enhanced citations features for your and group workspaces.
+                </p>
+
+                
+                <div class="card p-3 mb-3">
+                    <h5>Standard Citations</h5>
+                    <p class="text-muted">
+                        Standard citations is always enabled for both Your Workspace and Group Workspace.
+                    </p>
+                    <p class="mb-0">
+                        Users can see text content of the source/citation for documents.
+                    </p>
+                </div>
+
+                
+                <div class="card p-3">
+                    <h5>Enhanced Citations</h5>
+                    <p class="text-muted mb-2">
+                        Enable Enhanced Citation to store files in a Storage Account,
+                        and show direct references (Preview feature, files are saved to storage, presentation 
+                        layer will be available in a future release).
+                    </p>
+
+                    
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_enhanced_citations"
+                            name="enable_enhanced_citations"
+                            {% if settings.enable_enhanced_citations %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_enhanced_citations">
+                            Enable Enhanced Citations
+                        </label>
+                    </div>
+
+                    
+                    <div id="enhanced_citation_settings" style="display: none;">
+                        
+                        <div class="card mb-3 p-3">
+                            <h6><strong>All filetypes</strong></h6>
+                            <div class="mb-3">
+                                <label for="office_docs_storage_account_url" class="form-label">
+                                    Storage Account Connection String
+                                </label>
+                                
+                                <div class="input-group">
+                                    <input
+                                        type="password" 
+                                        class="form-control"
+                                        id="office_docs_storage_account_url"
+                                        name="office_docs_storage_account_url"
+                                        value="{{ settings.office_docs_storage_account_url or '' }}"
+                                    >
+                                    <button type="button" class="btn btn-outline-secondary" id="toggle_office_conn_str">Show</button>
+                                </div>
+                                
+                            </div>
+                        </div>
+
+                        
+                        <!-- <div class="card mb-3 p-3">
+                            <h6><strong>Video Files</strong></h6>
+                            {% if settings.enable_video_file_support %}
+                                
+                                <div class="mb-3">
+                                    <label for="video_files_storage_account_url" class="form-label">
+                                        Storage Account Connection String
+                                    </label>
+                                    
+                                    <div class="input-group">
+                                        <input
+                                            type="password" 
+                                            class="form-control"
+                                            id="video_files_storage_account_url"
+                                            name="video_files_storage_account_url"
+                                            value="{{ settings.video_files_storage_account_url or '' }}"
+                                        >
+                                        <button type="button" class="btn btn-outline-secondary" id="toggle_video_conn_str">Show</button>
+                                    </div>
+                                    
+                                </div>
+                            {% else %}
+                                
+                                <p class="text-danger mb-1">
+                                    Video support is currently disabled in the Workspaces tab.
+                                </p>
+                                <p class="mt-2 mb-0">
+                                    <small class="text-muted">
+                                        Reference:
+                                        <a href="#workspaces" onclick="switchTab(event, 'workspaces-tab')">
+                                            Enable Video File Support
+                                        </a>
+                                        (see the Workspaces tab)
+                                    </small>
+                                </p>
+                            {% endif %}
+                        </div>
+
+                        
+                        <div class="card mb-3 p-3">
+                            <h6><strong>Audio Files</strong></h6>
+                            {% if settings.enable_audio_file_support %}
+                                
+                                <div class="mb-3">
+                                    <label for="audio_files_storage_account_url" class="form-label">
+                                        Storage Account Connection String
+                                    </label>
+                                    
+                                    <div class="input-group">
+                                        <input
+                                            type="password" 
+                                            class="form-control"
+                                            id="audio_files_storage_account_url"
+                                            name="audio_files_storage_account_url"
+                                            value="{{ settings.audio_files_storage_account_url or '' }}"
+                                        >
+                                        <button type="button" class="btn btn-outline-secondary" id="toggle_audio_conn_str">Show</button>
+                                    </div>
+                                    
+                                </div>
+                            {% else %}
+                                
+                                <p class="text-danger mb-1">
+                                    Audio support is currently disabled in the Workspaces tab.
+                                </p>
+                                <p class="mt-2 mb-0">
+                                    <small class="text-muted">
+                                        Reference:
+                                        <a href="#workspaces" onclick="switchTab(event, 'workspaces-tab')">
+                                            Enable Audio File Support
+                                        </a>
+                                        (see the Workspaces tab)
+                                    </small>
+                                </p>
+                            {% endif %}
+                        </div> -->
+                    </div>
                 </div>
             </div>
 
-
-            <!-- SAFETY TAB -->
+            
             <div class="tab-pane fade" id="safety" role="tabpanel" aria-labelledby="safety-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure content safety, archiving, and user feedback settings. If Content Safety is enabled, user
                     messages will be sent to the safety endpoint for analysis. If User Feedback is enabled, users will see
                     thumbs up/down to provide feedback on AI responses.
                 </p>
                 <div class="card p-3 mb-3">
-                    <!-- ENABLE CONTENT SAFETY -->
+                    
                     <h5>Content Safety</h5>
                     <p class="text-muted">Enable content safety to filter out inappropriate content.</p>
                     <div class="form-group form-check form-switch mb-3">
@@ -627,11 +1095,11 @@
                         </label>
                     </div>
 
-                    <!-- CONTENT SAFETY DETAILS - Shown/Hidden based on toggle -->
+                    
                     <div id="content_safety_settings"
                          {% if not settings.enable_content_safety %}style="display: none;"{% endif %}>
+
                         
-                        <!-- APIM toggle for Content Safety -->
                         <div class="form-group form-check form-switch mb-3 d-flex align-items-center">
                             <input
                                 type="checkbox"
@@ -645,7 +1113,7 @@
                             </label>
                         </div>
 
-                        <!-- Non-APIM fields (hidden if APIM is enabled) -->
+                        
                         <div id="non_apim_content_safety_settings"
                              {% if settings.enable_content_safety_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
@@ -696,7 +1164,7 @@
                             </div>
                         </div>
 
-                        <!-- APIM fields (hidden if APIM is disabled) -->
+                        
                         <div id="apim_content_safety_settings"
                              {% if not settings.enable_content_safety_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
@@ -740,8 +1208,8 @@
                         <div id="test_safety_result" class="mt-2"></div>
                     </div>
                 </div>
+
                 
-                <!-- ENABLE USER FEEDBACK -->
                 <div class="card p-3 mb-3">
                     <h5>User Feedback</h5>
                     <p class="text-muted">Enable user feedback (thumbs up/down) for AI responses.</p>
@@ -758,17 +1226,54 @@
                         </label>
                     </div>
                 </div>
+                
+                
+                <div class="card p-3 mb-3">
+                    <h5>Admin Access Permissions</h5>
+                    <p class="text-muted">Control which users can access specific administrative views related to safety and feedback.</p>
 
-                <!-- CONVERSATION ARCHIVING -->
+                    
+                    <div class="form-group form-check form-switch mb-2">
+                        <input type="checkbox"
+                            class="form-check-input"
+                            id="require_member_of_safety_violation_admin"
+                            name="require_member_of_safety_violation_admin"
+                            {% if settings.require_member_of_safety_violation_admin %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="require_member_of_safety_violation_admin">
+                            Require Membership for Safety Violation Admin View
+                        </label>
+                    </div>
+                     <p class="text-muted small mb-3">
+                        If enabled, only users who are members of the 'SafetyViolationAdmin' role (defined in your App registration) can access the Safety Violations admin page. If disabled, any user with the general 'Admin' role can access it.
+                    </p>
+
+                    
+                    <div class="form-group form-check form-switch mb-2">
+                        <input type="checkbox"
+                            class="form-check-input"
+                            id="require_member_of_feedback_admin"
+                            name="require_member_of_feedback_admin"
+                            {% if settings.require_member_of_feedback_admin %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="require_member_of_feedback_admin">
+                            Require Membership for Feedback Admin View
+                        </label>
+                    </div>
+                     <p class="text-muted small mb-0">
+                        If enabled, only users who are members of the 'FeedbackAdmin' role (defined in your App registration) can access the User Feedback admin page. If disabled, any user with the general 'Admin' role can access it. Requires 'Enable User Feedback' to be active.
+                    </p>
+                </div>
+                
+                
+                
                 <div class="card p-3 mb-3">
                     <h5>Conversation Archiving</h5>
                     <p class="text-muted">When enabled, conversation deletions will be archived instead of permanently deleted.</p>
                     <div class="form-group form-check form-switch mb-3">
-                        <input 
-                            type="checkbox" 
-                            class="form-check-input" 
-                            id="enable_conversation_archiving" 
-                            name="enable_conversation_archiving" 
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_conversation_archiving"
+                            name="enable_conversation_archiving"
                             {% if settings.enable_conversation_archiving %}checked{% endif %}
                         >
                         <label class="form-check-label ms-2" for="enable_conversation_archiving">
@@ -778,13 +1283,14 @@
                 </div>
             </div>
 
-            <!-- SEARCH AND EXTRACT TAB -->
+            
             <div class="tab-pane fade" id="search-extract" role="tabpanel" aria-labelledby="search-extract-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Configure Bing Web Search, Azure AI Search, and Document Intelligence settings.
                 </p>
 
-                <!-- BING WEB SEARCH -->
+                
                 <div class="card p-3 mb-3">
                     <h5>Bing Web Search</h5>
                     <p class="text-muted">
@@ -803,10 +1309,10 @@
                         </label>
                     </div>
 
-                    <!-- Hide Bing fields if not enabled -->
+                    
                     <div id="web_search_settings" {% if not settings.enable_web_search %}style="display: none;"{% endif %}>
 
-                        <!-- APIM toggle for Bing Web Search -->
+                        
                         <div class="form-group form-check form-switch mb-3 d-flex align-items-center">
                             <input
                                 type="checkbox"
@@ -820,7 +1326,7 @@
                             </label>
                         </div>
 
-                        <!-- Non-APIM fields -->
+                        
                         <div id="non_apim_web_search_settings" {% if settings.enable_web_search_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="bing_search_key" class="form-label">Bing Search Key</label>
@@ -843,7 +1349,7 @@
                             </div>
                         </div>
 
-                        <!-- APIM fields -->
+                        
                         <div id="apim_web_search_settings" {% if not settings.enable_web_search_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="azure_apim_web_search_endpoint" class="form-label">
@@ -887,7 +1393,7 @@
                     </div>
                 </div>
 
-                <!-- AZURE AI SEARCH -->
+                
                 <div class="card p-3 mb-3">
                     <h5>Azure AI Search</h5>
                     <p class="text-muted">
@@ -905,9 +1411,9 @@
                             Use APIM instead of direct Azure AI Search
                         </label>
                     </div>
-                    
+
                     <div>
-                        <!-- Non-APIM fields -->
+                        
                         <div id="non_apim_ai_search_settings" {% if settings.enable_ai_search_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="azure_ai_search_endpoint" class="form-label">Search Endpoint</label>
@@ -952,8 +1458,8 @@
                                 </div>
                             </div>
                         </div>
-                    
-                        <!-- APIM fields -->
+
+                        
                         <div id="apim_ai_search_settings" {% if not settings.enable_ai_search_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="azure_apim_ai_search_endpoint" class="form-label">
@@ -989,12 +1495,12 @@
                                 </div>
                             </div>
                         </div>
-                    
-                        <!-- Make the button the same style as Web Search -->
-                        <button 
-                            type="button" 
-                            class="btn btn-secondary mt-3" 
-                            style="width: auto;" 
+
+                        
+                        <button
+                            type="button"
+                            class="btn btn-secondary mt-3"
+                            style="width: auto;"
                             id="test_azure_ai_search_button"
                         >
                             Test Azure AI Search Connection
@@ -1002,8 +1508,8 @@
                         <div id="test_azure_ai_search_result" class="mt-2"></div>
                     </div>
                 </div>
+
                 
-                <!-- AZURE DOCUMENT INTELLIGENCE (no enable/disable toggle) -->
                 <div class="card p-3 mb-3">
                     <h5>Document Intelligence</h5>
                     <p class="text-muted">
@@ -1021,9 +1527,9 @@
                             Use APIM instead of direct Document Intelligence endpoint
                         </label>
                     </div>
-                    
+
                     <div>
-                        <!-- Non-APIM fields -->
+                        
                         <div id="non_apim_document_intelligence_settings" {% if settings.enable_document_intelligence_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="azure_document_intelligence_endpoint" class="form-label">
@@ -1072,8 +1578,8 @@
                                 </div>
                             </div>
                         </div>
-                    
-                        <!-- APIM fields -->
+
+                        
                         <div id="apim_document_intelligence_settings" {% if not settings.enable_document_intelligence_apim %}style="display: none;"{% endif %}>
                             <div class="mb-3">
                                 <label for="azure_apim_document_intelligence_endpoint" class="form-label">
@@ -1109,12 +1615,12 @@
                                 </div>
                             </div>
                         </div>
-                    
-                        <!-- Match the style of the Web Search button -->
-                        <button 
-                            type="button" 
-                            class="btn btn-secondary mt-3" 
-                            style="width: auto;" 
+
+                        
+                        <button
+                            type="button"
+                            class="btn btn-secondary mt-3"
+                            style="width: auto;"
                             id="test_azure_doc_intelligence_button"
                         >
                             Test Document Intelligence Connection
@@ -1124,9 +1630,10 @@
                 </div>
             </div>
 
-            <!-- OTHER TAB -->
+            
             <div class="tab-pane fade" id="other" role="tabpanel" aria-labelledby="other-tab">
-                <p class="text-muted">
+                
+                 <p class="text-muted">
                     Miscellaneous or rarely changed settings, such as maximum file size, conversation history limits,
                     etc.
                 </p>
@@ -1149,8 +1656,29 @@
                             rows="5">{{ settings.default_system_prompt }}</textarea>
                     </div>
                 </div>
+
+                <div class="card mb-3 p-3">
+                    <h5>File Processing Logs</h5>
+                    <p class="text-muted mb-2">
+                        Enable logging of file processing events for debugging and auditing purposes. Logs are stored in the file_processing container in cosmos.
+                    </p>
+
+                    
+                    <div class="form-group form-check form-switch mb-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="enable_file_processing_logs"
+                            name="enable_file_processing_logs"
+                            {% if settings.enable_file_processing_logs %}checked{% endif %}
+                        >
+                        <label class="form-check-label ms-2" for="enable_file_processing_logs">
+                            Enable File Processing Logs
+                        </label>
+                    </div>
+                </div>
             </div>
-        </div>
+        </div> 
     </form>
 </div>
 {% endblock %}
@@ -1158,9 +1686,9 @@
 {% block scripts %}
 
 <script src="https://cdn.jsdelivr.net/npm/simplemde@1.11.2/dist/simplemde.min.js"></script>
-
 <script>
-    // We’ll store the SimpleMDE instance globally so we can destroy or read its content
+    // Existing SimpleMDE script...
+     // We’ll store the SimpleMDE instance globally so we can destroy or read its content
     let simplemde = null;
 
     // Grab references to the toggle, the editor container, and the preview container
@@ -1194,7 +1722,7 @@
         if (simplemde) {
             landingPageMarkdownPreview.innerHTML = simplemde.markdown(simplemde.value());
         } else {
-            // If for some reason simplemde is null (e.g., user never toggled on?), 
+            // If for some reason simplemde is null (e.g., user never toggled on?),
             // just show raw text
             landingPageMarkdownPreview.innerHTML = document.getElementById("landing_page_text_editor").value;
         }
@@ -1218,15 +1746,24 @@
 </script>
 
 <script>
-    // Prepopulate model arrays from server
-    window.gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}');
-    window.gptAll = JSON.parse('{{ settings.gpt_model.all|tojson()|safe }}');
+    // Prepopulate model arrays and classification data from server
+    window.gptSelected = JSON.parse('{{ settings.gpt_model.selected|tojson()|safe }}' || '[]');
+    window.gptAll      = JSON.parse('{{ settings.gpt_model.all|tojson()|safe }}' || '[]');
 
-    window.embeddingSelected = JSON.parse('{{ settings.embedding_model.selected|tojson()|safe }}');
-    window.embeddingAll = JSON.parse('{{ settings.embedding_model.all|tojson()|safe }}');
+    window.embeddingSelected = JSON.parse('{{ settings.embedding_model.selected|tojson()|safe }}' || '[]');
+    window.embeddingAll      = JSON.parse('{{ settings.embedding_model.all|tojson()|safe }}' || '[]');
 
-    window.imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}');
-    window.imageAll = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}');
+    window.imageSelected = JSON.parse('{{ settings.image_gen_model.selected|tojson()|safe }}' || '[]');
+    window.imageAll      = JSON.parse('{{ settings.image_gen_model.all|tojson()|safe }}' || '[]');
+
+    // *** NEW: Classification Data ***
+    window.classificationCategories = JSON.parse('{{ settings.document_classification_categories|tojson(indent=None)|safe }}' || '[]');
+    // Ensure it's always an array
+    if (!Array.isArray(window.classificationCategories)) {
+        window.classificationCategories = [];
+    }
+    window.enableDocumentClassification = "{{ enable_document_classification }}";
+
 </script>
-<script src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/admin_settings.js') }}"></script>
 {% endblock %}

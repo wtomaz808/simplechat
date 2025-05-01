@@ -12,7 +12,7 @@ def get_suggestions(query):
     if not bing_key:
         return []
 
-    autosuggest_url = f"{BING_SEARCH_ENDPOINT}/v7.0/suggestions"
+    autosuggest_url = f"{bing_search_endpoint}/v7.0/suggestions"
     headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query}
     response = requests.get(autosuggest_url, headers=headers, params=params)
@@ -20,7 +20,7 @@ def get_suggestions(query):
     suggestions = response.json()["suggestionGroups"][0]["searchSuggestions"]
     return [s["displayText"] for s in suggestions]
 
-def get_search_results(query, top_n=5):
+def get_search_results(query, top_n=10):
     settings = get_settings()
     if not settings.get('enable_web_search'):
         return []
@@ -29,7 +29,7 @@ def get_search_results(query, top_n=5):
     if not bing_key:
         return []
 
-    search_url = f"{BING_SEARCH_ENDPOINT}/v7.0/search"
+    search_url = f"{bing_search_endpoint}/v7.0/search"
     headers = {"Ocp-Apim-Subscription-Key": bing_key}
     params = {"q": query, "count": top_n}
     response = requests.get(search_url, headers=headers, params=params)
@@ -38,7 +38,7 @@ def get_search_results(query, top_n=5):
     return [{"name": r["name"], "url": r["url"], "snippet": r["snippet"]} for r in results]
 
 
-def process_query_with_bing_and_llm(user_query):
+def process_query_with_bing_and_llm(user_query, top_n=10):
     print(f"Original Query: {user_query}")
     suggestions = get_suggestions(user_query)
     if suggestions:
@@ -48,7 +48,7 @@ def process_query_with_bing_and_llm(user_query):
         refined_query = user_query
         print("No suggestions available. Using the original query.")
 
-    search_results = get_search_results(refined_query, top_n=5)
+    search_results = get_search_results(refined_query, top_n=top_n)
     print(f"Search Results: {search_results}")
 
     return search_results

@@ -1,46 +1,76 @@
 # route_frontend_authentication.py
 
 from config import *
+from functions_authentication import _build_msal_app, _load_cache, _save_cache
 
 def register_route_frontend_authentication(app):
     @app.route('/login')
     def login():
-        msal_app = ConfidentialClientApplication(
-            CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET
-        )
+        # Clear potentially stale cache/user info before starting new login
+        session.pop("user", None)
+        session.pop("token_cache", None)
+
+        # Use helper to build app (cache not strictly needed here, but consistent)
+        msal_app = _build_msal_app()
         auth_url = msal_app.get_authorization_request_url(
-            scopes=SCOPE,
-            redirect_uri=url_for('authorized', _external=True, _scheme='https')
+            scopes=SCOPE, # Use SCOPE from config (includes offline_access)
+            redirect_uri=url_for('authorized', _external=True, _scheme='https') # Ensure scheme is https if deployed
         )
         print("Redirecting to Azure AD for authentication.")
         return redirect(auth_url)
 
-    @app.route('/getAToken')
+    @app.route('/getAToken') # This is your redirect URI path
     def authorized():
-        msal_app = ConfidentialClientApplication(
-            CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET
-        )
+        # Check for errors passed back from Azure AD
+        if request.args.get('error'):
+            error = request.args.get('error')
+            error_description = request.args.get('error_description', 'No description provided.')
+            print(f"Azure AD Login Error: {error} - {error_description}")
+            return f"Login Error: {error} - {error_description}", 400 # Or render an error page
+
         code = request.args.get('code')
         if not code:
-            print("Authorization code not found.")
+            print("Authorization code not found in callback.")
             return "Authorization code not found", 400
+
+        # Build MSAL app WITH session cache (will be loaded by _build_msal_app via _load_cache)
+        msal_app = _build_msal_app(cache=_load_cache()) # Load existing cache
+
         result = msal_app.acquire_token_by_authorization_code(
             code=code,
-            scopes=SCOPE,
+            scopes=SCOPE, # Request the same scopes again
             redirect_uri=url_for('authorized', _external=True, _scheme='https')
         )
+
         if "error" in result:
             error_description = result.get("error_description", result.get("error"))
-            print(f"Login failure: {error_description}")
+            print(f"Token acquisition failure: {error_description}")
             return f"Login failure: {error_description}", 500
+
+        # --- Store results ---
+        # Store user identity info (claims from ID token)
         session["user"] = result.get("id_token_claims")
-        session["access_token"] = result.get("access_token")
-        print("User logged in successfully.")
-        return redirect(url_for('index'))
+        # DO NOT store access/refresh token directly in session anymore
+
+        # --- CRITICAL: Save the entire cache (contains tokens) to session ---
+        _save_cache(msal_app.token_cache)
+
+        print(f"User {session['user'].get('name')} logged in successfully.")
+        # Redirect to the originally intended page or home
+        # You might want to store the original destination in the session during /login
+        return redirect(url_for('index')) # Or another appropriate page
 
     @app.route('/logout')
     def logout():
+        user_name = session.get("user", {}).get("name", "User")
+        # Clear Flask session data
         session.clear()
-        logout_url = f"{AUTHORITY}/oauth2/v2.0/logout?post_logout_redirect_uri={url_for('index', _external=True)}"
-        print("User logged out. Redirecting to Azure AD logout endpoint.")
+        # Redirect user to Azure AD logout endpoint
+        # MSAL provides a helper for this too, but constructing manually is fine
+        logout_uri = url_for('index', _external=True, _scheme='https') # Where to land after logout
+        logout_url = (
+            f"{AUTHORITY}/oauth2/v2.0/logout"
+            f"?post_logout_redirect_uri={quote(logout_uri)}"
+        )
+        print(f"{user_name} logged out. Redirecting to Azure AD logout.")
         return redirect(logout_url)

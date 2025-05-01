@@ -534,6 +534,30 @@ Both schemas are found in the `artifacts/` folder (`user-index.json` and `group-
 5. Wait for deployment to complete.
 6. Upload your `.env` or configure application settings in the Azure Portal.
 
+#### Deploying via Az Web Deploy
+
+Use the following Learn article [Quickstart: Deploy a Python (Django, Flask, or FastAPI) web app to Azure - Azure App Service | Microsoft Learn](https://learn.microsoft.com/en-us/azure/app-service/quickstart-python?tabs=flask%2Cwindows%2Cazure-cli%2Czip-deploy%2Cdeploy-instructions-azportal%2Cterminal-bash%2Cdeploy-instructions-zip-azcli) but here are a few notes:
+
+1. Zip the contents of the single_app folder, DO NOT ZIP the single_app folder but the contents, except for a few files.
+   1. INCLUDE
+      1. static
+      2. templates
+      3. requirements.txt
+      4. ALL PYTHON FILES (anything ending in .py). The following screen shot is a point in time and the file names may change or more add or some removed.
+   2. DO NOT INCLUDE
+      1. .deployment
+      2. .dockerignore
+      3. .DS_Store
+      4. .env
+      5. Dockerfile
+      6. example.env
+
+![Files to zip](./images/files_to_zip.png)
+
+![Zip the files](./images/zip_the_files.png)
+
+2. Make sure to include `SCM_DO_BUILD_DURING_DEPLOYMENT=true` in your environment variables
+
 ### Running the Application
 
 Visit your app service in Azure and select the URL

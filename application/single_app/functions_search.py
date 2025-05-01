@@ -2,9 +2,8 @@
 
 from config import *
 from functions_content import *
-from functions_documents import *
 
-def hybrid_search(query, user_id, document_id=None, top_n=3, doc_scope="all", active_group_id=None):
+def hybrid_search(query, user_id, document_id=None, top_n=20, doc_scope="all", active_group_id=None):
     """
     Hybrid search that queries the user doc index or the group doc index
     depending on doc type.
@@ -26,80 +25,71 @@ def hybrid_search(query, user_id, document_id=None, top_n=3, doc_scope="all", ac
 
     if doc_scope == "all":
         if document_id:
-            # Search user documents
             user_results = search_client_user.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}' and document_id eq '{document_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
-            # Search group documents
             group_results = search_client_group.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}' and document_id eq '{document_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
         else:
-            # Search user documents
             user_results = search_client_user.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
-            # Search group documents
             group_results = search_client_group.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
-        # Combine results from both searches
         user_results_final = extract_search_results(user_results, top_n)
         group_results_final = extract_search_results(group_results, top_n)
         results = user_results_final + group_results_final
     
     elif doc_scope == "personal":
         if document_id:
-            # Search user documents
             user_results = search_client_user.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}' and document_id eq '{document_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(user_results, top_n)
         else:
-            # Search user documents
             user_results = search_client_user.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(user_results, top_n)
 
     elif doc_scope == "group":
         if document_id:
-            # Search group documents
             group_results = search_client_group.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}' and document_id eq '{document_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(group_results, top_n)
         else:
-            # Search group documents
             group_results = search_client_group.search(
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}'",
-                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date"]
+                select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(group_results, top_n)
     
@@ -110,7 +100,6 @@ def extract_search_results(paged_results, top_n):
     for i, r in enumerate(paged_results):
         if i >= top_n:
             break
-        # Convert the raw result to a minimal dict you can serialize.
         extracted.append({
             "id": r["id"],
             "chunk_text": r["chunk_text"],
@@ -120,6 +109,12 @@ def extract_search_results(paged_results, top_n):
             "version": r["version"],
             "chunk_sequence": r["chunk_sequence"],
             "upload_date": r["upload_date"],
+            "document_classification": r["document_classification"],
+            "page_number": r["page_number"],
+            "author": r["author"],
+            "chunk_keywords": r["chunk_keywords"],
+            "title": r["title"],
+            "chunk_summary": r["chunk_summary"],
             "score": r["@search.score"]
         })
     return extracted
