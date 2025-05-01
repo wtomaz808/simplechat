@@ -98,7 +98,7 @@ ALLOWED_EXTENSIONS = {
     'dvr-ms', 'wav'
 }
 ALLOWED_EXTENSIONS_IMG = {'png', 'jpg', 'jpeg'}
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 16 MB
+MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
 # Azure AD Configuration
 CLIENT_ID = os.getenv("CLIENT_ID")
