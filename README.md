@@ -1,8 +1,8 @@
 <!-- BEGIN REVISED README.MD BLOCK -->
 
+# Simple Chat
 
-
-# Simple Chat ![logo](./images/logo.png)
+![logo](./images/logo.png)
 
 *   [Jump to Table of Contents](#table-of-contents)
 
