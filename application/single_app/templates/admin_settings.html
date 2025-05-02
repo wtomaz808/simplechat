@@ -253,6 +253,8 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            <label for="gpt_model" class="form-label">Azure OpenAI GPT Model Selection</label>
+                            <br><small>Each selected model will be available in the Chat UI as an option for the User. You can select multiple models.</small>
                             <div id="gpt_models_list" class="mt-2 mb-3">
                                 
                             </div>
@@ -299,6 +301,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="azure_apim_gpt_deployment" class="form-label">Azure APIM Deployment</label>
+                        <br><small class="text-muted">Each model defined here will be available in the Chat UI as an option for the User. You can include multiple models seperated by a comma (example: gpt-4o, o-1, o-3).</small>
                         <input type="text" class="form-control" id="azure_apim_gpt_deployment"
                             name="azure_apim_gpt_deployment" value="{{ settings.azure_apim_gpt_deployment or '' }}">
                     </div>
