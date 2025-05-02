@@ -215,28 +215,28 @@ Below is a summary of recent additions, reflecting the state as of version `v0.2
 
 #### Bug Fixes
 
-A.  **Azure AI Search Index Migration**
-    *   Implemented automatic schema updates: on every Admin page load, the application checks for and adds any **missing fields** (e.g., `author`, `chunk_keywords`, `document_classification`, `page_number`, `start_time`, `video_ocr_chunk_text`, etc.) to both user and group indexes using the Azure AI Search SDK.
-    *   Corrected SDK usage (using `SearchIndexClient.create_or_update_index`) to update index schema without requiring a full index rebuild.
-B.  **User & Group Management**
-    *   Resolved a **401 error** occurring when searching for users to add to a group by implementing `SerializableTokenCache` in MSAL tied to the Flask session, ensuring proper token acquisition and refresh (`acquire_token_by_authorization_code`, `_save_cache`, `acquire_token_silent`).
-    *   Restored missing **metadata extraction** and **classification** initiation buttons within the Group Workspace UI.
-    *   Updated role descriptions in Admin settings for clarity and published an OpenAPI specification (`/api/`).
-C.  **Conversation Flow & UI**
-    *   Ensured a new conversation is **auto-created** upon first user interaction (typing, prompt selection, file upload) if none is active.
-    *   Enabled **custom logo persistence** across application restarts by storing the logo as Base64 in Cosmos DB (constraints: max 100px height, ≤ 500 KB).
-    *   Fixed CSS to prevent uploaded file previews from **overflowing** the chat input area.
-    *   Ensured conversation title changes in the left pane sync automatically **without** requiring a manual refresh.
-    *   Corrected JavaScript errors related to `loadConversations()` in `chat-input-actions.js`.
-    *   Fixed feedback button behavior and ensured selecting a prompt correctly sends the full prompt content.
-    *   Included original `search_query` & `user_message` in Azure AI Search request telemetry for better logging.
-    *   Ensured existing documents correctly display processing status (`percent_complete`) instead of appearing “Not Available”.
-    *   Added support for **Unicode characters** (e.g., Japanese) in text file chunking logic.
-D.  **Miscellaneous Fixes**
-    *   Fixed JavaScript error `loadConversations is not defined` occurring during file uploads.
-    *   Ensured classification labels are not displayed in the documents list or title area if the feature is disabled.
-    *   Selecting a prompt or uploading a file now reliably creates a new conversation if one doesn't exist.
-    *   Corrected an error related to "new categories" by seeding missing nested settings configurations with defaults on application startup.
+1. **Azure AI Search Index Migration**
+      - Implemented automatic schema updates: on every Admin page load, the application checks for and adds any **missing fields** (e.g., `author`, `chunk_keywords`, `document_classification`, `page_number`, `start_time`, `video_ocr_chunk_text`, etc.) to both user and group indexes using the Azure AI Search SDK.
+      - Corrected SDK usage (using `SearchIndexClient.create_or_update_index`) to update index schema without requiring a full index rebuild.
+2. **User & Group Management**
+   *   Resolved a **401 error** occurring when searching for users to add to a group by implementing `SerializableTokenCache` in MSAL tied to the Flask session, ensuring proper token acquisition and refresh (`acquire_token_by_authorization_code`, `_save_cache`, `acquire_token_silent`).
+   *   Restored missing **metadata extraction** and **classification** initiation buttons within the Group Workspace UI.
+   *   Updated role descriptions in Admin settings for clarity and published an OpenAPI specification (`/api/`).  
+3. **Conversation Flow & UI**
+   *   Ensured a new conversation is **auto-created** upon first user interaction (typing, prompt selection, file upload) if none is active.
+   *   Enabled **custom logo persistence** across application restarts by storing the logo as Base64 in Cosmos DB (constraints: max 100px height, ≤ 500 KB).
+   *   Fixed CSS to prevent uploaded file previews from **overflowing** the chat input area.
+   *   Ensured conversation title changes in the left pane sync automatically **without** requiring a manual refresh.
+   *   Corrected JavaScript errors related to `loadConversations()` in `chat-input-actions.js`.
+   *   Fixed feedback button behavior and ensured selecting a prompt correctly sends the full prompt content.
+   *   Included original `search_query` & `user_message` in Azure AI Search request telemetry for better logging.
+   *   Ensured existing documents correctly display processing status (`percent_complete`) instead of appearing “Not Available”.
+   *   Added support for **Unicode characters** (e.g., Japanese) in text file chunking logic.
+4. **Miscellaneous Fixes**
+   *   Fixed JavaScript error `loadConversations is not defined` occurring during file uploads.
+   *   Ensured classification labels are not displayed in the documents list or title area if the feature is disabled.
+   *   Selecting a prompt or uploading a file now reliably creates a new conversation if one doesn't exist.
+   *   Corrected an error related to "new categories" by seeding missing nested settings configurations with defaults on application startup.
 
 ## Release Notes
 
