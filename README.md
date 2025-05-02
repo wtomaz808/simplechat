@@ -51,7 +51,9 @@ The application utilizes **Azure Cosmos DB** for storing conversations, metadata
 
 ![Architecture Diagram](./images/architecture.png)
 
-### Why Enable Optional Features? <a href="#simple-chat-application" style="text-decoration: none;">↑</a>
+### Why Enable Optional Features?
+
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 #### **Content Safety**
 
@@ -150,7 +152,7 @@ Enables detailed logging for the entire file ingestion and processing pipeline, 
 
 ## Roadmap
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 [Roadmap (as of 5/1/25) · microsoft/simplechat · Discussion #133](https://github.com/microsoft/simplechat/discussions/133)
 
@@ -167,7 +169,7 @@ Enables detailed logging for the entire file ingestion and processing pipeline, 
 
 ## Latest Features
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Below is a summary of recent additions, reflecting the state as of version `v0.212.78`.
 
@@ -238,13 +240,13 @@ D.  **Miscellaneous Fixes**
 
 ## Release Notes
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 For a detailed, version-by-version list of features, improvements, and bug fixes, please refer to the [Release Notes](./RELEASE_NOTES.md).
 
 ## Demos
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 ### Upload document and review metadata
 
@@ -256,7 +258,7 @@ For a detailed, version-by-version list of features, improvements, and bug fixes
 
 ## Detailed Workflows
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 ### Content Safety
 
@@ -312,7 +314,7 @@ This workflow describes how documents uploaded via "Your Workspace" or "Group Wo
 
 ## Prerequisites
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Before you begin the setup, ensure you have the following:
 
@@ -326,7 +328,7 @@ Before you begin the setup, ensure you have the following:
 
 ## Setup Instructions
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 ### Provision Azure Resources
 
@@ -431,7 +433,7 @@ Deploy the necessary Azure services. For a quick estimate of monthly costs based
 
 ### Application-Specific Configuration Steps
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 With the Azure resources provisioned, proceed with configuring the application itself. Perform these steps in order.
 
@@ -762,7 +764,7 @@ This method involves creating a zip file of the application code and uploading i
 
 ### Upgrading the Application
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Keeping your Simple Chat application up-to-date involves deploying the newer version of the code. Using **Deployment Slots** is the recommended approach for production environments to ensure zero downtime and provide easy rollback capabilities.
 
@@ -838,7 +840,7 @@ For mature development practices, set up a Continuous Integration/Continuous Dep
 
 ### Admin Settings Configuration
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Once the application is running and you log in as a user assigned the Admin role, you can access the **Admin Settings** page. This UI provides a centralized location to configure most application features and service connections.
 
@@ -877,7 +879,7 @@ Key configuration sections include:
 
 ### Azure Government Configuration
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 To run the application in Azure Government cloud:
 
@@ -899,7 +901,7 @@ To run the application in Azure Government cloud:
 
 ### How to use Managed Identity
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Using Managed Identity allows the App Service to authenticate to other Azure resources securely without needing to store secrets (like API keys or connection strings) in Application Settings.
 
@@ -959,7 +961,7 @@ Using Managed Identity allows the App Service to authenticate to other Azure res
 
 ## FAQ
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 1. **Q: We've put Simple Chat behind a firewall (like Azure Firewall or a WAF), and some features (like search, document upload, or admin settings updates) don't work. What's wrong?**
 
@@ -1020,7 +1022,7 @@ Using Managed Identity allows the App Service to authenticate to other Azure res
 
 ## Usage
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 1. **Login**: Access the application URL. You will be redirected to Azure AD for authentication. Log in with an assigned organizational account.
 2. **Start Chat**: Begin typing a message in the input box or select a pre-defined prompt to start a new conversation.
@@ -1056,7 +1058,7 @@ Okay, here is a new section dedicated to scaling the various components of the S
 
 ## Scaling the Application
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 **General Scaling Principle:** Monitor key performance metrics (CPU/memory utilization, request latency, queue lengths, RU consumption, query latency, rate limit responses) for all services using **Azure Monitor** and **Application Insights**. Use these metrics to make informed decisions about when and how to scale each component.
 
@@ -1064,7 +1066,7 @@ As user load, data volume, or feature usage increases, you will need to scale th
 
 ### Azure App Service
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 The App Service hosts the Python backend application.
 
@@ -1090,7 +1092,7 @@ The App Service hosts the Python backend application.
 
 ### Azure Cosmos DB
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Cosmos DB stores metadata, conversations, settings, etc. Scaling focuses on Request Units per second (RU/s) and global distribution.
 
@@ -1115,7 +1117,7 @@ Cosmos DB stores metadata, conversations, settings, etc. Scaling focuses on Requ
 
 ### Azure AI Search
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Azure AI Search scaling involves adjusting replicas, partitions, and the service tier.
 
@@ -1136,7 +1138,7 @@ Azure AI Search scaling involves adjusting replicas, partitions, and the service
 
 ### Azure AI / Cognitive Services (OpenAI, Document Intelligence, etc.)
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 Services like Azure OpenAI, Document Intelligence, Content Safety, Speech Service, and Video Indexer are typically consumed via API calls and often have rate limits (e.g., Tokens Per Minute/Requests Per Minute for OpenAI, Transactions Per Second for others).
 
@@ -1156,7 +1158,7 @@ Services like Azure OpenAI, Document Intelligence, Content Safety, Speech Servic
 
 ## Table of Contents 
 
-> <a href="#simple-chat-application" style="text-decoration: none;">Return to top</a>
+> <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
 - [Overview](#overview)
 - [Features](#features)
