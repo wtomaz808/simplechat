@@ -1,6 +1,108 @@
 <!-- BEGIN RELEASE_NOTES.MD BLOCK -->
 
 # Feature Release
+
+## (v0.212.78)
+
+### New Features
+
+#### 1. Audio & Video Processing
+
+- **Audio processing pipeline**
+  - Integrated Azure Speech transcriptions into document ingestion.
+  - Splits transcripts into ~400-word chunks for downstream indexing.
+- **Video Indexer settings UI**
+  - Added input fields in Admin Settings for Video Indexer endpoint, key and locale.
+
+#### 2. Multi-Model Support
+
+- Users may choose from **multiple OpenAI deployments** at runtime.
+- Model list is dynamically populated based on Admin settings (including APIM).
+
+#### 3. Advanced Chunking Logic
+
+- **PDF & PPTX**: page-based chunks via Document Intelligence.
+- **DOC/DOCX**: ~400-word chunks via Document Intelligence.
+- **Images** (jpg/jpeg/png/bmp/tiff/tif/heif): single-chunk OCR.
+- **Plain Text (.txt)**: ~400-word chunks.
+- **HTML**: hierarchical H1–H5 splits with table rebuilding, 600–1200-word sizing.
+- **Markdown (.md)**: header-based splitting, table & code-block integrity, 600–1200-word sizing.
+- **JSON**: `RecursiveJsonSplitter` w/ `convert_lists=True`, `max_chunk_size=600`.
+- **Tabular (CSV/XLSX/XLS)**: pandas-driven row chunks (≤800 chars + header), sheets as separate files, formulas stripped.
+
+#### 4. Group Workspace Consolidation
+
+- Unified all group document logic into `functions_documents.js`.
+- Removed `functions_group_documents.js` duplication.
+
+#### 5. Bulk File Uploads
+
+- Support for uploading **up to 10 files** in a single operation, with parallel ingestion and processing.
+
+#### 6. GPT-Driven Metadata Extraction
+
+- Admins can select a **GPT model** to power metadata parsing.
+- All new documents are processed through the chosen model for entity, keyword, and summary extraction.
+
+#### 7. Advanced Document Classification
+
+- Admin-configurable classification fields, each with **custom color-coded labels**.
+- Classification metadata persisted per document for filtering and display.
+
+#### 8. Contextual Classification Propagation
+
+- When a classified document is referenced in chat, its tags are **automatically applied to the conversation** as contextual metadata.
+
+#### 9. Chat UI Enhancements
+
+- **Left-docked** conversation menu for persistent navigation.
+- **Editable** conversation titles inline (left & right panes stay in sync).
+- Streamlined **new chat** flow: click-to-start or type-to-auto-create.
+- **User-defined prompts** surfaced inline within the message input.
+
+
+
+### Bug Fixes
+
+#### A. AI Search Index Migration
+
+- Automatically add any **missing** fields (e.g. `author`, `chunk_keywords`, `document_classification`, `page_number`, `start_time`, `video_ocr_chunk_text`, etc.) on every Admin page load.
+- Fixed SDK usage (`Collection` attribute) to update index schema without full-index replacement.
+
+#### B. User & Group Management
+
+- **User search 401 error** when adding a new user to a group resolved by:
+  - Implementing `SerializableTokenCache` in MSAL tied to Flask session.
+  - Ensuring `_save_cache()` is called after `acquire_token_by_authorization_code`.
+  - Refactoring `get_valid_access_token()` to use `acquire_token_silent()`.
+- Restored **metadata extraction** & **classification** buttons in Group Workspace.
+- Fixed new role language in Admin settings and published an OpenAPI spec for `/api/`.
+
+#### C. Conversation Flow & UI
+
+- **Auto-create** a new conversation on first user input, prompt selection or file upload.
+- **Custom logo persistence** across reboots via Base64 storage in Cosmos (max 100 px height, ≤ 500 KB).
+- Prevent uploaded files from **overflowing** the chat window (CSS update).
+- Sync conversation title in left pane **without** manual refresh.
+- Restore missing `loadConversations()` in `chat-input-actions.js`.
+- Fix feedback button behavior and ensure prompt selection sends full content.
+- Include original `search_query` & `user_message` in AI Search telemetry.
+- Ensure existing documents no longer appear “Not Available” by populating `percent_complete`.
+- Support **Unicode** (e.g. Japanese) in text-file chunking.
+
+#### D. Miscellaneous Fixes
+
+- **Error uploading file** (`loadConversations is not defined`) fixed.
+- **Classification disabled** no longer displays in documents list or title.
+- **Select prompt/upload file** now always creates a conversation if none exists.
+- **Fix new categories** error by seeding missing nested settings with defaults on startup.
+
+
+
+### Breaking Changes & Migration Notes
+
+- **Index schema** must be re-migrated via Admin Settings (admin initiates in the app settings page).
+
 ## (v0.203.15)
 
 The update introduces "Workspaces," allowing users and groups to store both **documents** and **custom prompts** in a shared context. A new **prompt selection** feature enhances the chat workflow for a smoother experience. Additionally, admin configuration has been streamlined, and the landing page editor now supports improved Markdown formatting.
