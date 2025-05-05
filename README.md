@@ -143,7 +143,7 @@ Leverages Azure Speech Service to automatically transcribe audio files, converti
 -   **Timestamped text chunks** enable precise linking of citations back to the specific moment in the audio file.
 -   **Enhanced citation support** allows users to click a citation and potentially jump to (or reference) the relevant audio timestamp.
 
-| ![image-20250505095725440](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250505095725440.png) | ![Workspace - Upload and process audio file](./images/workflow-upload_process_audio_file.png) |
+| ![Admin settings - Enable audio file support](./images/admin_settings-enable_audio_file_support.png) | ![Workspace - Upload and process audio file](./images/workflow-upload_process_audio_file.png) |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 
 #### **Document Classification**
