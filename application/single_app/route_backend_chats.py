@@ -320,7 +320,7 @@ def register_route_backend_chats(app):
                 search_args = {
                     "query": search_query,
                     "user_id": user_id,
-                    "top_n": 20,
+                    "top_n": 12,
                     "doc_scope": document_scope,
                     "active_group_id": active_group_id
                 }
