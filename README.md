@@ -132,7 +132,7 @@ Unlocks the value within video files by using Azure Video Indexer to transcribe 
 -   **Enhanced citations** in chat responses link directly to the specific time point in the video source.
 -   **Integrates seamlessly** with the application's document storage, search, and citation workflow.
 
-| ![Admin settings - Enable Video file support](./images/admin_settings-enable_video_file_support.png) | ![Workspace - Upload and process video file](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\workflow-upload_video_file.png) |
+| ![Admin settings - Enable Video file support](./images/admin_settings-enable_video_file_support.png) | ![Workspace - Upload and process video file](./images/workflow-upload_video_file.png) |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 
 #### **Audio Extraction (Speech Service)**
