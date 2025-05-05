@@ -1639,7 +1639,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id, 
-                    top_n=20, 
+                    top_n=12, 
                     doc_scope=document_scope
                 )
             elif document_scope == "group":
@@ -1647,7 +1647,7 @@ def extract_document_metadata(document_id, user_id, group_id=None):
                     json.dumps(meta_data), 
                     user_id, 
                     document_id=document_id,
-                    top_n=20, 
+                    top_n=12, 
                     doc_scope=document_scope, 
                     active_group_id=scope_id
                 )
