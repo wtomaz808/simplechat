@@ -64,9 +64,9 @@ Ensures governance and security by reviewing all user messages before they inter
 -   **Enhances security** by filtering potentially malicious or sensitive queries before they interact with external systems or internal data.
 -   **Optional RBAC** (`SafetyAdmin` App Role) restricts access to the Safety Violation Admin View, allowing designated personnel to review flagged content.
 
-| ![Content Safety - Settings](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-settings.png) | ![Content Safety - In Action](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-in_action.png) | ![Content Safety - Cosmos Container](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\content_safety-cosmos_container.png) |
+| ![Content Safety - Settings](./images/content_safety-settings.png) | ![Content Safety - In Action](./images/content_safety-in_action.png) | ![Content Safety - Cosmos Container](./images/content_safety-cosmos_container.png) |
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| ![Content Safety - Management](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-maangement.png) | ![Content Safety - Taking Action](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\content_safety-taking_action.png) | ![Content Safety - User View](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-user_view.png) |
+| ![Content Safety - Management](./images/content_safety-management.png) | ![Content Safety - Taking Action](./images/content_safety-taking_action.png) | ![Content Safety - User View](./images/content_safety-user_view.png) |
 
 #### **Your Workspaces**
 
