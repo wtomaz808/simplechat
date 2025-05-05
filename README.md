@@ -105,9 +105,9 @@ Provides a mechanism for end-users to offer direct feedback on the quality and r
 -   **User dashboard** for individuals to review their submitted feedback history.
 -   **Admin dashboard** for aggregating, reviewing, and acting upon feedback. Access is controlled by **Optional RBAC** (`FeedbackAdmin` App Role).
 
-| ![image-20250503094214672](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094214672.png) | ![image-20250503094223647](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094223647.png) | ![image-20250503094230618](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094230618.png) |
+| ![Admin Settings - Enable User Feedback](./images/admin_settings-enable_user_feedback.png) | ![Chat - Negative Feedback](./images/chat-feedback-negative.png) | ![Feedback Review - List all](./images/feedback_review-list_all.png) |
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| ![image-20250503094234372](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094234372.png) | ![image-20250503094248159](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094248159.png) | ![image-20250503094251604](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094251604.png) |
+| ![Feedback Review - Feedback review workflow](./images/feedback_review-workflow.png) | ![My feedback - List all](./images/my_feedback-list_all.png) | ![My feedback - View specific](./images/my_feedback-view_specific.png) |
 
 
 
