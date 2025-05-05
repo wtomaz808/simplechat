@@ -64,6 +64,10 @@ Ensures governance and security by reviewing all user messages before they inter
 -   **Enhances security** by filtering potentially malicious or sensitive queries before they interact with external systems or internal data.
 -   **Optional RBAC** (`SafetyAdmin` App Role) restricts access to the Safety Violation Admin View, allowing designated personnel to review flagged content.
 
+| ![Content Safety - Settings](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-settings.png) | ![Content Safety - In Action](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-in_action.png) | ![Content Safety - Cosmos Container](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\content_safety-cosmos_container.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Content Safety - Management](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-maangement.png) | ![Content Safety - Taking Action](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\content_safety-taking_action.png) | ![Content Safety - User View](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\content_safety-user_view.png) |
+
 #### **Your Workspaces**
 
 **Your Workspace** enhances individual productivity by allowing users to upload, manage, and utilize their personal documents as context for Azure OpenAI. It centralizes important files and prompts, eliminating repetitive uploads and copy-pasting. When enabled, the AI can reference these documents, leading to more relevant, personalized, and contextually accurate responses for tasks like summarizing reports, drafting emails, or brainstorming.
@@ -71,6 +75,10 @@ Ensures governance and security by reviewing all user messages before they inter
 -   **Centralized hub** for personal documents and frequently used prompts, making them easily accessible.
 -   **Improved AI context** by enabling Azure OpenAI to "see" user-specific documents, resulting in tailored and accurate responses.
 -   **Time-saving** by storing crucial information once for repeated use across multiple chat sessions.
+
+| ![Admin Settings - Enable Workspace](./images/admin_settings-enable_workspace.png) | ![Workspace - Document List](./images/workspace-doc_list.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Workspace - Prompt list](./images/workspace-prompt_list.png) | ![Workspace - Edit Prompt](./images/workspace-prompt_edit.png) |
 
 #### **My Groups (includes Group Workspaces)**
 
@@ -81,6 +89,13 @@ Facilitates teamwork by enabling users to create or join groups where documents 
 -   **Consistent AI responses** across the team by referencing identical data and prompt sets, minimizing misinformation.
 -   **Optional RBAC** (`CreateGroup` App Role) can be enforced to control which users have permission to create new groups.
 
+| ![Admin Settings - Enable Groups](./images/admin_settings-enable_groups.png) | ![App Registration - App Role - Create Group](./images/app_reg-app_role-create_group.png) | ![Enterprise App - Add user to Create Group role](./images/enterprise_app-add_user_to_role.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![My Groups - Group list](./images/my_groups-group_list.png) | ![My Groups - Find group - Request to join](./images/my_groups-find_group-request_to_join.png) | ![Manage Group - Group details as owner](./images/manage_group-group_details_as_owner.png) |
+| ![Manage Group - Add member](./images/manage_group-add_member.png) | ![Manage Group - Assign member role](./images/manage_group-update_member_role.png) | ![Group Workspace - Document list](./images/group_workspace-doc_list.png) |
+
+
+
 #### **User Feedback**
 
 Provides a mechanism for end-users to offer direct feedback on the quality and relevance of AI-generated responses. This feedback loop is crucial for monitoring model performance, identifying areas for improvement, and understanding user satisfaction.
@@ -90,6 +105,12 @@ Provides a mechanism for end-users to offer direct feedback on the quality and r
 -   **User dashboard** for individuals to review their submitted feedback history.
 -   **Admin dashboard** for aggregating, reviewing, and acting upon feedback. Access is controlled by **Optional RBAC** (`FeedbackAdmin` App Role).
 
+| ![image-20250503094214672](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094214672.png) | ![image-20250503094223647](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094223647.png) | ![image-20250503094230618](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094230618.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![image-20250503094234372](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094234372.png) | ![image-20250503094248159](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094248159.png) | ![image-20250503094251604](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250503094251604.png) |
+
+
+
 #### **Conversation Archiving**
 
 Addresses compliance and record-keeping needs by automatically retaining a copy of all user conversations in a separate Cosmos DB container, even if users delete them from their chat history interface.
@@ -97,6 +118,10 @@ Addresses compliance and record-keeping needs by automatically retaining a copy 
 -   **Dedicated archive container** in Cosmos DB ensures separation from live conversation data.
 -   **Post-deletion retention** guarantees that chats removed from the user history remain available for audit or legal discovery.
 -   **Supports policy compliance** for regulatory, legal, or internal organizational record-keeping requirements.
+
+| ![Admin Settings - Enable Conversation Archiving](./images/admin_settings-enable_conversation_archiving.png) | ![Chat - Delete conversation](./images/chat-delete_conversation.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Cosmos container - View archived conversation](./images/cosmos_container-view_archived_conversation.png) | ![Cosmos container - View archived messages](./images/cosmos_container-view_archived_messages.png) |
 
 #### **Video Extraction (Video Indexer)**
 
@@ -107,6 +132,9 @@ Unlocks the value within video files by using Azure Video Indexer to transcribe 
 -   **Enhanced citations** in chat responses link directly to the specific time point in the video source.
 -   **Integrates seamlessly** with the application's document storage, search, and citation workflow.
 
+| ![Admin settings - Enable Video file support](./images/admin_settings-enable_video_file_support.png) | ![Workspace - Upload and process video file](C:\Users\paullizer\OneDrive - Microsoft\Repos\GitHub\microsoft\simplechat\images\workflow-upload_video_file.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+
 #### **Audio Extraction (Speech Service)**
 
 Leverages Azure Speech Service to automatically transcribe audio files, converting spoken content into searchable and citable text.
@@ -114,6 +142,9 @@ Leverages Azure Speech Service to automatically transcribe audio files, converti
 -   **Accurate transcription** of various uploaded audio formats.
 -   **Timestamped text chunks** enable precise linking of citations back to the specific moment in the audio file.
 -   **Enhanced citation support** allows users to click a citation and potentially jump to (or reference) the relevant audio timestamp.
+
+| ![image-20250505095725440](C:\Users\paullizer\AppData\Roaming\Typora\typora-user-images\image-20250505095725440.png) | ![Workspace - Upload and process audio file](./images/workflow-upload_process_audio_file.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
 
 #### **Document Classification**
 
@@ -123,6 +154,9 @@ Allows organizations to categorize documents based on sensitivity, type, or othe
 -   **User-assigned labels** applied during the document upload process.
 -   **Classification propagation** ensures that tags associated with referenced documents appear in the chat context, indicating the nature of the source data.
 -   **Improved insights** into how different types of documents are being used and referenced in AI interactions.
+
+| ![Admin settings - Enable and configure Document classification](./images/admin_settings-enable_and_configure_doc_classification.png) | ![Workspace - View and update classification](./images/workflow-view_and_update_classification.png) | ![Chat - Classification propagation](./images/chat-classification_propagation.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 
 #### **Enhanced Citation (Storage Account)**
 
@@ -142,6 +176,9 @@ Uses AI (a configurable GPT model) to automatically enrich uploaded documents wi
 -   **Improved searchability**: Generated metadata enhances the information available to Azure AI Search, leading to more relevant results.
 -   **Manual override**: Users can manually edit or provide their own metadata if the AI-generated content needs correction or refinement.
 
+| ![Admin settings - Enable Enhanced citations](./images/admin_settings-enable_enhanced_citations.png) | ![Workspace - Enhanced citation tag](./images/workspace-enhanced_citation_tag.png) | ![Storage account - View documents for citation retrieval](./images/storage_account-view_doc_for_citation_retrieval.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+
 #### **File Processing Logs**
 
 Enables detailed logging for the entire file ingestion and processing pipeline, assisting administrators and developers in troubleshooting issues, monitoring performance, and auditing activity.
@@ -149,6 +186,9 @@ Enables detailed logging for the entire file ingestion and processing pipeline, 
 -   **Granular logging**: Captures step-by-step details of document ingestion, chunking, embedding, and indexing processes.
 -   **Error diagnostics**: Helps pinpoint failures or bottlenecks in the ingestion or AI-driven extraction steps.
 -   **Admin control**: Verbosity can be toggled on or off via Admin Settings, allowing control over logging volume.
+
+| ![Admin settings - Enable File processing logs](./images/admin_settings-enable_file_processing_logs.png) | ![Cosmos container - View specific document's file processing logs](./images/cosmos_container-view_specific_doc_file_processing_logs.png) |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
 
 ## Roadmap
 
