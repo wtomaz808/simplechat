@@ -213,7 +213,7 @@ Enables detailed logging for the entire file ingestion and processing pipeline, 
 
 Below is a summary of recent additions, reflecting the state as of version `v0.212.78`.
 
-### (v0.212.78)
+### (v0.212.79)
 
 #### New Features
 
