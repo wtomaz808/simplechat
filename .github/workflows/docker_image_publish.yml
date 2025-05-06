@@ -4,7 +4,7 @@ name: SimpleChat Docker Image Publish
 on:
   push:
     branches:
-    - actions-main-5-6-25
+    - main
   workflow_dispatch:
 
 jobs:
