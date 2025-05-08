@@ -211,9 +211,9 @@ Enables detailed logging for the entire file ingestion and processing pipeline, 
 
 > <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
-Below is a summary of recent additions, reflecting the state as of version `v0.212.78`.
+Below is a summary of recent additions, reflecting the state as of version `v0.212.91`.
 
-### (v0.212.79)
+### (v0.212.91)
 
 #### New Features
 
@@ -252,6 +252,11 @@ Below is a summary of recent additions, reflecting the state as of version `v0.2
     *   Conversation titles are **editable inline** directly in the left pane (changes sync with the main chat view).
     *   Streamlined **new chat** creation: automatically starts when user types a message, selects a prompt, or uploads a file if no chat is active.
     *   User-defined **custom prompts** are surfaced more clearly within the message input area.
+10.  **Semantic Reranking & Extractive Answers**
+     * Switched to semantic queries (`query_type="semantic"`) on both user and group indexes. 
+     * Enabled extractive highlights (`query_caption="extractive"`) to surface the most relevant snippet in each hit.  
+     * Enabled extractive answers (`query_answer="extractive"`) so the engine returns a concise, context-rich response directly from the index.  
+     * Automatically falls back to full-text search (`query_type="full"`, `search_mode="all"`) whenever no literal match is found, ensuring precise retrieval of references or other exact phrases.
 
 #### Bug Fixes
 
