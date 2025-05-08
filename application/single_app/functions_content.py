@@ -270,9 +270,9 @@ def generate_embedding(
     retries = 0
     current_delay = initial_delay
 
-    enable_image_gen_apim = settings.get('enable_image_gen_apim', False)
+    enable_embedding_apim = settings.get('enable_embedding_apim', False)
 
-    if enable_image_gen_apim:
+    if enable_embedding_apim:
         embedding_model = settings.get('azure_apim_embedding_deployment')
         embedding_client = AzureOpenAI(
             api_version = settings.get('azure_apim_embedding_api_version'),

@@ -29,6 +29,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}' and document_id eq '{document_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-user-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
@@ -36,6 +40,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}' and document_id eq '{document_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-group-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
         else:
@@ -43,6 +51,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-user-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
@@ -50,6 +62,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-group-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
 
@@ -63,6 +79,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}' and document_id eq '{document_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-user-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(user_results, top_n)
@@ -71,6 +91,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"user_id eq '{user_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-user-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "user_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(user_results, top_n)
@@ -81,6 +105,10 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}' and document_id eq '{document_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-group-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(group_results, top_n)
@@ -89,10 +117,16 @@ def hybrid_search(query, user_id, document_id=None, top_n=12, doc_scope="all", a
                 search_text=query,
                 vector_queries=[vector_query],
                 filter=f"group_id eq '{active_group_id}'",
+                query_type="semantic",
+                semantic_configuration_name="nexus-group-index-semantic-configuration",
+                query_caption="extractive",
+                query_answer="extractive",
                 select=["id", "chunk_text", "chunk_id", "file_name", "group_id", "version", "chunk_sequence", "upload_date", "document_classification", "page_number", "author", "chunk_keywords", "title", "chunk_summary"]
             )
             results = extract_search_results(group_results, top_n)
     
+    results = sorted(results, key=lambda x: x['score'], reverse=True)[:top_n]
+
     return results 
 
 def extract_search_results(paged_results, top_n):
