@@ -60,7 +60,12 @@
 - Streamlined **new chat** flow: click-to-start or type-to-auto-create.
 - **User-defined prompts** surfaced inline within the message input.
 
+#### 10. Semantic Reranking & Extractive Answers
 
+* Switched to semantic queries (`query_type="semantic"`) on both user and group indexes. 
+* Enabled extractive highlights (`query_caption="extractive"`) to surface the most relevant snippet in each hit.  
+* Enabled extractive answers (`query_answer="extractive"`) so the engine returns a concise, context-rich response directly from the index.  
+* Automatically falls back to full-text search (`query_type="full"`, `search_mode="all"`) whenever no literal match is found, ensuring precise retrieval of references or other exact phrases.
 
 ### Bug Fixes
 
