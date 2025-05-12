@@ -495,7 +495,7 @@ The application uses Azure Active Directory (Entra ID) for user authentication a
     *   Enter the URI: `https://<your-app-service-name>.azurewebsites.net/getAToken` (Replace `<your-app-service-name>` with your actual App Service name).
     *   Next in the **Front-channel logout URL** section of the page
     *   Enter the URI: `https://<your-app-service-name>.azurewebsites.net/logout` (Replace `<your-app-service-name>` with your actual App Service name).
-    *   Now look the the **Implicit grant and hybrid flows**
+    *   Now look at the **Implicit grant and hybrid flows** section
     *   Make sure the checked for ***ID tokens (used for implicit and hybrid flows)** is checked
     *   Click the **Save** button
     ![App Registration Settings](./images/app_reg_settings.png)  *(Note: Image shows general area, details might differ slightly)*
