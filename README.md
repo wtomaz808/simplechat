@@ -490,6 +490,21 @@ The application uses Azure Active Directory (Entra ID) for user authentication a
         *   Enter the URI: `https://<your-app-service-name>.azurewebsites.net/.auth/login/aad/callback` (Replace `<your-app-service-name>` with your actual App Service name).
     *   Click **Register**.
     *   Note the **Application (client) ID** and **Directory (tenant) ID**. These are needed for the `.env` file (`CLIENT_ID`, `TENANT_ID`).
+    *   Next, click the  **Authentication** link in the Manage section 
+    *   In the Web **Redirect URIs** section of the page click **Add URI**
+    *   Enter the URI: `https://<your-app-service-name>.azurewebsites.net/getAToken` (Replace `<your-app-service-name>` with your actual App Service name).
+    *   Next in the **Front-channel logout URL** section of the page
+    *   Enter the URI: `https://<your-app-service-name>.azurewebsites.net/logout` (Replace `<your-app-service-name>` with your actual App Service name).
+    *   Now look the the **Implicit grant and hybrid flows**
+    *   Make sure the checked for ***ID tokens (used for implicit and hybrid flows)** is checked
+    *   Click the **Save** button
+    ![App Registration Settings](./images/app_reg_settings.png)  *(Note: Image shows general area, details might differ slightly)*
+    *    Click on the **Certificates and secrets link** in the manage section
+    *    Click on **Client Secrets**
+    *    Verify that there is a Secret Named **MICROSOFT_PROVIDER_AUTHENTICATION_SECRET**
+    *    If there is not, click on **New Client Secret** to create a new secret using **MICROSOFT_PROVIDER_AUTHENTICATION_SECRET** as the name.
+    *    Make sure you copy the **Value** before you leave this page.
+    ![App Registration Settings](./images/app_reg_secrets.png)  *(Note: Image shows general area, details might differ slightly)*
 
 2.  **Configure App Service Authentication**:
     *   Go to your **App Service** in the Azure portal.
@@ -501,9 +516,14 @@ The application uses Azure Active Directory (Entra ID) for user authentication a
     *   **Restrict access**: Require authentication.
     *   **Unauthenticated requests**: HTTP 302 Found redirect: recommended for web apps.
     *   Click **Add**. This configures the built-in App Service Authentication (Easy Auth).
-    *   **Important**: After adding the provider, go back into the **Authentication** settings for the App Service, click **Edit** on the Microsoft provider. Ensure the **Issuer URL** is correct (usually `https://login.microsoftonline.com/<your-tenant-id>/v2.0`). Note the **Client Secret** value shown here (or create a new one under the App Registration -> Certificates & secrets). This secret (`MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`) is often automatically added to App Service Application Settings, but verify it's present.
+    *   ⚠️ **Important**  ⚠️: After adding the provider, go back into the **Authentication** settings for the App Service, click **Edit** on the Microsoft provider. 
+        *   Ensure the **Issuer URL** is correct (usually `https://login.microsoftonline.com/<your-tenant-id>/v2.0` or `https://sts.windows.net/<your-tenant-id>/v2.0`). 
+        *   Note the **Client Secret Setting Name** value shown here. This secret (`MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`) is often automatically added to App Service Application Settings.  If the name is not there (or a different name is there) click on **Click to edit secret value**
+        *   Click on **Add**, for the name use `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET` for the value enter the Key that you copied in the previous step
+        *   Click **Apply**, the click **Apply** again
+        *   Return to the **Edit identity provider** page and now select `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET` for the Client Secret setting name.  (It may take a minute for that name to appear)
 
-    ![App Registration - Authentication Configuration in App Service](./images/app_reg-authentication.png)  *(Note: Image shows general area, details might differ slightly)*
+    ![App Registration - Authentication Configuration in App Service](./images/app_reg_edit_identity.png)  *(Note: Image shows general area, details might differ slightly)*
 
 3.  **Configure API Permissions**:
     *   Go back to your **App Registration** in Azure AD.
@@ -1200,60 +1220,63 @@ Services like Azure OpenAI, Document Intelligence, Content Safety, Speech Servic
 
 > <a href="#simple-chat" style="text-decoration: none;">Return to top</a>
 
-- [Overview](#overview)
-- [Features](#features)
-  - [Why Enable Optional Features?](#why-enable-optional-features)
-    - [Content Safety](#content-safety)
-    - [Your Workspaces](#your-workspaces)
-    - [My Groups (includes Group Workspaces)](#my-groups-includes-group-workspaces)
-    - [User Feedback](#user-feedback)
-    - [Conversation Archiving](#conversation-archiving)
-    - [Video Extraction (Video Indexer)](#video-extraction-video-indexer)
-    - [Audio Extraction (Speech Service)](#audio-extraction-speech-service)
-    - [Document Classification](#document-classification)
-    - [Enhanced Citation (Storage Account)](#enhanced-citation-storage-account)
-    - [Metadata Extraction](#metadata-extraction)
-    - [File Processing Logs](#file-processing-logs)
-- [Roadmap](#roadmap)
-- [Latest Features](#latest-features)
-  - [(v0.212.78)](#v021278)
-    - [New Features](#new-features)
-    - [Bug Fixes](#bug-fixes)
-- [Release Notes](#release-notes)
-- [Demos](#demos)
-  - [Upload document and review metadata](#upload-document-and-review-metadata)
-  - [Classify document and chat with document](#classify-document-and-chat-with-document)
-- [Detailed Workflows](#detailed-workflows)
-  - [Content Safety](#content-safety-1)
-  - [Add your data (RAG Ingestion)](#add-your-data-rag-ingestion)
-- [Prerequisites](#prerequisites)
-- [Setup Instructions](#setup-instructions)
-  - [Provision Azure Resources](#provision-azure-resources)
-  - [Application-Specific Configuration Steps](#application-specific-configuration-steps)
-    - [Setting Up Authentication (Azure AD / Entra ID)](#setting-up-authentication-azure-ad--entra-id)
-    - [Grant App Registration Access to Azure OpenAI (for Model Fetching)](#grant-app-registration-access-to-azure-openai-for-model-fetching)
-    - [Clone the Repository](#clone-the-repository)
-    - [Configure Environment Variables (.env File)](#configure-environment-variables-env-file)
-    - [Alternate Method: Update App Settings via JSON (Advanced)](#alternate-method-update-app-settings-via-json-advanced)
-    - [Initializing Indexes in Azure AI Search](#initializing-indexes-in-azure-ai-search)
-  - [Installing and Deploying the Application Code](#installing-and-deploying-the-application-code)
-    - [Deploying via VS Code (Recommended for Simplicity)](#deploying-via-vs-code-recommended-for-simplicity)
-    - [Deploying via Azure CLI (Zip Deploy)](#deploying-via-azure-cli-zip-deploy)
-  - [Running the Application](#running-the-application)
-  - [Upgrading the Application](#upgrading-the-application)
-    - [Using Deployment Slots (Recommended for Production/Staging)](#using-deployment-slots-recommended-for-productionstaging)
-    - [Using Direct Deployment to Production (Simpler, for Dev/Test or Low Impact Changes)](#using-direct-deployment-to-production-simpler-for-devtest-or-low-impact-changes)
-    - [Automate via CI/CD](#automate-via-cicd)
-  - [Admin Settings Configuration](#admin-settings-configuration)
-  - [Azure Government Configuration](#azure-government-configuration)
-  - [How to use Managed Identity](#how-to-use-managed-identity)
-- [FAQ](#faq)
-- [Usage](#usage)
-  - [User Workflow Summary](#user-workflow-summary)
-- [Scaling the Application](#scaling-the-application)
-  - [Azure App Service](#azure-app-service)
-  - [Azure Cosmos DB](#azure-cosmos-db)
-  - [Azure AI Search](#azure-ai-search)
-  - [Azure AI / Cognitive Services (OpenAI, Document Intelligence, etc.)](#azure-ai--cognitive-services-openai-document-intelligence-etc)
+- [Simple Chat](#simple-chat)
+  - [Overview](#overview)
+        - [Screenshot of the Chat UI](#screenshot-of-the-chat-ui)
+  - [Features](#features)
+    - [Why Enable Optional Features?](#why-enable-optional-features)
+      - [**Content Safety**](#content-safety)
+      - [**Your Workspaces**](#your-workspaces)
+      - [**My Groups (includes Group Workspaces)**](#my-groups-includes-group-workspaces)
+      - [**User Feedback**](#user-feedback)
+      - [**Conversation Archiving**](#conversation-archiving)
+      - [**Video Extraction (Video Indexer)**](#video-extraction-video-indexer)
+      - [**Audio Extraction (Speech Service)**](#audio-extraction-speech-service)
+      - [**Document Classification**](#document-classification)
+      - [**Enhanced Citation (Storage Account)**](#enhanced-citation-storage-account)
+      - [**Metadata Extraction**](#metadata-extraction)
+      - [**File Processing Logs**](#file-processing-logs)
+  - [Roadmap](#roadmap)
+  - [Latest Features](#latest-features)
+    - [(v0.212.79)](#v021279)
+      - [New Features](#new-features)
+      - [Bug Fixes](#bug-fixes)
+  - [Release Notes](#release-notes)
+  - [Demos](#demos)
+    - [Upload document and review metadata](#upload-document-and-review-metadata)
+    - [Classify document and chat with document](#classify-document-and-chat-with-document)
+  - [Detailed Workflows](#detailed-workflows)
+    - [Content Safety](#content-safety-1)
+    - [Add your data (RAG Ingestion)](#add-your-data-rag-ingestion)
+  - [Prerequisites](#prerequisites)
+  - [Setup Instructions](#setup-instructions)
+    - [Provision Azure Resources](#provision-azure-resources)
+    - [Application-Specific Configuration Steps](#application-specific-configuration-steps)
+      - [Setting Up Authentication (Azure AD / Entra ID)](#setting-up-authentication-azure-ad--entra-id)
+      - [Grant App Registration Access to Azure OpenAI (for Model Fetching)](#grant-app-registration-access-to-azure-openai-for-model-fetching)
+      - [Clone the Repository](#clone-the-repository)
+      - [Configure Environment Variables (`.env` File)](#configure-environment-variables-env-file)
+      - [Alternate Method: Update App Settings via JSON (Advanced)](#alternate-method-update-app-settings-via-json-advanced)
+      - [Initializing Indexes in Azure AI Search](#initializing-indexes-in-azure-ai-search)
+    - [Installing and Deploying the Application Code](#installing-and-deploying-the-application-code)
+      - [Deploying via VS Code (Recommended for Simplicity)](#deploying-via-vs-code-recommended-for-simplicity)
+      - [Deploying via Azure CLI (Zip Deploy)](#deploying-via-azure-cli-zip-deploy)
+    - [Running the Application](#running-the-application)
+    - [Upgrading the Application](#upgrading-the-application)
+      - [Using Deployment Slots (Recommended for Production/Staging)](#using-deployment-slots-recommended-for-productionstaging)
+      - [Using Direct Deployment to Production (Simpler, for Dev/Test or Low Impact Changes)](#using-direct-deployment-to-production-simpler-for-devtest-or-low-impact-changes)
+      - [Automate via CI/CD](#automate-via-cicd)
+    - [Admin Settings Configuration](#admin-settings-configuration)
+    - [Azure Government Configuration](#azure-government-configuration)
+    - [How to use Managed Identity](#how-to-use-managed-identity)
+  - [FAQ](#faq)
+  - [Usage](#usage)
+    - [User Workflow Summary](#user-workflow-summary)
+  - [Scaling the Application](#scaling-the-application)
+    - [Azure App Service](#azure-app-service)
+    - [Azure Cosmos DB](#azure-cosmos-db)
+    - [Azure AI Search](#azure-ai-search)
+    - [Azure AI / Cognitive Services (OpenAI, Document Intelligence, etc.)](#azure-ai--cognitive-services-openai-document-intelligence-etc)
+  - [Table of Contents](#table-of-contents)
 
 <!-- END REVISED README.MD BLOCK -->
