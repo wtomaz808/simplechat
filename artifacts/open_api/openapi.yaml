@@ -3946,7 +3946,7 @@ paths:
                   status:
                     type: string
                     enum: [success, nothingToAdd]
-                    description: 'success' if fields were added, 'nothingToAdd' if index was already up-to-date.
+                    description: "'success' if fields were added, 'nothingToAdd' if index was already up-to-date."
                   added:
                     type: array
                     items:
