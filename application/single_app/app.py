@@ -54,6 +54,11 @@ def to_datetime_filter(value):
 def format_datetime_filter(value):
     return value.strftime('%Y-%m-%d %H:%M')
 
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
 # Register a custom Jinja filter for Markdown
 def markdown_filter(text):
     if not text:
