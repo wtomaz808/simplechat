@@ -621,9 +621,11 @@ Core configuration values are managed via environment variables, typically set i
     ```dotenv
     # Azure Cosmos DB
     # Use connection string OR endpoint/key OR managed identity
-    AZURE_COSMOS_ENDPOINT="<your-cosmosdb-account-uri>" # e.g., https://mycosmosdb.documents.azure.com:443/
+    # e.g., https://mycosmosdb.documents.azure.com:443/
+    AZURE_COSMOS_ENDPOINT="<your-cosmosdb-account-uri>"
     AZURE_COSMOS_KEY="<your-cosmosdb-primary-key>"
-    AZURE_COSMOS_AUTHENTICATION_TYPE="key" # Options: "key", "connection_string", "managed_identity"
+    # Options: "key", "connection_string", "managed_identity"
+    AZURE_COSMOS_AUTHENTICATION_TYPE="key"
     
     # Azure Bing Search (Only needed if Bing Search feature is enabled in Admin Settings)
     # Endpoint is usually standard, Key obtained from Bing Search resource.
@@ -635,7 +637,8 @@ Core configuration values are managed via environment variables, typically set i
     # SECRET_KEY should be a long, random, secret string (e.g., 32+ chars) used for Flask session signing. Generate one securely.
     SECRET_KEY="Generate-A-Strong-Random-Secret-Key-Here!"
     # AZURE_ENVIRONMENT: Set based on your cloud environment
-    AZURE_ENVIRONMENT="public" # Options: "public", "usgovernment"
+    # Options: "public", "usgovernment"
+    AZURE_ENVIRONMENT="public"
     ```
     
 3.  **Upload Settings to Azure App Service (Recommended using VS Code)**:
