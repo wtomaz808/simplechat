@@ -939,7 +939,8 @@ app_settings.app_title }} {% endblock %} {% block head %}
     dropdownItems.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm" role="status"></div> Loading...</div>';
     document.getElementById("btn-change-group").disabled = true;
 
-    return fetch("/api/groups") // Assuming this endpoint returns the structure { groups: [], ... }
+    // Set a large page_size to get all groups at once
+    return fetch("/api/groups?page_size=1000") // Request up to 1000 groups to avoid pagination
       .then((r) => {
         if (!r.ok) {
           // Handle HTTP errors (like 401, 500)
