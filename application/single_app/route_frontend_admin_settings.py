@@ -64,13 +64,49 @@ def register_route_frontend_admin_settings(app):
                  print(f"Error retrieving GPT deployments: {e}")
             # ... similar try/except for embedding and image models ...
 
+            # --- Check for updates using extract_latest_version_from_html ---
+            update_available = False
+            latest_version = None
+            download_url = None
+            
+            try:
+                # Get the current version from app config
+                current_version = app.config.get('VERSION', '0.0.0')
+                
+                # GitHub releases page URL for simplechat
+                github_url = "https://github.com/microsoft/simplechat/releases"
+                
+                # Fetch HTML content from GitHub releases page
+                response = requests.get(github_url, timeout=5)
+                if response.status_code == 200:
+                    # Extract latest version from HTML
+                    html_content = response.text
+                    latest_version = extract_latest_version_from_html(html_content)
+                    
+                    if latest_version:
+                        # Compare with current version
+                        comparison_result = compare_versions(latest_version, current_version)
+                        
+                        if comparison_result == 1:  # latest_version > current_version
+                            update_available = True
+                            download_url = f"{github_url}/tag/v{latest_version}"
+                            print(f"Update available: Current version {current_version}, Latest version {latest_version}")
+                        else:
+                            print(f"No update needed: Current version {current_version}, Latest version {latest_version}")
+                else:
+                    print(f"Failed to fetch GitHub releases page: Status code {response.status_code}")
+            except Exception as e:
+                print(f"Error checking for updates: {e}")
 
             # !!! REMOVE THIS LINE FROM GET HANDLER !!!
             # update_settings(settings) # <--- Remove this
 
             return render_template(
                 'admin_settings.html',
-                settings=settings
+                settings=settings,
+                update_available=update_available,
+                latest_version=latest_version,
+                download_url=download_url
                 # You don't need to pass deployments separately if they are added to settings['..._model']['all']
                 # gpt_deployments=gpt_deployments,
                 # embedding_deployments=embedding_deployments,
