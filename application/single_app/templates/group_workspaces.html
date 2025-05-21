@@ -1018,6 +1018,12 @@ app_settings.app_title }} {% endblock %} {% block head %}
               // Update dropdown button text
               dropdownButton.querySelector(".selected-group-text").textContent = groupName;
               
+              // Update active state
+              document.querySelectorAll("#group-dropdown-items .dropdown-item").forEach(i => {
+                i.classList.remove("active");
+              });
+              this.classList.add("active");
+              
               // Close dropdown
               const dropdownInstance = bootstrap.Dropdown.getInstance(dropdownButton);
               if (dropdownInstance) {
