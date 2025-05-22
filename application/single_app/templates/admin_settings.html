@@ -193,6 +193,28 @@
                     ></div>
                 </div>
 
+                <!-- Dark Mode Card -->
+                <div class="card p-3 mt-3">
+                    <h5>Appearance</h5>
+                    <p class="text-muted mb-1">Configure the app appearance and theme settings.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Default Theme</label>
+                        <div class="form-group form-check form-switch mb-3">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="enable_dark_mode_default"
+                                name="enable_dark_mode_default"
+                                {% if settings.enable_dark_mode_default %}checked{% endif %}
+                            >
+                            <label class="form-check-label ms-2" for="enable_dark_mode_default">
+                                Enable Dark Mode by Default
+                            </label>
+                        </div>
+                        <p class="text-muted small">Users can still toggle dark mode individually from the navigation bar.</p>
+                  </div>
+                </div>
                 <!-- New Classification Banner Section -->
                 <div class="card p-3 mb-3">
                     <h5>Classification Banner</h5>

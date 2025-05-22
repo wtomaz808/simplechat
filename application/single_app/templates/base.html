@@ -1,7 +1,7 @@
 <!-- templates/base.html -->
  
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light" id="htmlRoot">
 
 <head>
   <meta charset="UTF-8" />
@@ -132,6 +132,19 @@
     }
   </style>
 
+  <!-- Dark mode early initialization to prevent flash -->
+  <script>
+    (function() {
+      // Check localStorage first for fast theme loading to prevent flash
+      var savedTheme = localStorage.getItem('simplechat-theme');
+      
+      if (savedTheme) {
+        // Apply saved theme immediately to html element before page renders
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+      }
+    })();
+  </script>
+  
   {% block head %}{% endblock %}
 </head>
 
@@ -256,6 +269,20 @@
   
           {% if session.get('user') and session['user'].get('roles')
              and ('Admin' in session['user']['roles'] or 'User' in session['user']['roles']) %}
+            <!-- Dark Mode Toggle -->
+            <li class="nav-item">
+              <a class="nav-link dark-mode-toggle" id="darkModeToggle" role="button">
+                <span class="d-flex align-items-center">
+                  <i class="bi bi-sun-fill me-1" id="lightModeIcon"></i>
+                  <span id="lightModeText">Light</span>
+                </span>
+                <span class="d-flex align-items-center d-none">
+                  <i class="bi bi-moon-fill me-1" id="darkModeIcon"></i>
+                  <span id="darkModeText">Dark</span>
+                </span>
+              </a>
+            </li>
+            
             <!-- My Account Dropdown -->
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"
@@ -292,7 +319,7 @@
                 {% endif %}
               </ul>
             </li>
-  
+
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('logout') }}">
                 Logout
@@ -358,6 +385,14 @@
   <script src="/static/js/chat/purify.min.js"></script>
 
 
+  <!-- App settings for JS -->
+  <script>
+    const appSettings = {{ app_settings|tojson|safe }};
+  </script>
+  
+  <!-- Dark mode script -->
+  <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
+  
   {% block scripts %}{% endblock %}
 </body>
 
