@@ -6,6 +6,8 @@ const LOCAL_STORAGE_THEME_KEY = 'simplechat-theme';
 const darkModeToggle = document.getElementById('darkModeToggle');
 const lightModeIcon = document.getElementById('lightModeIcon');
 const darkModeIcon = document.getElementById('darkModeIcon');
+const lightModeContainer = lightModeIcon ? lightModeIcon.parentElement : null;
+const darkModeContainer = darkModeIcon ? darkModeIcon.parentElement : null;
 const htmlRoot = document.getElementById('htmlRoot');
 
 // Save user setting to API
@@ -48,14 +50,14 @@ function setThemeMode(mode) {
         htmlRoot.setAttribute('data-bs-theme', mode);
     }
     
-    // Update icons if they exist
-    if (lightModeIcon && darkModeIcon) {
+    // Update icons and text if they exist
+    if (lightModeContainer && darkModeContainer) {
         if (mode === 'dark') {
-            lightModeIcon.classList.add('d-none');
-            darkModeIcon.classList.remove('d-none');
+            lightModeContainer.classList.add('d-none');
+            darkModeContainer.classList.remove('d-none');
         } else {
-            lightModeIcon.classList.remove('d-none');
-            darkModeIcon.classList.add('d-none');
+            lightModeContainer.classList.remove('d-none');
+            darkModeContainer.classList.add('d-none');
         }
     }
 }

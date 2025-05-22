@@ -225,8 +225,14 @@
             <!-- Dark Mode Toggle -->
             <li class="nav-item">
               <a class="nav-link dark-mode-toggle" id="darkModeToggle" role="button">
-                <i class="bi bi-sun-fill" id="lightModeIcon"></i>
-                <i class="bi bi-moon-fill d-none" id="darkModeIcon"></i>
+                <span class="d-flex align-items-center">
+                  <i class="bi bi-sun-fill me-1" id="lightModeIcon"></i>
+                  <span id="lightModeText">Light</span>
+                </span>
+                <span class="d-flex align-items-center d-none">
+                  <i class="bi bi-moon-fill me-1" id="darkModeIcon"></i>
+                  <span id="darkModeText">Dark</span>
+                </span>
               </a>
             </li>
             
