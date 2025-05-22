@@ -92,8 +92,19 @@ main {
     padding: 0.25rem;
     display: flex;
     align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 .dark-mode-toggle:hover {
     opacity: 0.8;
+}
+
+/* Ensure nav-link containing dark mode toggle is aligned with other nav links */
+.nav-item .nav-link.dark-mode-toggle {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
 }
