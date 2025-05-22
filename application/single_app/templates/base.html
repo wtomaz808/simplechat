@@ -106,6 +106,19 @@
     }
   </style>
 
+  <!-- Dark mode early initialization to prevent flash -->
+  <script>
+    (function() {
+      // Check localStorage first for fast theme loading to prevent flash
+      var savedTheme = localStorage.getItem('simplechat-theme');
+      
+      if (savedTheme) {
+        // Apply saved theme immediately to html element before page renders
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+      }
+    })();
+  </script>
+  
   {% block head %}{% endblock %}
 </head>
 

@@ -1,5 +1,6 @@
 // Dark mode functionality
 const USER_SETTINGS_KEY_DARK_MODE = 'darkModeEnabled';
+const LOCAL_STORAGE_THEME_KEY = 'simplechat-theme';
 
 // DOM Elements
 const darkModeToggle = document.getElementById('darkModeToggle');
@@ -33,54 +34,64 @@ function toggleDarkMode() {
     const newMode = isDarkMode ? 'light' : 'dark';
     
     // Update the theme
-    htmlRoot.setAttribute('data-bs-theme', newMode);
+    setThemeMode(newMode);
     
-    // Update icons
-    if (newMode === 'dark') {
-        lightModeIcon.classList.add('d-none');
-        darkModeIcon.classList.remove('d-none');
-    } else {
-        lightModeIcon.classList.remove('d-none');
-        darkModeIcon.classList.add('d-none');
-    }
-    
-    // Save the preference
+    // Save the preference to localStorage and API
+    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, newMode);
     saveUserSetting({ [USER_SETTINGS_KEY_DARK_MODE]: newMode === 'dark' });
 }
 
-// Load dark mode preference
-async function loadDarkModePreference() {
-    try {
-        // Get default setting from app settings
-        let isDarkMode = false;
-        
-        // Check if app default is dark mode (set by admin)
-        if (typeof appSettings !== 'undefined' && appSettings.enable_dark_mode_default) {
-            isDarkMode = true;
-        }
-        
-        // Try to load user's personal preference (overrides default)
-        const response = await fetch('/api/user/settings');
-        if (response.ok) {
-            const data = await response.json();
-            const settings = data.settings || {};
-            
-            // If user has a saved preference, use it instead of default
-            if (USER_SETTINGS_KEY_DARK_MODE in settings) {
-                isDarkMode = settings[USER_SETTINGS_KEY_DARK_MODE] === true;
-            }
-        }
-        
-        // Apply the theme
-        htmlRoot.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
-        
-        // Update icons
-        if (isDarkMode) {
+// Apply theme mode and update UI
+function setThemeMode(mode) {
+    // Update the theme attribute
+    if (htmlRoot) {
+        htmlRoot.setAttribute('data-bs-theme', mode);
+    }
+    
+    // Update icons if they exist
+    if (lightModeIcon && darkModeIcon) {
+        if (mode === 'dark') {
             lightModeIcon.classList.add('d-none');
             darkModeIcon.classList.remove('d-none');
         } else {
             lightModeIcon.classList.remove('d-none');
             darkModeIcon.classList.add('d-none');
+        }
+    }
+}
+
+// Load dark mode preference
+async function loadDarkModePreference() {
+    try {
+        // Check for localStorage theme first (already applied in head for fast loading)
+        let localTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
+        
+        // Default from app settings if no localStorage
+        if (!localTheme && typeof appSettings !== 'undefined' && appSettings.enable_dark_mode_default) {
+            localTheme = 'dark';
+        }
+        
+        // Sync with server - which may override localStorage if user has multiple devices
+        const response = await fetch('/api/user/settings');
+        if (response.ok) {
+            const data = await response.json();
+            const settings = data.settings || {};
+            
+            // If user has a saved preference in their account, use it and update localStorage
+            if (USER_SETTINGS_KEY_DARK_MODE in settings) {
+                const serverTheme = settings[USER_SETTINGS_KEY_DARK_MODE] === true ? 'dark' : 'light';
+                
+                // Update localStorage if server setting differs
+                if (!localTheme || serverTheme !== localTheme) {
+                    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, serverTheme);
+                    localTheme = serverTheme;
+                }
+            }
+        }
+        
+        // Apply the theme if we have one from any source (should already be applied, but this ensures UI is consistent)
+        if (localTheme) {
+            setThemeMode(localTheme);
         }
     } catch (error) {
         console.error('Error loading dark mode preference:', error);
@@ -93,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add click event listener to toggle
         darkModeToggle.addEventListener('click', toggleDarkMode);
         
-        // Load user preference
+        // Load user preference (to sync with server)
         loadDarkModePreference();
     }
 });
