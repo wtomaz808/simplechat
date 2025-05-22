@@ -86,6 +86,18 @@ main {
     border-color: #495057 !important;
 }
 
+/* Fix for conversation options button in dark mode */
+[data-bs-theme="dark"] .btn-light {
+    background-color: #343a40 !important;
+    color: #e9ecef !important;
+    border-color: #495057 !important;
+}
+
+[data-bs-theme="dark"] .btn-light:hover {
+    background-color: #495057 !important;
+    border-color: #6c757d !important;
+}
+
 /* Dark mode toggle styles */
 .dark-mode-toggle {
     cursor: pointer;
