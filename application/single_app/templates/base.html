@@ -1,7 +1,7 @@
 <!-- templates/base.html -->
  
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light" id="htmlRoot">
 
 <head>
   <meta charset="UTF-8" />
@@ -209,6 +209,14 @@
   
           {% if session.get('user') and session['user'].get('roles')
              and ('Admin' in session['user']['roles'] or 'User' in session['user']['roles']) %}
+            <!-- Dark Mode Toggle -->
+            <li class="nav-item">
+              <div class="nav-link dark-mode-toggle" id="darkModeToggle" role="button">
+                <i class="bi bi-sun-fill" id="lightModeIcon"></i>
+                <i class="bi bi-moon-fill d-none" id="darkModeIcon"></i>
+              </div>
+            </li>
+            
             <!-- My Account Dropdown -->
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"
@@ -245,7 +253,7 @@
                 {% endif %}
               </ul>
             </li>
-  
+
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('logout') }}">
                 Logout
@@ -284,6 +292,9 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.6/purify.min.js"></script>
 
+  <!-- Dark mode script -->
+  <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
+  
   {% block scripts %}{% endblock %}
 </body>
 

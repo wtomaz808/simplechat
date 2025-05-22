@@ -19,3 +19,48 @@ h1 {
 main {
     padding: 20px;
 }
+
+/* Dark mode styles */
+[data-bs-theme="dark"] {
+    --bs-body-bg: #212529;
+    --bs-body-color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .navbar-light {
+    background-color: #343a40 !important;
+}
+
+[data-bs-theme="dark"] .navbar-light .navbar-brand,
+[data-bs-theme="dark"] .navbar-light .nav-link {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .card {
+    background-color: #343a40;
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .text-muted {
+    color: #adb5bd !important;
+}
+
+[data-bs-theme="dark"] .modal-body::-webkit-scrollbar-track {
+    background: #343a40;
+}
+
+[data-bs-theme="dark"] .modal-content {
+    background-color: #212529;
+    color: #e9ecef;
+}
+
+/* Dark mode toggle styles */
+.dark-mode-toggle {
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.dark-mode-toggle:hover {
+    opacity: 0.8;
+}
