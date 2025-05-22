@@ -76,6 +76,16 @@ main {
     border-color: #495057 !important;
 }
 
+/* Fix for table headers in document classification in dark mode */
+[data-bs-theme="dark"] .table-light,
+[data-bs-theme="dark"] thead.table-light,
+[data-bs-theme="dark"] .table-light>th,
+[data-bs-theme="dark"] .table-light>td {
+    background-color: #343a40 !important;
+    color: #e9ecef !important;
+    border-color: #495057 !important;
+}
+
 /* Dark mode toggle styles */
 .dark-mode-toggle {
     cursor: pointer;
