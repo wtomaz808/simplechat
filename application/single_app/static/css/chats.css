@@ -56,6 +56,16 @@
   border-color: #e9ecef !important; /* Lighter border color */
 }
 
+/* Dark mode overrides for chat UI elements */
+[data-bs-theme="dark"] #left-pane {
+  background-color: #2b3035; /* Darker background for left pane in dark mode */
+}
+
+[data-bs-theme="dark"] #right-pane .border-bottom,
+[data-bs-theme="dark"] #right-pane .border-top {
+  border-color: #495057 !important; /* Darker border color for dark mode */
+}
+
 /* Basic styling for the split layout */
 .split-container {
   display: flex;
@@ -72,13 +82,17 @@
    height: 100%;
    overflow-y: auto;
 }
-/* Styling for the draggable gutter */
+/* Gutter styling */
 .gutter {
   background-color: #ffffff;
   background-repeat: no-repeat;
   background-position: 50%;
   /* position: relative; - Generally not needed unless overlapping */
   flex-shrink: 0; /* Prevent gutter from shrinking */
+}
+
+[data-bs-theme="dark"] .gutter {
+  background-color: #212529; /* Dark background for the gutter in dark mode */
 }
 .gutter.gutter-horizontal {
   background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeAPTBAPAXJmw1AAAAAElFTkSuQmCC');
@@ -195,6 +209,18 @@ body.layout-split .gutter {
   /* Optional: Set default background to white */
 }
 
+[data-bs-theme="dark"] .conversation-item {
+  border-bottom: 1px solid #495057;
+  color: #e9ecef;
+  background-color: #2b3035; /* Dark background */
+}
+
+[data-bs-theme="dark"] .conversation-item:hover,
+[data-bs-theme="dark"] .conversation-item.active {
+  background-color: #343a40; /* Slightly lighter for hover/active state */
+  color: #ffffff; /* Bright text for better contrast */
+}
+
 .citations-container {
   /* background-color: #f0f0f0; Slightly different bg if needed */
   padding: 10px 0 5px 0; /* Padding top/bottom, no horizontal needed */
@@ -296,6 +322,10 @@ body.layout-split .gutter {
   overflow-y: auto;
   flex-grow: 1;
   background-color: #ffffff; /* Optional: light background color for the chat area */
+}
+
+[data-bs-theme="dark"] #chatbox {
+  background-color: #2b3035; /* Darker background for chat area in dark mode */
 }
 
 .chat-container {
@@ -554,6 +584,31 @@ a.citation-link:hover {
   border-radius: 10px;
 }
 
+/* Dark mode message bubbles */
+[data-bs-theme="dark"] .message-bubble {
+  background-color: #343a40; /* Darker for dark mode */
+  color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .user-message .message-bubble {
+  background-color: #0d6efd; /* Darker blue for dark mode */
+  color: #ffffff;
+}
+
+[data-bs-theme="dark"] .ai-message .message-bubble {
+  background-color: #495057; /* Darker grey for AI in dark mode */
+  color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .file-message .message-bubble {
+  background-color: #198754; /* Darker green for dark mode */
+  color: #ffffff;
+}
+
+[data-bs-theme="dark"] .image-message .message-bubble {
+  background-color: #495057;
+}
+
 .message-bubble,
 .message-text {
   /* fall back to normal wrapping for most text */
@@ -810,4 +865,10 @@ ol {
   max-width: 250px;
   border-radius: var(--bs-border-radius);
   margin-bottom: 0;
+}
+
+#classification-banner {
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  z-index: 1050;
 }
