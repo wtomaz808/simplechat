@@ -59,6 +59,23 @@ main {
     color: #e9ecef !important;
 }
 
+/* Fix for group dropdown in dark mode */
+[data-bs-theme="dark"] #group-dropdown .group-search-container {
+    background-color: #343a40 !important;
+    border-bottom: 1px solid #495057 !important;
+}
+
+[data-bs-theme="dark"] #group-dropdown .dropdown-item:hover {
+    background-color: #495057 !important;
+    color: #e9ecef !important;
+}
+
+[data-bs-theme="dark"] #group-dropdown .dropdown-menu {
+    background-color: #343a40 !important;
+    color: #e9ecef !important;
+    border-color: #495057 !important;
+}
+
 /* Dark mode toggle styles */
 .dark-mode-toggle {
     cursor: pointer;
