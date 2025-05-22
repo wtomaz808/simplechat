@@ -159,6 +159,7 @@ def register_route_frontend_admin_settings(app):
                 'custom_logo_base64': settings.get('custom_logo_base64', ''),
                 'logo_version': settings.get('logo_version', 1),
                 'landing_page_text': form_data.get('landing_page_text', ''),
+                'enable_dark_mode_default': form_data.get('enable_dark_mode_default') == 'on',
 
                 # GPT (Direct & APIM)
                 'enable_gpt_apim': form_data.get('enable_gpt_apim') == 'on',
