@@ -1,3 +1,4 @@
+#launchwf
 name: Deploy to Azure Gov App Service
 
 on:
