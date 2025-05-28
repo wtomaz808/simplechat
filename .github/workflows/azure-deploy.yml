@@ -1,4 +1,4 @@
-#launchwf1a
+#1
 name: Deploy to Azure Gov App Service
 
 on:
