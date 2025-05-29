@@ -60,7 +60,7 @@ jobs:
               AZURE_COSMOS_ENDPOINT=${{ secrets.AZURE_COSMOS_ENDPOINT }} \
               AZURE_COSMOS_KEY=${{ secrets.AZURE_COSMOS_KEY }} \
               AZURE_ENVIRONMENT=${{ secrets.AZURE_ENVIRONMENT }} \
-              Client_ID=${{ secrets.CLIENT_ID }} \
+              CLIENT_ID=${{ secrets.CLIENT_ID }} \
               MICROSOFT_PROVIDER_AUTHENTICATION_SECRET=${{ secrets.MICROSOFT_PROVIDER_AUTHENTICATION_SECRET }} \
               SCM_DO_BUILD_DURING_DEPLOYMENT=${{ secrets.SCM_DO_BUILD_DURING_DEPLOYMENT }} \
               SECRET_KEY=${{ secrets.SECRET_KEY }} \
