@@ -1,4 +1,4 @@
-#devslot
+#newappsvc
 name: Deploy to Azure Gov new App Service
 
 on:
