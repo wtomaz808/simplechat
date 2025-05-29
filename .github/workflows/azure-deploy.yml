@@ -50,4 +50,5 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           package: webapp.zip
+          slot-name: ${{ secrets.AZURE_WEBAPP_SLOT_NAME }} # Set this secret to your slot name, e.g., 'staging'
 
