@@ -1,5 +1,5 @@
 #newappsvc
-name: Deploy to Azure Gov new App Service
+name: Deploy to Azure Gov new App Service & plan
 
 on:
   push:
@@ -40,20 +40,34 @@ jobs:
 
       # Optional: run tests here
 
-      # Create Web App if not exists (use existing resource group and app service plan)
+      # Create new resource group in US Gov Arizona
+      - name: Create new Resource Group (US Gov Arizona)
+        run: |
+          az group create --name ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} --location "usgovarizona"
+
+      # Create new App Service Plan (P0v3) in new resource group
+      - name: Create new App Service Plan (P0v3)
+        run: |
+          az appservice plan create \
+            --name ${{ secrets.AZURE_NEW_APP_SERVICE_PLAN }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --sku P0v3 \
+            --is-linux
+
+      # Create Web App if not exists (use new app service plan and resource group)
       - name: Create Web App if not exists
         run: |
           az webapp create \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --plan ${{ secrets.AZURE_APP_SERVICE_PLAN }} \
-            --name ${{ secrets.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --plan ${{ secrets.AZURE_NEW_APP_SERVICE_PLAN }} \
+            --name ${{ secrets.AZURE_NEW_WEBAPP_NAME }} \
             --runtime "PYTHON|3.12" || true
 
       # Set custom environment variables
       - name: Set App Service environment variables
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_WEBAPP_NAME }} \
             --settings \
               AZURE_COSMOS_AUTHENTICATION_TYPE=${{ secrets.AZURE_COSMOS_AUTHENTICATION_TYPE }} \
