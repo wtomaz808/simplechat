@@ -1,5 +1,5 @@
 #devslot
-name: Deploy to Azure Gov App Service
+name: Deploy to Azure Gov new App Service
 
 on:
   push:
