@@ -1,4 +1,4 @@
-#newappsvc
+#1
 name: Deploy to Azure Gov new App Service & plan
 
 on:
