@@ -1,4 +1,4 @@
-#testslot
+#devslot
 name: Deploy to Azure Gov App Service
 
 on:
