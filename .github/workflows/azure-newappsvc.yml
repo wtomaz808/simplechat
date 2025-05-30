@@ -38,16 +38,12 @@ jobs:
           set -e
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      
-
       
       - name: Create new Resource Group (US Gov Arizona)
         run: |
           set -e
           az group create --name ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} --location "usgovarizona"
 
-      
       - name: Create new Cosmos DB Account
         run: |
           set -e
@@ -57,7 +53,6 @@ jobs:
             --locations regionName="USGov Arizona" failoverPriority=0 isZoneRedundant=False \
             --default-consistency-level "Session" \
             --kind GlobalDocumentDB
-
       
       - name: Create new Document Intelligence Resource
         run: |
@@ -69,7 +64,6 @@ jobs:
             --sku S0 \
             --location "usgovarizona" \
             --yes
-
       
       - name: Create new AI Search Resource
         run: |
@@ -79,7 +73,6 @@ jobs:
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --location "usgovarizona" \
             --sku basic
-
       
       - name: Create new Storage Account
         run: |
@@ -90,7 +83,6 @@ jobs:
             --location "usgovarizona" \
             --sku Standard_LRS \
             --kind StorageV2
-
       
       - name: Create new App Service Plan (P0v3)
         run: |
@@ -101,7 +93,6 @@ jobs:
             --sku P0v3 \
             --is-linux
 
-      
       - name: Create Web App if not exists
         run: |
           set -e
@@ -110,7 +101,6 @@ jobs:
             --plan ${{ secrets.AZURE_NEW_APP_SERVICE_PLAN }} \
             --name ${{ secrets.AZURE_NEW_WEBAPP_NAME }} \
             --runtime "PYTHON|3.12" || true
-
       
       - name: Set App Service environment variables
         run: |
