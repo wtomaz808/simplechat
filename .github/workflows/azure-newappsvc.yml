@@ -1,4 +1,4 @@
-name: Deploy to Azure Gov SC Inra & Code
+name: Deploy to Azure Gov SC Inra & Code #test 
 
 on:
   push:
