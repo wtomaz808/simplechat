@@ -39,15 +39,15 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # Optional: run tests here
+      
 
-      # Create new resource group in US Gov Arizona
+      
       - name: Create new Resource Group (US Gov Arizona)
         run: |
           set -e
           az group create --name ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} --location "usgovarizona"
 
-      # Create new Cosmos DB account
+      
       - name: Create new Cosmos DB Account
         run: |
           set -e
@@ -58,7 +58,7 @@ jobs:
             --default-consistency-level "Session" \
             --kind GlobalDocumentDB
 
-      # Create new Document Intelligence (Form Recognizer) resource
+      
       - name: Create new Document Intelligence Resource
         run: |
           set -e
@@ -70,7 +70,7 @@ jobs:
             --location "usgovarizona" \
             --yes
 
-      # Create new AI Search resource
+      
       - name: Create new AI Search Resource
         run: |
           set -e
@@ -80,7 +80,7 @@ jobs:
             --location "usgovarizona" \
             --sku basic
 
-      # Create new Storage Account
+      
       - name: Create new Storage Account
         run: |
           set -e
@@ -91,7 +91,7 @@ jobs:
             --sku Standard_LRS \
             --kind StorageV2
 
-      # Create new App Service Plan (P0v3) in new resource group
+      
       - name: Create new App Service Plan (P0v3)
         run: |
           set -e
@@ -101,7 +101,7 @@ jobs:
             --sku P0v3 \
             --is-linux
 
-      # Create Web App if not exists (use new app service plan and resource group)
+      
       - name: Create Web App if not exists
         run: |
           set -e
@@ -111,7 +111,7 @@ jobs:
             --name ${{ secrets.AZURE_NEW_WEBAPP_NAME }} \
             --runtime "PYTHON|3.12" || true
 
-      # Set custom environment variables
+      
       - name: Set App Service environment variables
         run: |
           set -e
