@@ -1,4 +1,4 @@
-name: Deploy to Azure Gov SC Inra & Code #test 
+name: Deploy to Azure Gov SC Inra & Code #1
 
 on:
   push:
@@ -52,6 +52,26 @@ jobs:
             --locations regionName="USGov Arizona" failoverPriority=0 isZoneRedundant=False \
             --default-consistency-level "Session" \
             --kind GlobalDocumentDB
+
+      - name: Create Cosmos DB SQL Database
+        run: |
+          set -e
+          az cosmosdb sql database create \
+            --account-name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_NEW_COSMOSDB_DATABASE }}
+
+      - name: Create Cosmos DB Containers
+        run: |
+          set -e
+          for container in message settings groups group_prompt feedback archived_messages group_documents user_settings conversations documents file_processing archived_conversations safety; do
+            az cosmosdb sql container create \
+              --account-name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
+              --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+              --database-name ${{ secrets.AZURE_NEW_COSMOSDB_DATABASE }} \
+              --name $container \
+              --partition-key-path "/id"
+          done
 
       - name: Create new Document Intelligence Resource
         run: |
