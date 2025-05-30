@@ -35,6 +35,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./application/single_app
         run: |
+          set -e
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
@@ -43,11 +44,13 @@ jobs:
       # Create new resource group in US Gov Arizona
       - name: Create new Resource Group (US Gov Arizona)
         run: |
+          set -e
           az group create --name ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} --location "usgovarizona"
 
       # Create new Cosmos DB account
       - name: Create new Cosmos DB Account
         run: |
+          set -e
           az cosmosdb create \
             --name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
@@ -58,6 +61,7 @@ jobs:
       # Create new Document Intelligence (Form Recognizer) resource
       - name: Create new Document Intelligence Resource
         run: |
+          set -e
           az cognitiveservices account create \
             --name ${{ secrets.AZURE_NEW_FORMRECOGNIZER_NAME }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
@@ -69,6 +73,7 @@ jobs:
       # Create new AI Search resource
       - name: Create new AI Search Resource
         run: |
+          set -e
           az search service create \
             --name ${{ secrets.AZURE_NEW_SEARCH_NAME }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
@@ -78,6 +83,7 @@ jobs:
       # Create new Storage Account
       - name: Create new Storage Account
         run: |
+          set -e
           az storage account create \
             --name ${{ secrets.AZURE_NEW_STORAGE_ACCOUNT }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
@@ -88,6 +94,7 @@ jobs:
       # Create new App Service Plan (P0v3) in new resource group
       - name: Create new App Service Plan (P0v3)
         run: |
+          set -e
           az appservice plan create \
             --name ${{ secrets.AZURE_NEW_APP_SERVICE_PLAN }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
@@ -97,6 +104,7 @@ jobs:
       # Create Web App if not exists (use new app service plan and resource group)
       - name: Create Web App if not exists
         run: |
+          set -e
           az webapp create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --plan ${{ secrets.AZURE_NEW_APP_SERVICE_PLAN }} \
@@ -106,6 +114,7 @@ jobs:
       # Set custom environment variables
       - name: Set App Service environment variables
         run: |
+          set -e
           az webapp config appsettings set \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_WEBAPP_NAME }} \
