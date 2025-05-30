@@ -45,6 +45,46 @@ jobs:
         run: |
           az group create --name ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} --location "usgovarizona"
 
+      # Create new Cosmos DB account
+      - name: Create new Cosmos DB Account
+        run: |
+          az cosmosdb create \
+            --name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --locations regionName="USGov Arizona" failoverPriority=0 isZoneRedundant=False \
+            --default-consistency-level "Session" \
+            --kind GlobalDocumentDB
+
+      # Create new Document Intelligence (Form Recognizer) resource
+      - name: Create new Document Intelligence Resource
+        run: |
+          az cognitiveservices account create \
+            --name ${{ secrets.AZURE_NEW_FORMRECOGNIZER_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --kind FormRecognizer \
+            --sku S0 \
+            --location "usgovarizona" \
+            --yes
+
+      # Create new AI Search resource
+      - name: Create new AI Search Resource
+        run: |
+          az search service create \
+            --name ${{ secrets.AZURE_NEW_SEARCH_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --location "usgovarizona" \
+            --sku basic
+
+      # Create new Storage Account
+      - name: Create new Storage Account
+        run: |
+          az storage account create \
+            --name ${{ secrets.AZURE_NEW_STORAGE_ACCOUNT }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --location "usgovarizona" \
+            --sku Standard_LRS \
+            --kind StorageV2
+
       # Create new App Service Plan (P0v3) in new resource group
       - name: Create new App Service Plan (P0v3)
         run: |
