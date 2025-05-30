@@ -57,7 +57,7 @@ jobs:
         run: |
           set -e
           az cognitiveservices account create \
-            --name ${{ secrets.AZURE_NEW_FORMRECOGNIZER_NAME }} \
+            --name ${{ secrets.AZURE_NEW_DOCINTEL_NAME }} \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --kind FormRecognizer \
             --sku S0 \
