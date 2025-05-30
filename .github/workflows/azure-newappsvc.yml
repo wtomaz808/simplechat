@@ -89,6 +89,6 @@ jobs:
       - name: Deploy .zip to Azure Gov App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_NEW_WEBAPP_NAME }}
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           package: webapp.zip
 
