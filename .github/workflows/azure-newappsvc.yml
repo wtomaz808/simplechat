@@ -1,5 +1,5 @@
-#1
 name: Deploy to Azure Gov new App Service & plan
+#1 
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
         run: |
           az webapp config appsettings set \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
-            --name ${{ secrets.AZURE_WEBAPP_NAME }} \
+            --name ${{ secrets.AZURE_NEW_WEBAPP_NAME }} \
             --settings \
               AZURE_COSMOS_AUTHENTICATION_TYPE=${{ secrets.AZURE_COSMOS_AUTHENTICATION_TYPE }} \
               AZURE_COSMOS_ENDPOINT=${{ secrets.AZURE_COSMOS_ENDPOINT }} \
