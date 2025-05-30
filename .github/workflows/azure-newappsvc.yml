@@ -1,5 +1,5 @@
 name: Deploy to Azure Gov new App Service & plan
-#3
+#1
 
 on:
   push:
