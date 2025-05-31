@@ -171,7 +171,8 @@ jobs:
             --model-name gpt-4o \
             --model-version "2024-05-13" \
             --sku Standard \
-            --model-format OpenAI
+            --model-format OpenAI \
+            --capacity 1
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
@@ -179,7 +180,8 @@ jobs:
             --model-name gpt-4o-mini \
             --model-version "2024-05-13" \
             --sku Standard \
-            --model-format OpenAI
+            --model-format OpenAI \
+            --capacity 1
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
@@ -187,7 +189,8 @@ jobs:
             --model-name text-embedding-ada-002 \
             --model-version "2" \
             --sku Standard \
-            --model-format OpenAI
+            --model-format OpenAI \
+            --capacity 1
 
       - name: Output Cosmos DB and OpenAI endpoint and key to file
         run: |
