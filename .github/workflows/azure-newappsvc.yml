@@ -169,8 +169,8 @@ jobs:
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
-            --deployment-name gpt-4 \
-            --model-name gpt-4 \
+            --deployment-name gpt-4o \
+            --model-name gpt-4o \
             --model-version "2024-05-13" \
             --sku Standard \
             --model-format OpenAI \
