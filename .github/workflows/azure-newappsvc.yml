@@ -172,7 +172,7 @@ jobs:
             --model-version "2024-05-13" \
             --sku Standard \
             --model-format OpenAI \
-            --scale-settings scaleType=Standard
+            --scale-settings-scale-type Standard
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
@@ -181,7 +181,7 @@ jobs:
             --model-version "2024-05-13" \
             --sku Standard \
             --model-format OpenAI \
-            --scale-settings scaleType=Standard
+            --scale-settings-scale-type Standard
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
@@ -190,7 +190,7 @@ jobs:
             --model-version "2" \
             --sku Standard \
             --model-format OpenAI \
-            --scale-settings scaleType=Standard
+            --scale-settings-scale-type Standard
 
       - name: Output Cosmos DB and OpenAI endpoint and key to file
         run: |
