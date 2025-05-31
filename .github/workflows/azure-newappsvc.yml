@@ -53,7 +53,7 @@ jobs:
             --default-consistency-level "Session" \
             --kind GlobalDocumentDB
 
-      - name: Create Cosmos DB SQL Database
+      - name: Create new Cosmos DB SQL Database
         run: |
           set -e
           az cosmosdb sql database create \
@@ -149,4 +149,77 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_NEW_WEBAPP_NAME }}
           package: webapp.zip
+
+      - name: Create Azure OpenAI Resource
+        run: |
+          set -e
+          az cognitiveservices account create \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --kind OpenAI \
+            --sku S0 \
+            --location "usgovarizona" \
+            --yes
+
+      - name: Deploy OpenAI Models
+        run: |
+          set -e
+          az cognitiveservices account deployment create \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --deployment-name gpt-4o \
+            --model-name gpt-4o \
+            --model-version "2024-05-13" \
+            --sku Standard \
+            --model-format OpenAI \
+            --scale-settings scaleType=Standard
+          az cognitiveservices account deployment create \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --deployment-name gpt-4o-mini \
+            --model-name gpt-4o-mini \
+            --model-version "2024-05-13" \
+            --sku Standard \
+            --model-format OpenAI \
+            --scale-settings scaleType=Standard
+          az cognitiveservices account deployment create \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --deployment-name text-embedding-ada-002 \
+            --model-name text-embedding-ada-002 \
+            --model-version "2" \
+            --sku Standard \
+            --model-format OpenAI \
+            --scale-settings scaleType=Standard
+
+      - name: Output Cosmos DB and OpenAI endpoint and key to file
+        run: |
+          set -e
+          COSMOS_ENDPOINT=$(az cosmosdb show \
+            --name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --query "documentEndpoint" -o tsv)
+          COSMOS_KEY=$(az cosmosdb keys list \
+            --name ${{ secrets.AZURE_NEW_COSMOSDB_ACCOUNT }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --query "primaryMasterKey" -o tsv)
+          OPENAI_ENDPOINT=$(az cognitiveservices account show \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --query "properties.endpoint" -o tsv)
+          OPENAI_KEY=$(az cognitiveservices account keys list \
+            --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
+            --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
+            --query "key1" -o tsv)
+          echo "COSMOS_ENDPOINT=$COSMOS_ENDPOINT" > resource_output.env
+          echo "COSMOS_KEY=$COSMOS_KEY" >> resource_output.env
+          echo "OPENAI_ENDPOINT=$OPENAI_ENDPOINT" >> resource_output.env
+          echo "OPENAI_KEY=$OPENAI_KEY" >> resource_output.env
+          cat resource_output.env
+
+      - name: Upload Cosmos output as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-output
+          path: resource_output.env
 
