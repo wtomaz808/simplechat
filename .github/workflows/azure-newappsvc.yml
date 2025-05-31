@@ -164,11 +164,13 @@ jobs:
       - name: Deploy OpenAI Models
         run: |
           set -e
+          # GPT-4o is not available in Azure Gov as of mid-2024. Use supported models for Azure Gov region.
+          # Example: GPT-4, GPT-35-Turbo, text-embedding-ada-002
           az cognitiveservices account deployment create \
             --resource-group ${{ secrets.AZURE_NEW_RESOURCE_GROUP }} \
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
-            --deployment-name gpt-4o \
-            --model-name gpt-4o \
+            --deployment-name gpt-4 \
+            --model-name gpt-4 \
             --model-version "2024-05-13" \
             --sku Standard \
             --model-format OpenAI \
@@ -178,7 +180,7 @@ jobs:
             --name ${{ secrets.AZURE_NEW_OPENAI_NAME }} \
             --deployment-name gpt-4o-mini \
             --model-name gpt-4o-mini \
-            --model-version "2024-05-13" \
+            --model-version "2024-07-18" \
             --sku Standard \
             --model-format OpenAI \
             --capacity 1
